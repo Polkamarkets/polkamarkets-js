@@ -1,0 +1,9 @@
+{
+  "name": "polkamarkets-js",
+  "version": "1.0.0",
+  "description": "Polkamarkets Javascript SDK",
+  "main": "index.js",
+  "repository": "https://github.com/Polkamarkets/polkamarkets-js",
+  "author": "Ricardo Marques <ricardo.ds.marques@gmail.com>",
+  "license": "MIT"
+}
