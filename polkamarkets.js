@@ -1,25 +1,19 @@
 import * as realitioLib from '@reality.eth/reality-eth-lib/formatters/question';
 import * as beprojs from 'bepro-js';
-
 export default class Polkamarkets {
-  // local vars
-
-  // bepro app
-  // public bepro: any;
-
-  // bepro smart contract instances
-  // public contracts: any = {};
-
-  // indicates if user has already done a successful metamask login
-  // public loggedIn: boolean = false;
-
-  // user eth address
-  // public address: string = '';
-
-  // util functions
   constructor(web3Provider, web3EventsProvider = null) {
+    // bepro app
     this.bepro = new beprojs.Application({ web3Provider, web3EventsProvider });
     this.bepro.start();
+
+    // bepro smart contract instances
+    this.contracts = {};
+
+    // indicates if user has already done a successful metamask login
+    this.loggedIn = false;
+
+    // user eth address
+    this.address = '';
   }
 
   getPredictionMarketContract(contractAddress) {
