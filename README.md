@@ -75,7 +75,7 @@ await polkamarkets.buy(marketId, outcomeId, ethAmount, minOutcomeSharesToBuy);
 
 // Selling Outcome Shares
 const maxOutcomeSharesToSell = await polkamarkets.calcSellAmount(marketId, outcomeId, ethAmount)
-await polkamarkets.buy(marketId, outcomeId, ethAmount, maxOutcomeSharesToSell);
+await polkamarkets.sell(marketId, outcomeId, ethAmount, maxOutcomeSharesToSell);
 
 // Claiming Winnings
 await polkamarkets.claimWinnings(marketId);
