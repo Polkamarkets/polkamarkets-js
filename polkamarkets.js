@@ -1,5 +1,6 @@
 import * as realitioLib from '@reality.eth/reality-eth-lib/formatters/question';
 import * as beprojs from 'bepro-js';
+
 export default class Polkamarkets {
   constructor(web3Provider, web3EventsProvider = null) {
     // bepro app
@@ -26,6 +27,19 @@ export default class Polkamarkets {
 
   getRealitioERC20Contract(contractAddress) {
     this.contracts.realitio = this.bepro.getRealitioERC20Contract({ contractAddress });
+  }
+
+  getContracts() {
+    // re-fetching contracts
+    if (this.contracts.pm && this.contracts.pm.params.contractAddress) {
+      this.getPredictionMarketContract(this.contracts.pm.params.contractAddress);
+    }
+    if (this.contracts.realitio && this.contracts.realitio.params.contractAddress) {
+      this.getRealitioERC20Contract(this.contracts.realitio.params.contractAddress);
+    }
+    if (this.contracts.erc20 && this.contracts.erc20.params.contractAddress) {
+      this.getERC20Contract(this.contracts.erc20.params.contractAddress);
+    }
   }
 
   // returns wether wallet is connected to service or not

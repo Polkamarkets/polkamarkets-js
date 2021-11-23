@@ -1,6 +1,6 @@
 {
   "name": "polkamarkets-js",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Polkamarkets Javascript SDK",
   "engines": {
     "node": "^14.15.0"
