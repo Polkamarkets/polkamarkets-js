@@ -1,6 +1,6 @@
 {
-    "name": "bepro-js",
-    "version": "1.1.7",
+    "name": "polkamarkets-js",
+    "version": "1.2.1",
     "description": "",
     "main": "index.js",
     "directories": {
@@ -8,7 +8,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/betprotocol/bepro-js.git"
+        "url": "https://github.com/Polkamarkets/polkamarkets-js.git"
     },
     "scripts": {
         "test": "truffle compile && ./node_modules/.bin/mocha ./tests/index.js --timeout 3000000 --require babel-core/register --require babel-polyfill --exit",
