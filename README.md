@@ -1,44 +1,44 @@
-# ![alt tag](https://uploads-ssl.webflow.com/5fc917a7914bf7aa30cae033/5ff4e84c73f45881c8b9cd85_Logo-purple-dark-background-p-500.png)
+# ![alt tag](https://uploads-ssl.webflow.com/6001b8a9fb88852f468bf865/600f55bddbe2354c1e36e200_Dark.svg)
 
 ## Introductions
 
-`bepro-js#feature/prediction-markets` is the BEPRO Javascript SDK to integrate Prediction Markets into any dapp.
+`polkamarkets-js` is the Polkamarkets' Javascript SDK to integrate Prediction Markets into any dapp.
 
 ## Installation
 
 Using [npm](https://www.npmjs.com/):
 
 ```bash
-npm install "https://github.com/bepronetwork/bepro-js.git#feature/prediction-markets" --save
+npm install "https://github.com/Polkamarkets/polkamarkets-js" --save
 ```
 
 Using [yarn](https://yarnpkg.com/):
 
 ```bash
-yarn add https://github.com/bepronetwork/bepro-js.git#feature/prediction-markets
+yarn add https://github.com/Polkamarkets/polkamarkets-js
 ```
 
 ## Usage
 
 ### Initializing App
 
-`bepro-js` library initialization is performed in [`Application.js`](https://github.com/bepronetwork/bepro-js/blob/feature/prediction-markets/src/Application.js).
+`polkamarkets-js` library initialization is performed in [`Application.js`](https://github.com/Polkamarkets/polkamarkets-js/blob/main/src/Application.js).
 
 You'll need to provide a web3 RPC provider (e.g., Infura for Ethereum dapps)
 
 ```javascript
-import * as beprojs from 'bepro-js';
+import * as polkamarketsjs from 'polkamarkets-js';
 
 // Moonriver RPC
 const web3Provider = 'https://rpc.moonriver.moonbeam.network';
 
-const bepro = new beprojs.Application({ web3Provider });
+const polkamarkets = new polkamarketsjs.Application({ web3Provider });
 
 // Starting application
-bepro.start();
+polkamarkets.start();
 
 // Connecting wallet
-await bepro.login();
+await polkamarkets.login();
 ```
 
 ### Prediction Markets
@@ -47,13 +47,13 @@ Once the library is initialized, it's ready to interact with prediction markets 
 
 ```javascript
 const contractAddress = '0xDcBe79f74c98368141798eA0b7b979B9bA54b026';
-const contract = bepro.getPredictionMarketContract({ contractAddress });
+const contract = polkamarkets.getPredictionMarketContract({ contractAddress });
 ```
 
 Once initialized, you'll be able to interact with the smart contract.
 
-- Prediction Market Smart Contract: [PredictionMarket.sol](https://github.com/bepronetwork/bepro-js/blob/feature/prediction-markets/contracts/PredictionMarket.sol)
-- Prediction Market JS Integration: [PredictionMarketContract.js](https://github.com/bepronetwork/bepro-js/blob/feature/prediction-markets/src/models/PredictionMarketContract.js)
+- Prediction Market Smart Contract: [PredictionMarket.sol](https://github.com/Polkamarkets/polkamarkets-js/blob/main/contracts/PredictionMarket.sol)
+- Prediction Market JS Integration: [PredictionMarketContract.js](https://github.com/Polkamarkets/polkamarkets-js/blob/main/src/models/PredictionMarketContract.js)
 
 Here's a few call examples
 
@@ -95,4 +95,4 @@ Contributions are welcomed but we ask to red existing code guidelines, specially
 
 The usage of ETH in all methods or params means using the native currency of that blockchain, example BSC in Binance Chain would still be nominated as ETH
 
-[1]: https://github.com/bepronetwork/bepro-js/blob/master/CONTRIBUTING.md
+[1]: https://github.com/Polkamarkets/polkamarkets-js/blob/main/CONTRIBUTING.md
