@@ -118,7 +118,7 @@ contract PredictionMarket {
   address public realitioAddress;
   uint256 public realitioTimeout;
   // market creation
-  IERC20 public token; // token used for rewards / market creation
+  IERC20 public requiredBalanceToken; // token used for rewards / market creation
   uint256 public requiredBalance; // required balance for market creation
 
   // ------ Modifiers ------
@@ -151,7 +151,7 @@ contract PredictionMarket {
   }
 
   modifier mustHoldRequiredBalance() {
-    require(token.balanceOf(msg.sender) >= requiredBalance, "msg.sender must hold minimum erc20 balance");
+    require(requiredBalance == 0 || requiredBalanceToken.balanceOf(msg.sender) >= requiredBalance, "msg.sender must hold minimum erc20 balance");
     _;
   }
 
@@ -160,7 +160,7 @@ contract PredictionMarket {
   /// @dev protocol is immutable and has no ownership
   constructor(
     uint256 _fee,
-    IERC20 _token,
+    IERC20 _requiredBalanceToken,
     uint256 _requiredBalance,
     address _realitioAddress,
     uint256 _realitioTimeout
@@ -169,7 +169,7 @@ contract PredictionMarket {
     require(_realitioTimeout > 0, "timeout must be positive");
 
     fee = _fee;
-    token = _token;
+    requiredBalanceToken = _requiredBalanceToken;
     requiredBalance = _requiredBalance;
     realitioAddress = _realitioAddress;
     realitioTimeout = _realitioTimeout;
