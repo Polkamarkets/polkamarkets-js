@@ -80,6 +80,7 @@ contract PredictionMarket {
     // market outcomes
     uint256[] outcomeIds;
     mapping(uint256 => MarketOutcome) outcomes;
+    IERC20 token; // ERC20 token market will use for trading
   }
 
   struct MarketFees {
@@ -179,23 +180,26 @@ contract PredictionMarket {
 
   /// @dev Creates a market, initializes the outcome shares pool and submits a question in Realitio
   function createMarket(
+    uint256 value,
     string calldata question,
     string calldata image,
     uint256 closesAt,
     address arbitrator,
-    uint256 outcomes
-  ) external payable mustHoldRequiredBalance returns (uint256) {
+    uint256 outcomes,
+    IERC20 token
+  ) external mustHoldRequiredBalance returns (uint256) {
     uint256 marketId = marketIndex;
     marketIds.push(marketId);
 
     Market storage market = markets[marketId];
 
-    require(msg.value > 0, "stake needs to be > 0");
+    require(value > 0, "stake needs to be > 0");
     require(closesAt > now, "market must resolve after the current date");
     require(arbitrator != address(0), "invalid arbitrator address");
     // v1 - only binary markets
     require(outcomes == 2, "number of outcomes has to be 2");
 
+    market.token = token;
     market.closesAtTimestamp = closesAt;
     market.state = MarketState.open;
     market.fees.value = fee;
@@ -224,7 +228,7 @@ contract PredictionMarket {
       0
     );
 
-    addLiquidity(marketId, msg.value);
+    addLiquidity(marketId, value);
 
     // emiting initial price events
     emitMarketOutcomePriceEvents(marketId);
@@ -286,11 +290,11 @@ contract PredictionMarket {
   function buy(
     uint256 marketId,
     uint256 outcomeId,
-    uint256 minOutcomeSharesToBuy
-  ) external payable timeTransitions(marketId) atState(marketId, MarketState.open) {
+    uint256 minOutcomeSharesToBuy,
+    uint256 value
+  ) external timeTransitions(marketId) atState(marketId, MarketState.open) {
     Market storage market = markets[marketId];
 
-    uint256 value = msg.value;
     uint256 shares = calcBuyAmount(value, marketId, outcomeId);
     require(shares >= minOutcomeSharesToBuy, "minimum buy amount not reached");
     require(shares > 0, "shares amount is 0");
@@ -309,6 +313,8 @@ contract PredictionMarket {
 
     transferOutcomeSharesfromPool(msg.sender, marketId, outcomeId, shares);
 
+    require(market.token.transferFrom(msg.sender, address(this), value), "erc20 transfer failed");
+
     emit MarketActionTx(msg.sender, MarketAction.buy, marketId, outcomeId, shares, value, now);
     emitMarketOutcomePriceEvents(marketId);
   }
@@ -319,7 +325,7 @@ contract PredictionMarket {
     uint256 outcomeId,
     uint256 value,
     uint256 maxOutcomeSharesToSell
-  ) external payable timeTransitions(marketId) atState(marketId, MarketState.open) {
+  ) external timeTransitions(marketId) atState(marketId, MarketState.open) {
     Market storage market = markets[marketId];
     MarketOutcome storage outcome = market.outcomes[outcomeId];
 
@@ -342,25 +348,15 @@ contract PredictionMarket {
     removeSharesFromMarket(marketId, valuePlusFees);
 
     // Transferring funds to user
-    msg.sender.transfer(value);
+    require(market.token.transferFrom(address(this), msg.sender, value), "erc20 transfer failed");
 
     emit MarketActionTx(msg.sender, MarketAction.sell, marketId, outcomeId, shares, value, now);
     emitMarketOutcomePriceEvents(marketId);
   }
 
   /// @dev Adds liquidity to a market - external
-  function addLiquidity(uint256 marketId)
-    external
-    payable
-    timeTransitions(marketId)
-    atState(marketId, MarketState.open)
-  {
-    addLiquidity(marketId, msg.value);
-  }
-
-  /// @dev Private function, used by addLiquidity and CreateMarket
   function addLiquidity(uint256 marketId, uint256 value)
-    private
+    public
     timeTransitions(marketId)
     atState(marketId, MarketState.open)
   {
@@ -421,6 +417,9 @@ contract PredictionMarket {
 
     uint256 liquidityPrice = getMarketLiquidityPrice(marketId);
     uint256 liquidityValue = liquidityPrice.mul(liquidityAmount) / ONE;
+
+    require(market.token.transferFrom(msg.sender, address(this), value), "erc20 transfer failed");
+
     emit MarketActionTx(msg.sender, MarketAction.addLiquidity, marketId, 0, liquidityAmount, liquidityValue, now);
     emit MarketLiquidity(marketId, market.liquidity, liquidityPrice, now);
   }
@@ -428,7 +427,6 @@ contract PredictionMarket {
   /// @dev Removes liquidity to a market - external
   function removeLiquidity(uint256 marketId, uint256 shares)
     external
-    payable
     timeTransitions(marketId)
     atState(marketId, MarketState.open)
   {
@@ -483,7 +481,7 @@ contract PredictionMarket {
     }
 
     // transferring user funds from liquidity removed
-    msg.sender.transfer(liquidityAmount);
+    require(market.token.transferFrom(address(this), msg.sender, liquidityAmount), "erc20 transfer failed");
 
     emit MarketActionTx(msg.sender, MarketAction.removeLiquidity, marketId, 0, shares, liquidityAmount, now);
     emit MarketLiquidity(marketId, market.liquidity, getMarketLiquidityPrice(marketId), now);
@@ -538,7 +536,7 @@ contract PredictionMarket {
       now
     );
 
-    msg.sender.transfer(value);
+    require(market.token.transferFrom(address(this), msg.sender, value), "erc20 transfer failed");
   }
 
   /// @dev Allows holders of voided outcome shares to claim balance back.
@@ -572,7 +570,7 @@ contract PredictionMarket {
       now
     );
 
-    msg.sender.transfer(value);
+    require(market.token.transferFrom(address(this), msg.sender, value), "erc20 transfer failed");
   }
 
   /// @dev Allows liquidity providers to claim earnings from liquidity providing.
@@ -605,18 +603,18 @@ contract PredictionMarket {
       now
     );
 
-    msg.sender.transfer(value);
+    require(market.token.transferFrom(address(this), msg.sender, value), "erc20 transfer failed");
   }
 
   /// @dev Allows liquidity providers to claim their fees share from fees pool
-  function claimFees(uint256 marketId) public payable {
+  function claimFees(uint256 marketId) public {
     Market storage market = markets[marketId];
 
     uint256 claimableFees = getUserClaimableFees(marketId, msg.sender);
 
     if (claimableFees > 0) {
       market.fees.claimed[msg.sender] = market.fees.claimed[msg.sender].add(claimableFees);
-      msg.sender.transfer(claimableFees);
+      require(market.token.transferFrom(address(this), msg.sender, claimableFees), "erc20 transfer failed");
     }
 
     emit MarketActionTx(
