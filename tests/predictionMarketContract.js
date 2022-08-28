@@ -22,8 +22,8 @@ context('Prediction Market Contract', async () => {
   context('Contract Deployment', async () => {
     it('should start the Application', mochaAsync(async () => {
       app = new Application({
-        web3Provider: 'https://kovan.infura.io/v3/5a3e570fd7e544779cf240da53d0d908',
-        web3PrivateKey: '0x2e0bf3d13116fbb5b323c8969f61cb9710da3d6df66ceff81a962e57b3701905'
+        web3Provider: process.env.WEB3_PROVIDER,
+        web3PrivateKey: process.env.WEB3_PRIVATE_KEY
       });
       expect(app).to.not.equal(null);
     }));
@@ -69,11 +69,11 @@ context('Prediction Market Contract', async () => {
     it('should create a Market', mochaAsync(async () => {
       try {
         const res = await predictionMarketContract.createMarket({
-          name: 'Will BTC price close above 100k$ on May 1st 2022',
+          name: 'Will BTC price close above 100k$ on May 1st 2024',
           image: 'foo-bar',
           category: 'Foo;Bar',
           oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-          duration: moment('2022-05-01').unix(),
+          duration: moment('2024-05-01').unix(),
           outcomes: ['Yes', 'No'],
           ethAmount: ethAmount
         });
@@ -90,11 +90,11 @@ context('Prediction Market Contract', async () => {
 
     it('should create another Market', mochaAsync(async () => {
       const res = await predictionMarketContract.createMarket({
-        name: 'Will ETH price close above 10k$ on May 1st 2022',
+        name: 'Will ETH price close above 10k$ on May 1st 2024',
         image: 'foo-bar',
         category: 'Foo;Bar',
         oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-        duration: moment('2022-05-01').unix(),
+        duration: moment('2024-05-01').unix(),
         outcomes: ['Yes', 'No'],
         ethAmount: 0.001
       });
@@ -110,7 +110,7 @@ context('Prediction Market Contract', async () => {
       const res = await predictionMarketContract.getMarketData({marketId: 0});
       expect(res).to.eql({
         name: '',
-        closeDateTime: '2022-05-01 00:00',
+        closeDateTime: '2024-05-01 00:00',
         state: 0,
         oracleAddress: '0x0000000000000000000000000000000000000000',
         liquidity: 0.01,
@@ -121,7 +121,7 @@ context('Prediction Market Contract', async () => {
     it('should get Market details', mochaAsync(async () => {
       const res = await predictionMarketContract.getMarketDetails({marketId: 0});
       expect(res).to.eql({
-        name: 'Will BTC price close above 100k$ on May 1st 2022',
+        name: 'Will BTC price close above 100k$ on May 1st 2024',
         category: 'Foo',
         subcategory: 'Bar',
         outcomes: ['Yes', 'No'],
