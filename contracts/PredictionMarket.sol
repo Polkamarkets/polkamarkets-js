@@ -348,7 +348,7 @@ contract PredictionMarket {
     removeSharesFromMarket(marketId, valuePlusFees);
 
     // Transferring funds to user
-    require(market.token.transferFrom(address(this), msg.sender, value), "erc20 transfer failed");
+    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
 
     emit MarketActionTx(msg.sender, MarketAction.sell, marketId, outcomeId, shares, value, now);
     emitMarketOutcomePriceEvents(marketId);
@@ -481,7 +481,7 @@ contract PredictionMarket {
     }
 
     // transferring user funds from liquidity removed
-    require(market.token.transferFrom(address(this), msg.sender, liquidityAmount), "erc20 transfer failed");
+    require(market.token.transfer(msg.sender, liquidityAmount), "erc20 transfer failed");
 
     emit MarketActionTx(msg.sender, MarketAction.removeLiquidity, marketId, 0, shares, liquidityAmount, now);
     emit MarketLiquidity(marketId, market.liquidity, getMarketLiquidityPrice(marketId), now);
@@ -536,7 +536,7 @@ contract PredictionMarket {
       now
     );
 
-    require(market.token.transferFrom(address(this), msg.sender, value), "erc20 transfer failed");
+    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
   }
 
   /// @dev Allows holders of voided outcome shares to claim balance back.
@@ -570,7 +570,7 @@ contract PredictionMarket {
       now
     );
 
-    require(market.token.transferFrom(address(this), msg.sender, value), "erc20 transfer failed");
+    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
   }
 
   /// @dev Allows liquidity providers to claim earnings from liquidity providing.
@@ -603,7 +603,7 @@ contract PredictionMarket {
       now
     );
 
-    require(market.token.transferFrom(address(this), msg.sender, value), "erc20 transfer failed");
+    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
   }
 
   /// @dev Allows liquidity providers to claim their fees share from fees pool
@@ -614,7 +614,7 @@ contract PredictionMarket {
 
     if (claimableFees > 0) {
       market.fees.claimed[msg.sender] = market.fees.claimed[msg.sender].add(claimableFees);
-      require(market.token.transferFrom(address(this), msg.sender, claimableFees), "erc20 transfer failed");
+      require(market.token.transfer(msg.sender, claimableFees), "erc20 transfer failed");
     }
 
     emit MarketActionTx(
