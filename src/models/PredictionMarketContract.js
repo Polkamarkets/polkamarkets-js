@@ -414,7 +414,7 @@ class PredictionMarketContract extends IContract {
    * @param {Array} outcomes
    */
   async createMarket ({value, name, image, duration, oracleAddress, outcomes, category, token}) {
-    let valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
     const question = realitioLib.encodeText('single-select', name, outcomes, category);
 
     return await this.__sendTx(
@@ -437,7 +437,7 @@ class PredictionMarketContract extends IContract {
    * @param {Integer} value
    */
   async addLiquidity({marketId, value}) {
-    let valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
     return await this.__sendTx(
       this.getContract().methods.addLiquidity(marketId, valueToWei),
     );
@@ -465,7 +465,7 @@ class PredictionMarketContract extends IContract {
    * @param {Integer} value
    */
   async buy ({ marketId, outcomeId, value, minOutcomeSharesToBuy}) {
-    let valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
     minOutcomeSharesToBuy = Numbers.toSmartContractDecimals(minOutcomeSharesToBuy, 18);
 
     return await this.__sendTx(
@@ -481,7 +481,7 @@ class PredictionMarketContract extends IContract {
    * @param {Integer} shares
    */
   async sell({marketId, outcomeId, value, maxOutcomeSharesToSell}) {
-    valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
     maxOutcomeSharesToSell = Numbers.toSmartContractDecimals(maxOutcomeSharesToSell, 18);
     return await this.__sendTx(
       this.getContract().methods.sell(marketId, outcomeId, valueToWei, maxOutcomeSharesToSell),
@@ -517,7 +517,7 @@ class PredictionMarketContract extends IContract {
   };
 
   async calcBuyAmount({ marketId, outcomeId, value }) {
-    valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
 
     const amount = await this.getContract()
       .methods.calcBuyAmount(
@@ -531,7 +531,7 @@ class PredictionMarketContract extends IContract {
   }
 
   async calcSellAmount({ marketId, outcomeId, value }) {
-    valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
 
     const amount = await this.getContract()
       .methods.calcSellAmount(
