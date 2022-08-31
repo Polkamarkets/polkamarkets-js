@@ -56,6 +56,10 @@ class ERC20Contract extends IContract {
     return await this.getContract().methods.decimals().call();
   }
 
+  async balanceOf({ address }) {
+    return Numbers.fromDecimalsNumber(await this.getContract().methods.balanceOf(address).call(), this.getDecimals());
+  }
+
   async isApproved({address, amount, spenderAddress}) {
     try {
       let approvedAmount = Numbers.fromDecimals(
