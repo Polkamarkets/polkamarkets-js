@@ -109,6 +109,17 @@ contract PredictionMarket {
     mapping(address => bool) voidedClaims; // wether user has claimed voided market shares
   }
 
+  struct CreateMarketArgs {
+    uint256 value;
+    uint256 closesAt;
+    uint256 outcomes;
+    IERC20 token;
+    uint256[] distribution;
+    string question;
+    string image;
+    address arbitrator;
+  }
+
   uint256[] marketIds;
   mapping(uint256 => Market) markets;
   uint256 public marketIndex;
@@ -180,34 +191,28 @@ contract PredictionMarket {
 
   /// @dev Creates a market, initializes the outcome shares pool and submits a question in Realitio
   function createMarket(
-    uint256 value,
-    string calldata question,
-    string calldata image,
-    uint256 closesAt,
-    address arbitrator,
-    uint256 outcomes,
-    IERC20 token
+    CreateMarketArgs calldata args
   ) external mustHoldRequiredBalance returns (uint256) {
     uint256 marketId = marketIndex;
     marketIds.push(marketId);
 
     Market storage market = markets[marketId];
 
-    require(value > 0, "stake needs to be > 0");
-    require(closesAt > now, "market must resolve after the current date");
-    require(arbitrator != address(0), "invalid arbitrator address");
+    require(args.value > 0, "stake needs to be > 0");
+    require(args.closesAt > now, "market must resolve after the current date");
+    require(args.arbitrator != address(0), "invalid arbitrator address");
     // v1 - only binary markets
-    require(outcomes == 2, "number of outcomes has to be 2");
+    require(args.outcomes == 2, "number of outcomes has to be 2");
 
-    market.token = token;
-    market.closesAtTimestamp = closesAt;
+    market.token = args.token;
+    market.closesAtTimestamp = args.closesAt;
     market.state = MarketState.open;
     market.fees.value = fee;
     // setting intial value to an integer that does not map to any outcomeId
     market.resolution.outcomeId = MAX_UINT_256;
 
     // creating market outcomes
-    for (uint256 i = 0; i < outcomes; i++) {
+    for (uint256 i = 0; i < args.outcomes; i++) {
       market.outcomeIds.push(i);
       MarketOutcome storage outcome = market.outcomes[i];
 
@@ -216,23 +221,21 @@ contract PredictionMarket {
     }
 
     // creating question in realitio
-    RealitioERC20 realitio = RealitioERC20(realitioAddress);
-
-    market.resolution.questionId = realitio.askQuestionERC20(
+    RealitioERC20(realitioAddress).askQuestionERC20(
       2,
-      question,
-      arbitrator,
+      args.question,
+      args.arbitrator,
       uint32(realitioTimeout),
-      uint32(closesAt),
+      uint32(args.closesAt),
       0,
       0
     );
 
-    addLiquidity(marketId, value);
+    addLiquidity(marketId, args.value, args.distribution);
 
     // emiting initial price events
     emitMarketOutcomePriceEvents(marketId);
-    emit MarketCreated(msg.sender, marketId, outcomes, question, image);
+    emit MarketCreated(msg.sender, marketId, args.outcomes, args.question, args.image);
 
     // incrementing market array index
     marketIndex = marketIndex + 1;
@@ -355,7 +358,7 @@ contract PredictionMarket {
   }
 
   /// @dev Adds liquidity to a market - external
-  function addLiquidity(uint256 marketId, uint256 value)
+  function addLiquidity(uint256 marketId, uint256 value, uint256[] memory distribution)
     public
     timeTransitions(marketId)
     atState(marketId, MarketState.open)
@@ -371,6 +374,8 @@ contract PredictionMarket {
     uint256 poolWeight = 0;
 
     if (market.liquidity > 0) {
+      require(distribution.length == 0, "market already has liquidity, can't distribute liquidity");
+
       // part of the liquidity is exchanged for outcome shares if market is not balanced
       for (uint256 i = 0; i < outcomesShares.length; i++) {
         uint256 outcomeShares = outcomesShares[i];
@@ -388,7 +393,28 @@ contract PredictionMarket {
       rebalanceFeesPool(marketId, liquidityAmount, MarketAction.addLiquidity);
     } else {
       // funding market with no liquidity
-      liquidityAmount = value;
+      if (distribution.length > 0) {
+        require(distribution.length == outcomesShares.length, "weight distribution length does not match");
+
+        // liquidity amount will be the product of the remaining shares distribution
+        liquidityAmount = 1;
+
+        uint256 maxHint = 0;
+        for (uint256 i = 0; i < distribution.length; i++) {
+          uint256 hint = distribution[i];
+          if (maxHint < hint) maxHint = hint;
+        }
+
+        for(uint256 i = 0; i < distribution.length; i++) {
+          uint256 remaining = value.mul(distribution[i]) / maxHint;
+          require(remaining > 0, "must hint a valid distribution");
+          sendBackAmounts[i] = value.sub(remaining);
+          liquidityAmount = liquidityAmount.mul(remaining);
+        }
+      } else {
+        // funding market with no liquidity and no distribution
+        liquidityAmount = value;
+      }
     }
 
     // funding market
