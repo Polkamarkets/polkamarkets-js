@@ -418,15 +418,16 @@ class PredictionMarketContract extends IContract {
     const question = realitioLib.encodeText('single-select', name, outcomes, category);
 
     return await this.__sendTx(
-      this.getContract().methods.createMarket(
-        valueToWei,
+      this.getContract().methods.createMarket({
+        value: valueToWei,
+        closesAt: duration,
+        outcomes: outcomes.length,
+        token: token,
+        distribution: [],
         question,
         image,
-        duration,
-        oracleAddress,
-        outcomes.length,
-        token
-      ),
+        arbitrator: oracleAddress,
+      })
     );
   };
 
@@ -439,7 +440,7 @@ class PredictionMarketContract extends IContract {
   async addLiquidity({marketId, value}) {
     const valueToWei = Numbers.toSmartContractDecimals(value, 18);
     return await this.__sendTx(
-      this.getContract().methods.addLiquidity(marketId, valueToWei),
+      this.getContract().methods.addLiquidity(marketId, valueToWei, []),
     );
   };
 
