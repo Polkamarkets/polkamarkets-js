@@ -163,7 +163,10 @@ contract PredictionMarket {
   }
 
   modifier mustHoldRequiredBalance() {
-    require(requiredBalance == 0 || requiredBalanceToken.balanceOf(msg.sender) >= requiredBalance, "msg.sender must hold minimum erc20 balance");
+    require(
+      requiredBalance == 0 || requiredBalanceToken.balanceOf(msg.sender) >= requiredBalance,
+      "msg.sender must hold minimum erc20 balance"
+    );
     _;
   }
 
@@ -190,9 +193,7 @@ contract PredictionMarket {
   // ------ Core Functions ------
 
   /// @dev Creates a market, initializes the outcome shares pool and submits a question in Realitio
-  function createMarket(
-    CreateMarketArgs calldata args
-  ) external mustHoldRequiredBalance returns (uint256) {
+  function createMarket(CreateMarketArgs calldata args) external mustHoldRequiredBalance returns (uint256) {
     uint256 marketId = marketIndex;
     marketIds.push(marketId);
 
@@ -358,11 +359,11 @@ contract PredictionMarket {
   }
 
   /// @dev Adds liquidity to a market - external
-  function addLiquidity(uint256 marketId, uint256 value, uint256[] memory distribution)
-    public
-    timeTransitions(marketId)
-    atState(marketId, MarketState.open)
-  {
+  function addLiquidity(
+    uint256 marketId,
+    uint256 value,
+    uint256[] memory distribution
+  ) public timeTransitions(marketId) atState(marketId, MarketState.open) {
     Market storage market = markets[marketId];
 
     require(value > 0, "stake has to be greater than 0.");
@@ -402,7 +403,7 @@ contract PredictionMarket {
           if (maxHint < hint) maxHint = hint;
         }
 
-        for(uint256 i = 0; i < distribution.length; i++) {
+        for (uint256 i = 0; i < distribution.length; i++) {
           uint256 remaining = value.mul(distribution[i]) / maxHint;
           require(remaining > 0, "must hint a valid distribution");
           sendBackAmounts[i] = value.sub(remaining);
