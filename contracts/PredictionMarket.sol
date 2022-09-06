@@ -396,9 +396,6 @@ contract PredictionMarket {
       if (distribution.length > 0) {
         require(distribution.length == outcomesShares.length, "weight distribution length does not match");
 
-        // liquidity amount will be the product of the remaining shares distribution
-        liquidityAmount = 1;
-
         uint256 maxHint = 0;
         for (uint256 i = 0; i < distribution.length; i++) {
           uint256 hint = distribution[i];
@@ -409,12 +406,11 @@ contract PredictionMarket {
           uint256 remaining = value.mul(distribution[i]) / maxHint;
           require(remaining > 0, "must hint a valid distribution");
           sendBackAmounts[i] = value.sub(remaining);
-          liquidityAmount = liquidityAmount.mul(remaining);
         }
-      } else {
-        // funding market with no liquidity and no distribution
-        liquidityAmount = value;
       }
+
+      // funding market with total liquidity amount
+      liquidityAmount = value;
     }
 
     // funding market
