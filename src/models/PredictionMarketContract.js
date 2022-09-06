@@ -160,6 +160,14 @@ class PredictionMarketContract extends IContract {
     };
   }
 
+  async getMarketIdsFromQuestions({questions}) {
+    const events = await this.getEvents('MarketCreated');
+
+    return events.filter((event) => {
+      return questions.includes(event.returnValues.question);
+    }).map((event) => event.returnValues.marketId);
+  }
+
   /**
    * @function getMarketQuestionId
    * @description getMarketQuestionId
