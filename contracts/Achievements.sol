@@ -18,11 +18,7 @@ contract Achievements is ERC721 {
   RealitioERC20 public realitioERC20;
   PredictionMarket public predictionMarket;
 
-  event LogNewAchievement(
-    uint256 indexed achievementId,
-    address indexed user,
-    string content
-  );
+  event LogNewAchievement(uint256 indexed achievementId, address indexed user, string content);
 
   // Buy: Claim through market[x].outcome[y].shares.holders[msg.sender] > 0
   // AddLiquidity: Claim through market[x].liquidityShares[msg.sender] > 0
@@ -66,7 +62,11 @@ contract Achievements is ERC721 {
     _setBaseURI(_baseURI);
   }
 
-  function createAchievement(Action action, uint256 occurrences, string memory content) public returns (uint256) {
+  function createAchievement(
+    Action action,
+    uint256 occurrences,
+    string memory content
+  ) public returns (uint256) {
     require(occurrences > 0, "occurrences has to be greater than 0");
     uint256 achievementId = achievementIndex;
     Achievement storage achievement = achievements[achievementId];
