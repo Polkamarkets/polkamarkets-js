@@ -902,7 +902,7 @@ contract PredictionMarket {
       marketSharesSum = marketSharesSum.add(getOutcomeOddsWeight(marketId, i));
     }
 
-    return marketSharesProduct.mul(market.outcomeIds.length).div(marketSharesSum).div(market.liquidity);
+    return marketSharesProduct.mul(market.outcomeIds.length).mul(ONE).div(marketSharesSum).div(market.liquidity);
   }
 
   function getMarketResolvedOutcome(uint256 marketId) public view returns (int256) {
