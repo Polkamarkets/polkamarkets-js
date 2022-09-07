@@ -886,13 +886,23 @@ contract PredictionMarket {
     Market storage market = markets[marketId];
 
     if (market.state == MarketState.resolved && !isMarketVoided(marketId)) {
-      // resolved market, price is either 0 or 1
+      // resolved market, outcome prices are either 0 or 1
       // final liquidity price = outcome shares / liquidity shares
       return market.outcomes[market.resolution.outcomeId].shares.available.mul(ONE).div(market.liquidity);
     }
 
-    // liquidity price = # liquidity shares / # outcome shares * # outcomes
-    return market.liquidity.mul(ONE * market.outcomeIds.length).div(market.sharesAvailable);
+    // liquidity price = product(every outcome shares) / sum (every outcomeOddsWeight) * # outcomes / liquidity shares
+    uint256 marketSharesProduct = 1;
+    uint256 marketSharesSum = 0;
+
+    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+      MarketOutcome storage outcome = market.outcomes[i];
+
+      marketSharesProduct = marketSharesProduct.mul(outcome.shares.available);
+      marketSharesSum = marketSharesSum.add(getOutcomeOddsWeight(marketId, i));
+    }
+
+    return marketSharesProduct.mul(market.outcomeIds.length).div(marketSharesSum).div(market.liquidity);
   }
 
   function getMarketResolvedOutcome(uint256 marketId) public view returns (int256) {
@@ -925,16 +935,35 @@ contract PredictionMarket {
     return market.outcomeIds;
   }
 
+  function getOutcomeOddsWeight(uint256 marketId, uint256 outcomeId) public view returns (uint256) {
+    Market storage market = markets[marketId];
+
+    uint256 productWeight = 1;
+
+    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+      if (i == outcomeId) continue;
+
+      productWeight = productWeight.mul(market.outcomes[i].shares.available);
+    }
+
+    return productWeight;
+  }
+
   function getMarketOutcomePrice(uint256 marketId, uint256 outcomeId) public view returns (uint256) {
     Market storage market = markets[marketId];
-    MarketOutcome storage outcome = market.outcomes[outcomeId];
 
     if (market.state == MarketState.resolved && !isMarketVoided(marketId)) {
       // resolved market, price is either 0 or 1
       return outcomeId == market.resolution.outcomeId ? ONE : 0;
     }
 
-    return (market.sharesAvailable.sub(outcome.shares.available)).mul(ONE).div(market.sharesAvailable);
+    uint256 sumOutcomeOddsWeight = 0;
+    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+      sumOutcomeOddsWeight = sumOutcomeOddsWeight.add(getOutcomeOddsWeight(marketId, i));
+    }
+
+    // outcome price = outcomeOddsWeight / sum(every outcomeOddsWeight)
+    return getOutcomeOddsWeight(marketId, outcomeId).mul(ONE).div(sumOutcomeOddsWeight);
   }
 
   function getMarketOutcomeData(uint256 marketId, uint256 outcomeId)
