@@ -892,17 +892,17 @@ contract PredictionMarket {
     }
 
     // liquidity price = product(every outcome shares) / sum (every outcomeOddsWeight) * # outcomes / liquidity shares
-    uint256 marketSharesProduct = 1;
+    uint256 marketSharesProduct = ONE;
     uint256 marketSharesSum = 0;
 
     for (uint256 i = 0; i < market.outcomeIds.length; i++) {
       MarketOutcome storage outcome = market.outcomes[i];
 
-      marketSharesProduct = marketSharesProduct.mul(outcome.shares.available);
+      marketSharesProduct = marketSharesProduct.mul(outcome.shares.available).div(ONE);
       marketSharesSum = marketSharesSum.add(getOutcomeOddsWeight(marketId, i));
     }
 
-    return marketSharesProduct.mul(market.outcomeIds.length).mul(ONE).div(marketSharesSum).div(market.liquidity);
+    return marketSharesProduct.mul(market.outcomeIds.length).mul(ONE).div(marketSharesSum).mul(ONE).div(market.liquidity);
   }
 
   function getMarketResolvedOutcome(uint256 marketId) public view returns (int256) {
@@ -938,12 +938,12 @@ contract PredictionMarket {
   function getOutcomeOddsWeight(uint256 marketId, uint256 outcomeId) public view returns (uint256) {
     Market storage market = markets[marketId];
 
-    uint256 productWeight = 1;
+    uint256 productWeight = ONE;
 
     for (uint256 i = 0; i < market.outcomeIds.length; i++) {
       if (i == outcomeId) continue;
 
-      productWeight = productWeight.mul(market.outcomes[i].shares.available);
+      productWeight = productWeight.mul(market.outcomes[i].shares.available).div(ONE);
     }
 
     return productWeight;
@@ -959,7 +959,7 @@ contract PredictionMarket {
 
     uint256 sumOutcomeOddsWeight = 0;
     for (uint256 i = 0; i < market.outcomeIds.length; i++) {
-      sumOutcomeOddsWeight = sumOutcomeOddsWeight.add(getOutcomeOddsWeight(marketId, i));
+      sumOutcomeOddsWeight = sumOutcomeOddsWeight + getOutcomeOddsWeight(marketId, i);
     }
 
     // outcome price = outcomeOddsWeight / sum(every outcomeOddsWeight)
