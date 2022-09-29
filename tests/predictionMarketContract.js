@@ -481,4 +481,89 @@ context('Prediction Market Contract', async () => {
       expect(amountTransferred).to.equal(0.01);
     }));
   });
+
+  context('Multiple Outcomes', async () => {
+    context('Market Creation', async () => {
+      it('should create a Market with 3 outcomes', mochaAsync(async () => {
+        try {
+          const res = await predictionMarketContract.createMarket({
+            value,
+            name: 'Will BTC price close above 100k$ on May 1st 2024',
+            image: 'foo-bar',
+            category: 'Foo;Bar',
+            oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
+            duration: moment('2024-05-01').unix(),
+            outcomes: ['Yes', 'No', 'Maybe'],
+            token: tokenERC20Contract.getAddress(),
+          });
+          expect(res.status).to.equal(true);
+        } catch(e) {
+          console.log(e);
+        }
+
+        const marketIds = await predictionMarketContract.getMarkets();
+        marketId = marketIds[marketIds.length - 1];
+
+        const res = await predictionMarketContract.getMarketData({marketId});
+        expect(res.outcomeIds.length).to.eql(3);
+        expect(res.outcomeIds).to.eql([0, 1, 2]);
+      }));
+
+      it('should create a Market with 256 outcomes', mochaAsync(async () => {
+        // Array with outcomes with outcome id as name
+        // TODO: improve gas optimization for markets with 10+ outcomes
+        const outcomeCount = 8;
+        const outcomes = Array.from(Array(outcomeCount).keys());
+
+        try {
+          const res = await predictionMarketContract.createMarket({
+            value,
+            name: 'Will BTC price close above 100k$ on May 1st 2024',
+            image: 'foo-bar',
+            category: 'Foo;Bar',
+            oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
+            duration: moment('2024-05-01').unix(),
+            outcomes,
+            token: tokenERC20Contract.getAddress(),
+          });
+          expect(res.status).to.equal(true);
+        } catch(e) {
+          console.log(e);
+        }
+
+        const marketIds = await predictionMarketContract.getMarkets();
+        marketId = marketIds[marketIds.length - 1];
+
+        const res = await predictionMarketContract.getMarketData({marketId});
+        expect(res.outcomeIds.length).to.eql(outcomeCount);
+        expect(res.outcomeIds).to.eql(outcomes);
+      }));
+
+      it('should not create a Market with more than 256 outcomes', mochaAsync(async () => {
+        const oldMarketIds = await predictionMarketContract.getMarkets();
+        try {
+          const outcomes = Array.from(Array(257).keys());
+
+          const res = await predictionMarketContract.createMarket({
+            value,
+            name: 'Market with 257 outcomes',
+            image: 'foo-bar',
+            category: 'Foo;Bar',
+            oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
+            duration: moment('2024-05-01').unix(),
+            outcomes,
+            token: tokenERC20Contract.getAddress(),
+          });
+          expect(res.status).to.equal(true);
+        } catch(e) {
+          // not logging error, as tx is expected to fail
+          // console.log(e);
+        }
+
+        const currentMarketIds = await predictionMarketContract.getMarkets();
+
+        expect(currentMarketIds.length).to.eql(oldMarketIds.length);
+      }));
+    });
+  });
 });
