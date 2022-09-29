@@ -762,16 +762,19 @@ contract PredictionMarket {
     view
     returns (
       uint256,
-      uint256,
-      uint256
+      uint256[] memory
     )
   {
     Market storage market = markets[marketId];
+    uint256[] memory outcomeShares = new uint256[](market.outcomeIds.length);
+
+    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+      outcomeShares[i] = market.outcomes[i].shares.holders[user];
+    }
 
     return (
       market.liquidityShares[user],
-      market.outcomes[0].shares.holders[user],
-      market.outcomes[1].shares.holders[user]
+      outcomeShares
     );
   }
 
@@ -958,7 +961,7 @@ contract PredictionMarket {
 
     uint256 sumOutcomeOddsWeight = 0;
     for (uint256 i = 0; i < market.outcomeIds.length; i++) {
-      sumOutcomeOddsWeight = sumOutcomeOddsWeight + getOutcomeOddsWeight(marketId, i);
+      sumOutcomeOddsWeight = sumOutcomeOddsWeight.add(getOutcomeOddsWeight(marketId, i));
     }
 
     // outcome price = outcomeOddsWeight / sum(every outcomeOddsWeight)

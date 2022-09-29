@@ -85,17 +85,26 @@ contract Achievements is ERC721 {
   }
 
   function hasUserPlacedPrediction(address user, uint256 marketId) public view returns (bool) {
-    uint256[2] memory outcomeShares;
-    (, outcomeShares[0], outcomeShares[1]) = predictionMarket.getUserMarketShares(marketId, user);
+    uint256[] memory outcomeShares;
+    (, outcomeShares) = predictionMarket.getUserMarketShares(marketId, user);
 
-    require(outcomeShares[0] > 0 || outcomeShares[1] > 0, "user does not hold outcome shares");
+    bool hasPlacedPrediction;
+
+    for (uint256 i = 0; i < outcomeShares.length; i++) {
+      if (outcomeShares[i] > 0) {
+        hasPlacedPrediction = true;
+        break;
+      }
+    }
+
+    require(hasPlacedPrediction == true, "user does not hold outcome shares");
 
     return true;
   }
 
   function hasUserAddedLiquidity(address user, uint256 marketId) public view returns (bool) {
     uint256 liquidityShares;
-    (liquidityShares, , ) = predictionMarket.getUserMarketShares(marketId, user);
+    (liquidityShares, ) = predictionMarket.getUserMarketShares(marketId, user);
 
     require(liquidityShares > 0, "user does not hold liquidity shares");
 
@@ -133,8 +142,8 @@ contract Achievements is ERC721 {
   }
 
   function hasUserClaimedWinnings(address user, uint256 marketId) public view returns (bool) {
-    uint256[2] memory outcomeShares;
-    (, outcomeShares[0], outcomeShares[1]) = predictionMarket.getUserMarketShares(marketId, user);
+    uint256[] memory outcomeShares;
+    (, outcomeShares) = predictionMarket.getUserMarketShares(marketId, user);
     int256 resolvedOutcomeId = predictionMarket.getMarketResolvedOutcome(marketId);
 
     require(resolvedOutcomeId >= 0, "market is still not resolved");
