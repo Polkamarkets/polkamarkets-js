@@ -17,7 +17,6 @@ context('Prediction Market Contract', async () => {
   let tokenERC20Contract;
 
   // market / outcome ids we'll make unit tests with
-  let marketId = 0;
   let outcomeIds = [0, 1];
   const value = 0.01;
 
@@ -84,6 +83,8 @@ context('Prediction Market Contract', async () => {
   });
 
   context('Market Creation', async () => {
+    let marketId;
+
     it('should create a Market', mochaAsync(async () => {
       try {
         const res = await predictionMarketContract.createMarket({
@@ -126,8 +127,9 @@ context('Prediction Market Contract', async () => {
   });
 
   context('Market Data', async () => {
+    let marketId = 0;
     it('should get Market data', mochaAsync(async () => {
-      const res = await predictionMarketContract.getMarketData({marketId: 0});
+      const res = await predictionMarketContract.getMarketData({marketId});
       expect(res).to.eql({
         name: '',
         closeDateTime: '2024-05-01 00:00',
@@ -139,7 +141,7 @@ context('Prediction Market Contract', async () => {
     }));
 
     it('should get Market details', mochaAsync(async () => {
-      const res = await predictionMarketContract.getMarketDetails({marketId: 0});
+      const res = await predictionMarketContract.getMarketDetails({marketId});
       expect(res).to.eql({
         name: 'Will BTC price close above 100k$ on May 1st 2024',
         category: 'Foo',
@@ -170,6 +172,7 @@ context('Prediction Market Contract', async () => {
   });
 
   context('Market Interaction - Balanced Market (Same Outcome Odds)', async () => {
+    let marketId = 0;
     it('should add liquidity without changing shares balance', mochaAsync(async () => {
       const myShares = await predictionMarketContract.getMyMarketShares({marketId});
       const marketData = await predictionMarketContract.getMarketData({marketId});
@@ -245,13 +248,13 @@ context('Prediction Market Contract', async () => {
 
       // User gets liquidity tokens back in ETH
       expect(newContractBalance).to.below(contractBalance);
-      // TODO: check amountTransferred from internal transactions
       const amountTransferred = Number((contractBalance - newContractBalance).toFixed(5));
       expect(amountTransferred).to.equal(value);
     }));
   });
 
   context('Market Interaction - Unbalanced Market (Different Outcome Odds)', async () => {
+    let marketId = 0;
     it('should display my shares', mochaAsync(async () => {
       const res = await predictionMarketContract.getMyMarketShares({marketId});
       // currently holding liquidity tokens from market creation
@@ -292,7 +295,7 @@ context('Prediction Market Contract', async () => {
       expect(newOutcome2Data.price).to.below(outcome2Data.price);
       expect(newOutcome2Data.price).to.equal(0.2);
       // Prices sum = 1
-      // 0.05 + 0.05 = 1
+      // 0.5 + 0.5 = 1
       expect(newOutcome1Data.price + newOutcome2Data.price).to.equal(1);
 
       // Liquidity value remains the same
@@ -415,7 +418,6 @@ context('Prediction Market Contract', async () => {
 
       // User gets part of the liquidity tokens back in ETH
       expect(newContractBalance).to.below(contractBalance);
-      // TODO: check amountTransferred from internal transactions
       const amountTransferred = Number((contractBalance - newContractBalance).toFixed(5));
       expect(amountTransferred).to.equal(0.0025);
     }));
@@ -448,7 +450,7 @@ context('Prediction Market Contract', async () => {
       expect(newOutcome2Data.price).to.above(outcome2Data.price);
       expect(newOutcome2Data.price).to.equal(0.5);
       // Prices sum = 1
-      // 0.05 + 0.05 = 1
+      // 0.5 + 0.5 = 1
       expect(newOutcome1Data.price + newOutcome2Data.price).to.equal(1);
 
       // Liquidity value remains the same
@@ -476,24 +478,24 @@ context('Prediction Market Contract', async () => {
 
       // User gets shares value back in ETH
       expect(newContractBalance).to.below(contractBalance);
-      // TODO: check amountTransferred from internal transactions
       const amountTransferred = Number((contractBalance - newContractBalance).toFixed(5));
       expect(amountTransferred).to.equal(0.01);
     }));
   });
 
   context('Multiple Outcomes', async () => {
+    let marketId = 0;
     context('Market Creation', async () => {
       it('should create a Market with 3 outcomes', mochaAsync(async () => {
         try {
           const res = await predictionMarketContract.createMarket({
             value,
-            name: 'Will BTC price close above 100k$ on May 1st 2024',
+            name: 'Market with 3 outcomes',
             image: 'foo-bar',
             category: 'Foo;Bar',
             oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
             duration: moment('2024-05-01').unix(),
-            outcomes: ['Yes', 'No', 'Maybe'],
+            outcomes: ['A', 'B', 'C'],
             token: tokenERC20Contract.getAddress(),
           });
           expect(res.status).to.equal(true);
@@ -518,7 +520,7 @@ context('Prediction Market Contract', async () => {
         try {
           const res = await predictionMarketContract.createMarket({
             value,
-            name: 'Will BTC price close above 100k$ on May 1st 2024',
+            name: `Market with ${outcomeCount} outcomes`,
             image: 'foo-bar',
             category: 'Foo;Bar',
             oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
