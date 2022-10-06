@@ -84,11 +84,11 @@ contract Voting {
 
     // remove from total downvoted if needed
     if (hasUserVotedOtherDirection) {
-      action == VotesAction.upvoted ? item.downvotes.sub(1) : item.upvotes.sub(1);
+      action == VotesAction.upvoted ? item.downvotes = item.downvotes.sub(1) : item.upvotes = item.upvotes.sub(1);
     }
 
     // add the vote
-    action == VotesAction.upvoted ? item.upvotes.add(1) : item.downvotes.add(1);
+    action == VotesAction.upvoted ? item.upvotes = item.upvotes.add(1) : item.downvotes = item.downvotes.add(1);
     listToAddVote[msg.sender] = true;
     listToRemoveVote[msg.sender] = false;
 
@@ -121,7 +121,7 @@ contract Voting {
     require(hasUserVoted == true, "User doesn't have a vote on this item");
 
     // remove the vote
-    action == VotesAction.removeUpvoted ? item.upvotes.sub(1) : item.downvotes.sub(1);
+    action == VotesAction.removeUpvoted ? item.upvotes = item.upvotes.sub(1) : item.downvotes = item.downvotes.sub(1);
     listToRemoveVote[msg.sender] = false;
 
     // emit events
