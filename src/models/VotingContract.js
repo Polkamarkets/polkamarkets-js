@@ -46,26 +46,27 @@ class VotingContract extends IContract {
   /**
    * @function getItemVotes
    * @description Get Item Total upvotes and downvotes
+   * @param {Integer} itemId
    * @returns {Integer} upvotes
    * @returns {Integer} downvotes
    */
-  async getItemVotes() {
+  async getItemVotes({ itemId }) {
     let res = await this.params.contract
       .getContract()
       .methods
-      .getItemVotes()
+      .getItemVotes(itemId)
       .call();
 
     return {
-      upvotes: Numbers.fromDecimalsNumber(res[0], 18),
-      downvotes: Numbers.fromDecimalsNumber(res[1], 18)
+      upvotes: Number(res[0]),
+      downvotes: Number(res[1]),
     }
   }
 
   /**
    * @function hasUserVotedItem
    * @description Get info if user has voted the item
-   * @param {Integer} marketId
+   * @param {Integer} itemId
    * @param {Address} user
    * @returns {Boolean} upvoted
    * @returns {Boolean} downvoted
