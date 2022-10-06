@@ -64,6 +64,20 @@ class VotingContract extends IContract {
   }
 
   /**
+   * @function haveIVotedItem
+   * @description Get info if I have voted the item
+   * @param {Integer} itemId
+   * @returns {Boolean} upvoted
+   * @returns {Boolean} downvoted
+   */
+  async haveIVotedItem({ itemId }) {
+    const account = await this.getMyAccount();
+    if (!account) return { upvoted: 0, downvoted: 0 };
+
+    return this.hasUserVotedItem({ user: account, itemId });
+  }
+
+  /**
    * @function hasUserVotedItem
    * @description Get info if user has voted the item
    * @param {Integer} itemId
@@ -71,11 +85,11 @@ class VotingContract extends IContract {
    * @returns {Boolean} upvoted
    * @returns {Boolean} downvoted
    */
-  async hasUserVotedItem({ user, marketId }) {
+  async hasUserVotedItem({ user, itemId }) {
     let res = await this.params.contract
       .getContract()
       .methods
-      .getItemVotes(user, marketId)
+      .hasUserVotedItem(user, itemId)
       .call();
 
     return {
