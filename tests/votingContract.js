@@ -48,36 +48,86 @@ context('Voting Contract', async () => {
   context('Voting Items', async () => {
     it('should upvote an Item', mochaAsync(async () => {
       let itemId = 0;
+
+      // chek if there are no votes
+      let itemVotes = await votingContract.getItemVotes({ itemId });
+
+      expect(itemVotes.upvotes).to.equal(0);
+      expect(itemVotes.downvotes).to.equal(0);
+
+      const user = await votingContract.getMyAccount();
+
+      let userVoted = await votingContract.hasUserVotedItem({ itemId, user });
+
+      expect(userVoted.upvoted).to.equal(false);
+      expect(userVoted.downvoted).to.equal(false);
+
       const res = await votingContract.upvoteItem({
         itemId,
       });
 
       expect(res.status).to.equal(true);
 
-      const itemVotes = await votingContract.getItemVotes({ itemId });
+      itemVotes = await votingContract.getItemVotes({ itemId });
 
       expect(itemVotes.upvotes).to.equal(1);
       expect(itemVotes.downvotes).to.equal(0);
 
 
-      const userVoted = await votingContract.haveIVotedItem({ itemId });
+      userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(true);
       expect(userVoted.downvoted).to.equal(false);
+
+      // Validate User Votes
+      const userVotes = await votingContract.getUserVotes({ user });
+      expect(userVotes.length).to.equal(1);
+      expect(userVotes[0].itemId).to.equal(0);
+      expect(userVotes[0].upvoted).to.equal(true);
+      expect(userVotes[0].downvoted).to.equal(false);
     }));
 
     it('should downvote an Item', mochaAsync(async () => {
       let itemId = 1;
+
+      // chek if there are no votes
+      let itemVotes = await votingContract.getItemVotes({ itemId });
+
+      expect(itemVotes.upvotes).to.equal(0);
+      expect(itemVotes.downvotes).to.equal(0);
+
+      const user = await votingContract.getMyAccount();
+
+      let userVoted = await votingContract.hasUserVotedItem({ itemId, user });
+
+      expect(userVoted.upvoted).to.equal(false);
+      expect(userVoted.downvoted).to.equal(false);
+
       const res = await votingContract.downvoteItem({
         itemId,
       });
 
       expect(res.status).to.equal(true);
 
-      const itemVotes = await votingContract.getItemVotes({ itemId });
+      itemVotes = await votingContract.getItemVotes({ itemId });
 
       expect(itemVotes.upvotes).to.equal(0);
       expect(itemVotes.downvotes).to.equal(1);
+
+      userVoted = await votingContract.hasUserVotedItem({ itemId, user });
+
+      expect(userVoted.upvoted).to.equal(false);
+      expect(userVoted.downvoted).to.equal(true);
+
+      // Validate User Votes
+      const userVotes = await votingContract.getUserVotes({ user });
+      expect(userVotes.length).to.equal(2);
+      expect(userVotes[0].itemId).to.equal(0);
+      expect(userVotes[0].upvoted).to.equal(true);
+      expect(userVotes[0].downvoted).to.equal(false);
+      expect(userVotes[1].itemId).to.equal(1);
+      expect(userVotes[1].upvoted).to.equal(false);
+      expect(userVotes[1].downvoted).to.equal(true);
     }));
 
     it('should upvote an Item when there is already a downvote', mochaAsync(async () => {
@@ -89,7 +139,9 @@ context('Voting Contract', async () => {
       expect(itemVotes.upvotes).to.equal(0);
       expect(itemVotes.downvotes).to.equal(1);
 
-      let userVoted = await votingContract.haveIVotedItem({ itemId });
+      const user = await votingContract.getMyAccount();
+
+      let userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(false);
       expect(userVoted.downvoted).to.equal(true);
@@ -107,10 +159,20 @@ context('Voting Contract', async () => {
       expect(itemVotes.downvotes).to.equal(0);
 
 
-      userVoted = await votingContract.haveIVotedItem({ itemId });
+      userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(true);
       expect(userVoted.downvoted).to.equal(false);
+
+      // Validate User Votes
+      const userVotes = await votingContract.getUserVotes({ user });
+      expect(userVotes.length).to.equal(2);
+      expect(userVotes[0].itemId).to.equal(0);
+      expect(userVotes[0].upvoted).to.equal(true);
+      expect(userVotes[0].downvoted).to.equal(false);
+      expect(userVotes[1].itemId).to.equal(1);
+      expect(userVotes[1].upvoted).to.equal(true);
+      expect(userVotes[1].downvoted).to.equal(false);
     }));
 
     it('should downvote an Item when there is already an upvote', mochaAsync(async () => {
@@ -122,7 +184,9 @@ context('Voting Contract', async () => {
       expect(itemVotes.upvotes).to.equal(1);
       expect(itemVotes.downvotes).to.equal(0);
 
-      let userVoted = await votingContract.haveIVotedItem({ itemId });
+      const user = await votingContract.getMyAccount();
+
+      let userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(true);
       expect(userVoted.downvoted).to.equal(false);
@@ -140,10 +204,20 @@ context('Voting Contract', async () => {
       expect(itemVotes.downvotes).to.equal(1);
 
 
-      userVoted = await votingContract.haveIVotedItem({ itemId });
+      userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(false);
       expect(userVoted.downvoted).to.equal(true);
+
+      // Validate User Votes
+      const userVotes = await votingContract.getUserVotes({ user });
+      expect(userVotes.length).to.equal(2);
+      expect(userVotes[0].itemId).to.equal(0);
+      expect(userVotes[0].upvoted).to.equal(false);
+      expect(userVotes[0].downvoted).to.equal(true);
+      expect(userVotes[1].itemId).to.equal(1);
+      expect(userVotes[1].upvoted).to.equal(true);
+      expect(userVotes[1].downvoted).to.equal(false);
     }));
 
     it('should not allow to upvote an already upvoted item', mochaAsync(async () => {
@@ -155,7 +229,9 @@ context('Voting Contract', async () => {
       expect(itemVotes.upvotes).to.equal(1);
       expect(itemVotes.downvotes).to.equal(0);
 
-      let userVoted = await votingContract.haveIVotedItem({ itemId });
+      const user = await votingContract.getMyAccount();
+
+      let userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(true);
       expect(userVoted.downvoted).to.equal(false);
@@ -177,10 +253,20 @@ context('Voting Contract', async () => {
       expect(itemVotes.downvotes).to.equal(0);
 
 
-      userVoted = await votingContract.haveIVotedItem({ itemId });
+      userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(true);
       expect(userVoted.downvoted).to.equal(false);
+
+      // Validate User Votes
+      const userVotes = await votingContract.getUserVotes({ user });
+      expect(userVotes.length).to.equal(2);
+      expect(userVotes[0].itemId).to.equal(0);
+      expect(userVotes[0].upvoted).to.equal(false);
+      expect(userVotes[0].downvoted).to.equal(true);
+      expect(userVotes[1].itemId).to.equal(1);
+      expect(userVotes[1].upvoted).to.equal(true);
+      expect(userVotes[1].downvoted).to.equal(false);
     }));
 
     it('should not allow to downvote an already downvoted item', mochaAsync(async () => {
@@ -192,7 +278,9 @@ context('Voting Contract', async () => {
       expect(itemVotes.upvotes).to.equal(0);
       expect(itemVotes.downvotes).to.equal(1);
 
-      let userVoted = await votingContract.haveIVotedItem({ itemId });
+      const user = await votingContract.getMyAccount();
+
+      let userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(false);
       expect(userVoted.downvoted).to.equal(true);
@@ -214,10 +302,20 @@ context('Voting Contract', async () => {
       expect(itemVotes.downvotes).to.equal(1);
 
 
-      userVoted = await votingContract.haveIVotedItem({ itemId });
+      userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(false);
       expect(userVoted.downvoted).to.equal(true);
+
+      // Validate User Votes
+      const userVotes = await votingContract.getUserVotes({ user });
+      expect(userVotes.length).to.equal(2);
+      expect(userVotes[0].itemId).to.equal(0);
+      expect(userVotes[0].upvoted).to.equal(false);
+      expect(userVotes[0].downvoted).to.equal(true);
+      expect(userVotes[1].itemId).to.equal(1);
+      expect(userVotes[1].upvoted).to.equal(true);
+      expect(userVotes[1].downvoted).to.equal(false);
     }));
 
     it('should allow to remove upvote of an already upvoted item', mochaAsync(async () => {
@@ -229,7 +327,9 @@ context('Voting Contract', async () => {
       expect(itemVotes.upvotes).to.equal(1);
       expect(itemVotes.downvotes).to.equal(0);
 
-      let userVoted = await votingContract.haveIVotedItem({ itemId });
+      const user = await votingContract.getMyAccount();
+
+      let userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(true);
       expect(userVoted.downvoted).to.equal(false);
@@ -247,10 +347,20 @@ context('Voting Contract', async () => {
       expect(itemVotes.downvotes).to.equal(0);
 
 
-      userVoted = await votingContract.haveIVotedItem({ itemId });
+      userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(false);
       expect(userVoted.downvoted).to.equal(false);
+
+      // Validate User Votes
+      const userVotes = await votingContract.getUserVotes({ user });
+      expect(userVotes.length).to.equal(2);
+      expect(userVotes[0].itemId).to.equal(0);
+      expect(userVotes[0].upvoted).to.equal(false);
+      expect(userVotes[0].downvoted).to.equal(true);
+      expect(userVotes[1].itemId).to.equal(1);
+      expect(userVotes[1].upvoted).to.equal(false);
+      expect(userVotes[1].downvoted).to.equal(false);
     }));
 
     it('should allow to remove downvote of an already downvoted item', mochaAsync(async () => {
@@ -262,7 +372,9 @@ context('Voting Contract', async () => {
       expect(itemVotes.upvotes).to.equal(0);
       expect(itemVotes.downvotes).to.equal(1);
 
-      let userVoted = await votingContract.haveIVotedItem({ itemId });
+      const user = await votingContract.getMyAccount();
+
+      let userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(false);
       expect(userVoted.downvoted).to.equal(true);
@@ -280,10 +392,20 @@ context('Voting Contract', async () => {
       expect(itemVotes.downvotes).to.equal(0);
 
 
-      userVoted = await votingContract.haveIVotedItem({ itemId });
+      userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(false);
       expect(userVoted.downvoted).to.equal(false);
+
+      // Validate User Votes
+      const userVotes = await votingContract.getUserVotes({ user });
+      expect(userVotes.length).to.equal(2);
+      expect(userVotes[0].itemId).to.equal(0);
+      expect(userVotes[0].upvoted).to.equal(false);
+      expect(userVotes[0].downvoted).to.equal(false);
+      expect(userVotes[1].itemId).to.equal(1);
+      expect(userVotes[1].upvoted).to.equal(false);
+      expect(userVotes[1].downvoted).to.equal(false);
     }));
 
     it('should not allow to remove upvote of an item not upvoted', mochaAsync(async () => {
@@ -295,7 +417,9 @@ context('Voting Contract', async () => {
       expect(itemVotes.upvotes).to.equal(0);
       expect(itemVotes.downvotes).to.equal(0);
 
-      let userVoted = await votingContract.haveIVotedItem({ itemId });
+      const user = await votingContract.getMyAccount();
+
+      let userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(false);
       expect(userVoted.downvoted).to.equal(false);
@@ -318,10 +442,20 @@ context('Voting Contract', async () => {
       expect(itemVotes.downvotes).to.equal(0);
 
 
-      userVoted = await votingContract.haveIVotedItem({ itemId });
+      userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(false);
       expect(userVoted.downvoted).to.equal(false);
+
+      // Validate User Votes
+      const userVotes = await votingContract.getUserVotes({ user });
+      expect(userVotes.length).to.equal(2);
+      expect(userVotes[0].itemId).to.equal(0);
+      expect(userVotes[0].upvoted).to.equal(false);
+      expect(userVotes[0].downvoted).to.equal(false);
+      expect(userVotes[1].itemId).to.equal(1);
+      expect(userVotes[1].upvoted).to.equal(false);
+      expect(userVotes[1].downvoted).to.equal(false);
     }));
 
     it('should not allow to remove downvote of an item not downvoted', mochaAsync(async () => {
@@ -333,7 +467,9 @@ context('Voting Contract', async () => {
       expect(itemVotes.upvotes).to.equal(0);
       expect(itemVotes.downvotes).to.equal(0);
 
-      let userVoted = await votingContract.haveIVotedItem({ itemId });
+      const user = await votingContract.getMyAccount();
+
+      let userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(false);
       expect(userVoted.downvoted).to.equal(false);
@@ -356,10 +492,20 @@ context('Voting Contract', async () => {
       expect(itemVotes.downvotes).to.equal(0);
 
 
-      userVoted = await votingContract.haveIVotedItem({ itemId });
+      userVoted = await votingContract.hasUserVotedItem({ itemId, user });
 
       expect(userVoted.upvoted).to.equal(false);
       expect(userVoted.downvoted).to.equal(false);
+
+      // Validate User Votes
+      const userVotes = await votingContract.getUserVotes({ user });
+      expect(userVotes.length).to.equal(2);
+      expect(userVotes[0].itemId).to.equal(0);
+      expect(userVotes[0].upvoted).to.equal(false);
+      expect(userVotes[0].downvoted).to.equal(false);
+      expect(userVotes[1].itemId).to.equal(1);
+      expect(userVotes[1].upvoted).to.equal(false);
+      expect(userVotes[1].downvoted).to.equal(false);
     }));
   });
 });
