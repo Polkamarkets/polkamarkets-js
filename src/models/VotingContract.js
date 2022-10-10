@@ -7,10 +7,10 @@ const Numbers = require("../utils/Numbers");
 const IContract = require('./IContract');
 
 const actions = {
-  0: 'Upvoted',
-  1: 'Remove Upvoted',
-  2: 'Downvoted',
-  3: 'Remove Downvoted',
+  0: 'Upvote',
+  1: 'Remove Upvote',
+  2: 'Downvote',
+  3: 'Remove Downvote',
 }
 
 /**
@@ -64,20 +64,6 @@ class VotingContract extends IContract {
   }
 
   /**
-   * @function haveIVotedItem
-   * @description Get info if I have voted the item
-   * @param {Integer} itemId
-   * @returns {Boolean} upvoted
-   * @returns {Boolean} downvoted
-   */
-  async haveIVotedItem({ itemId }) {
-    const account = await this.getMyAccount();
-    if (!account) return { upvoted: 0, downvoted: 0 };
-
-    return this.hasUserVotedItem({ user: account, itemId });
-  }
-
-  /**
    * @function hasUserVotedItem
    * @description Get info if user has voted the item
    * @param {Integer} itemId
@@ -99,25 +85,13 @@ class VotingContract extends IContract {
   }
 
   /**
-   * @function getMyActions
-   * @description Get my voting actions
-   * @returns {Array} Voted Actions
-   */
-  async getMyActions() {
-    const account = await this.getMyAccount();
-    if (!account) return [];
-
-    return this.getActions({ user: account });
-  }
-
-  /**
-   * @function getMyActions
+   * @function getUserActions
    * @description Get user voting actions
    * @param {Address} user
    * @returns {Array} Voted Actions
    */
-  async getActions({ user }) {
-    const events = await this.getEvents('ItemVotesAction', { user });
+  async getUserActions({ user }) {
+    const events = await this.getEvents('ItemVoteAction', { user });
 
     return events.map(event => {
       return {
@@ -129,6 +103,41 @@ class VotingContract extends IContract {
     });
   }
 
+  /**
+   * @function getUserVotes
+   * @description Get user voting status for every item he has voted
+   * @param {Address} user
+   * @returns {Array} Voting status
+   */
+  async getUserVotes({ user }) {
+    const events = await this.getEvents('ItemVoteAction', { user });
+
+    const eventMap = new Map();
+
+    // go through all events and get the latest event per each item
+    events.forEach(event => {
+      eventMap.set(
+        Numbers.fromBigNumberToInteger(event.returnValues.itemId, 18),
+        actions[Numbers.fromBigNumberToInteger(event.returnValues.action, 18)]
+      );
+    });
+
+
+    return [...eventMap]
+      // sort by item id
+      .sort(([itemId1], [itemId2]) => itemId1 - itemId2)
+      .map(([itemId, action]) => (
+        // depending on the last action we know the state
+        // upvote - upvote
+        // downvote - downvote
+        // removeUpvote, removeDownvote - nothing
+        {
+          itemId,
+          upvoted: action === actions[0],
+          downvoted: action === actions[2],
+        }
+      ));
+  }
 
   /* POST User Functions */
 

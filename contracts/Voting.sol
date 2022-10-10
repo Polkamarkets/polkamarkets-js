@@ -18,18 +18,18 @@ contract Voting {
     uint256 timestamp
   );
 
-  event ItemVotesAction(
+  event ItemVoteAction(
     address indexed user,
-    VotesAction indexed action,
+    VoteAction indexed action,
     uint256 indexed itemId,
     uint256 timestamp
   );
 
-  enum VotesAction {
-    upvoted,
-    removeUpvoted,
-    downvoted,
-    removeDownvoted
+  enum VoteAction {
+    upvote,
+    removeUpvote,
+    downvote,
+    removeDownvote
   }
 
   struct ItemVotes {
@@ -64,22 +64,22 @@ contract Voting {
 
   /// @dev allows user to upvote an item
   function upvoteItem(uint256 itemId) mustHoldRequiredBalance external {
-    voteItem(itemId, VotesAction.upvoted);
+    voteItem(itemId, VoteAction.upvote);
   }
 
   /// @dev allows user to downvote an item
   function downvoteItem(uint256 itemId) mustHoldRequiredBalance external {
-    voteItem(itemId, VotesAction.downvoted);
+    voteItem(itemId, VoteAction.downvote);
   }
 
   /// @dev logic of upvoting/downvoting an item
-  function voteItem(uint256 itemId, VotesAction action) private {
-    require(action == VotesAction.upvoted || action == VotesAction.downvoted, "Function parameter has to be upvoted or downvoted");
+  function voteItem(uint256 itemId, VoteAction action) private {
+    require(action == VoteAction.upvote || action == VoteAction.downvote, "Function parameter has to be upvoted or downvoted");
 
     ItemVotes storage item = items[itemId];
 
-    mapping(address => bool) storage listToAddVote = action == VotesAction.upvoted ? item.usersUpvoted : item.usersDownvoted;
-    mapping(address => bool) storage listToRemoveVote = action == VotesAction.upvoted ? item.usersDownvoted : item.usersUpvoted;
+    mapping(address => bool) storage listToAddVote = action == VoteAction.upvote ? item.usersUpvoted : item.usersDownvoted;
+    mapping(address => bool) storage listToRemoveVote = action == VoteAction.upvote ? item.usersDownvoted : item.usersUpvoted;
 
     // check if user has not already voted on the selected direction
     bool hasUserVotedSelectedDirection = listToAddVote[msg.sender];
@@ -91,16 +91,16 @@ contract Voting {
 
     // remove from total downvoted if needed
     if (hasUserVotedOtherDirection) {
-      action == VotesAction.upvoted ? item.downvotes = item.downvotes.sub(1) : item.upvotes = item.upvotes.sub(1);
+      action == VoteAction.upvote ? item.downvotes = item.downvotes.sub(1) : item.upvotes = item.upvotes.sub(1);
     }
 
     // add the vote
-    action == VotesAction.upvoted ? item.upvotes = item.upvotes.add(1) : item.downvotes = item.downvotes.add(1);
+    action == VoteAction.upvote ? item.upvotes = item.upvotes.add(1) : item.downvotes = item.downvotes.add(1);
     listToAddVote[msg.sender] = true;
     listToRemoveVote[msg.sender] = false;
 
     // emit events
-    emit ItemVotesAction(msg.sender, action, itemId, now);
+    emit ItemVoteAction(msg.sender, action, itemId, now);
 
     emit ItemVotesUpdated(itemId, item.upvotes, item.downvotes, now);
 
@@ -108,22 +108,22 @@ contract Voting {
 
   /// @dev allows user to remove an upvote from an item
   function removeUpvoteItem(uint256 itemId) mustHoldRequiredBalance external {
-    removeVoteItem(itemId, VotesAction.removeUpvoted);
+    removeVoteItem(itemId, VoteAction.removeUpvote);
   }
 
   /// @dev allows user to remove a downvote from an item
   function removeDownvoteItem(uint256 itemId) mustHoldRequiredBalance external {
-    removeVoteItem(itemId, VotesAction.removeDownvoted);
+    removeVoteItem(itemId, VoteAction.removeDownvote);
   }
 
   /// @dev logic of removing an upvote/downvote from an item
-  function removeVoteItem(uint256 itemId, VotesAction action) private {
-    require(action == VotesAction.removeUpvoted || action == VotesAction.removeDownvoted, "Function parameter has to be removeUpvoted or removeDownvoted");
+  function removeVoteItem(uint256 itemId, VoteAction action) private {
+    require(action == VoteAction.removeUpvote || action == VoteAction.removeDownvote, "Function parameter has to be removeUpvoted or removeDownvoted");
 
     // get item votes
     ItemVotes storage item = items[itemId];
 
-    mapping(address => bool) storage listToRemoveVote = action == VotesAction.removeUpvoted ? item.usersUpvoted : item.usersDownvoted;
+    mapping(address => bool) storage listToRemoveVote = action == VoteAction.removeUpvote ? item.usersUpvoted : item.usersDownvoted;
 
     // check if user has voted item
     bool hasUserVoted = listToRemoveVote[msg.sender];
@@ -131,11 +131,11 @@ contract Voting {
     require(hasUserVoted == true, "User doesn't have a vote on this item");
 
     // remove the vote
-    action == VotesAction.removeUpvoted ? item.upvotes = item.upvotes.sub(1) : item.downvotes = item.downvotes.sub(1);
+    action == VoteAction.removeUpvote ? item.upvotes = item.upvotes.sub(1) : item.downvotes = item.downvotes.sub(1);
     listToRemoveVote[msg.sender] = false;
 
     // emit events
-    emit ItemVotesAction(msg.sender, action, itemId, now);
+    emit ItemVoteAction(msg.sender, action, itemId, now);
 
     emit ItemVotesUpdated(itemId, item.upvotes, item.downvotes, now);
   }
