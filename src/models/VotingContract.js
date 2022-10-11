@@ -107,7 +107,7 @@ class VotingContract extends IContract {
    * @function getUserVotes
    * @description Get user voting status for every item he has voted
    * @param {Address} user
-   * @returns {Array} Voting status
+   * @returns {Object} Voting status
    */
   async getUserVotes({ user }) {
     const events = await this.getEvents('ItemVoteAction', { user });
@@ -122,21 +122,13 @@ class VotingContract extends IContract {
       );
     });
 
+    const userVotes = {};
+    [...eventMap].forEach(([itemId, action]) => userVotes[itemId] = {
+      upvoted: action === actions[0],
+      downvoted: action === actions[2],
+    });
 
-    return [...eventMap]
-      // sort by item id
-      .sort(([itemId1], [itemId2]) => itemId1 - itemId2)
-      .map(([itemId, action]) => (
-        // depending on the last action we know the state
-        // upvote - upvote
-        // downvote - downvote
-        // removeUpvote, removeDownvote - nothing
-        {
-          itemId,
-          upvoted: action === actions[0],
-          downvoted: action === actions[2],
-        }
-      ));
+    return userVotes;
   }
 
   /* POST User Functions */
