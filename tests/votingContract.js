@@ -81,8 +81,7 @@ context('Voting Contract', async () => {
 
       // Validate User Votes
       const userVotes = await votingContract.getUserVotes({ user });
-      expect(userVotes.length).to.equal(1);
-      expect(userVotes[0].itemId).to.equal(0);
+      expect(Object.keys(userVotes).length).to.equal(1);
       expect(userVotes[0].upvoted).to.equal(true);
       expect(userVotes[0].downvoted).to.equal(false);
     }));
@@ -121,11 +120,9 @@ context('Voting Contract', async () => {
 
       // Validate User Votes
       const userVotes = await votingContract.getUserVotes({ user });
-      expect(userVotes.length).to.equal(2);
-      expect(userVotes[0].itemId).to.equal(0);
+      expect(Object.keys(userVotes).length).to.equal(2);
       expect(userVotes[0].upvoted).to.equal(true);
       expect(userVotes[0].downvoted).to.equal(false);
-      expect(userVotes[1].itemId).to.equal(1);
       expect(userVotes[1].upvoted).to.equal(false);
       expect(userVotes[1].downvoted).to.equal(true);
     }));
@@ -166,11 +163,9 @@ context('Voting Contract', async () => {
 
       // Validate User Votes
       const userVotes = await votingContract.getUserVotes({ user });
-      expect(userVotes.length).to.equal(2);
-      expect(userVotes[0].itemId).to.equal(0);
+      expect(Object.keys(userVotes).length).to.equal(2);
       expect(userVotes[0].upvoted).to.equal(true);
       expect(userVotes[0].downvoted).to.equal(false);
-      expect(userVotes[1].itemId).to.equal(1);
       expect(userVotes[1].upvoted).to.equal(true);
       expect(userVotes[1].downvoted).to.equal(false);
     }));
@@ -211,11 +206,9 @@ context('Voting Contract', async () => {
 
       // Validate User Votes
       const userVotes = await votingContract.getUserVotes({ user });
-      expect(userVotes.length).to.equal(2);
-      expect(userVotes[0].itemId).to.equal(0);
+      expect(Object.keys(userVotes).length).to.equal(2);
       expect(userVotes[0].upvoted).to.equal(false);
       expect(userVotes[0].downvoted).to.equal(true);
-      expect(userVotes[1].itemId).to.equal(1);
       expect(userVotes[1].upvoted).to.equal(true);
       expect(userVotes[1].downvoted).to.equal(false);
     }));
@@ -260,11 +253,9 @@ context('Voting Contract', async () => {
 
       // Validate User Votes
       const userVotes = await votingContract.getUserVotes({ user });
-      expect(userVotes.length).to.equal(2);
-      expect(userVotes[0].itemId).to.equal(0);
+      expect(Object.keys(userVotes).length).to.equal(2);
       expect(userVotes[0].upvoted).to.equal(false);
       expect(userVotes[0].downvoted).to.equal(true);
-      expect(userVotes[1].itemId).to.equal(1);
       expect(userVotes[1].upvoted).to.equal(true);
       expect(userVotes[1].downvoted).to.equal(false);
     }));
@@ -309,11 +300,9 @@ context('Voting Contract', async () => {
 
       // Validate User Votes
       const userVotes = await votingContract.getUserVotes({ user });
-      expect(userVotes.length).to.equal(2);
-      expect(userVotes[0].itemId).to.equal(0);
+      expect(Object.keys(userVotes).length).to.equal(2);
       expect(userVotes[0].upvoted).to.equal(false);
       expect(userVotes[0].downvoted).to.equal(true);
-      expect(userVotes[1].itemId).to.equal(1);
       expect(userVotes[1].upvoted).to.equal(true);
       expect(userVotes[1].downvoted).to.equal(false);
     }));
@@ -354,11 +343,9 @@ context('Voting Contract', async () => {
 
       // Validate User Votes
       const userVotes = await votingContract.getUserVotes({ user });
-      expect(userVotes.length).to.equal(2);
-      expect(userVotes[0].itemId).to.equal(0);
+      expect(Object.keys(userVotes).length).to.equal(2);
       expect(userVotes[0].upvoted).to.equal(false);
       expect(userVotes[0].downvoted).to.equal(true);
-      expect(userVotes[1].itemId).to.equal(1);
       expect(userVotes[1].upvoted).to.equal(false);
       expect(userVotes[1].downvoted).to.equal(false);
     }));
@@ -399,11 +386,9 @@ context('Voting Contract', async () => {
 
       // Validate User Votes
       const userVotes = await votingContract.getUserVotes({ user });
-      expect(userVotes.length).to.equal(2);
-      expect(userVotes[0].itemId).to.equal(0);
+      expect(Object.keys(userVotes).length).to.equal(2);
       expect(userVotes[0].upvoted).to.equal(false);
       expect(userVotes[0].downvoted).to.equal(false);
-      expect(userVotes[1].itemId).to.equal(1);
       expect(userVotes[1].upvoted).to.equal(false);
       expect(userVotes[1].downvoted).to.equal(false);
     }));
@@ -449,11 +434,9 @@ context('Voting Contract', async () => {
 
       // Validate User Votes
       const userVotes = await votingContract.getUserVotes({ user });
-      expect(userVotes.length).to.equal(2);
-      expect(userVotes[0].itemId).to.equal(0);
+      expect(Object.keys(userVotes).length).to.equal(2);
       expect(userVotes[0].upvoted).to.equal(false);
       expect(userVotes[0].downvoted).to.equal(false);
-      expect(userVotes[1].itemId).to.equal(1);
       expect(userVotes[1].upvoted).to.equal(false);
       expect(userVotes[1].downvoted).to.equal(false);
     }));
@@ -499,11 +482,9 @@ context('Voting Contract', async () => {
 
       // Validate User Votes
       const userVotes = await votingContract.getUserVotes({ user });
-      expect(userVotes.length).to.equal(2);
-      expect(userVotes[0].itemId).to.equal(0);
+      expect(Object.keys(userVotes).length).to.equal(2);
       expect(userVotes[0].upvoted).to.equal(false);
       expect(userVotes[0].downvoted).to.equal(false);
-      expect(userVotes[1].itemId).to.equal(1);
       expect(userVotes[1].upvoted).to.equal(false);
       expect(userVotes[1].downvoted).to.equal(false);
     }));
