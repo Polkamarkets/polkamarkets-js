@@ -7,25 +7,25 @@ module.exports = async function(deployer) {
 
   const markets = [
     {
-      name: 'Will Bitcoin price be above $100,000 by January 1st 2022?',
+      name: 'Will Bitcoin price be above $100,000 by January 1st 2024?',
       outcomes: ['Yes', 'No'],
       category: 'Crypto;Bitcoin',
       image: 'QmXUiapNZUbxfWpNYMtbT8Xpyk4EdF6gKWa7cw8SBX5gm9',
-      closesAt: 1640995200,
+      closesAt: 1704067200,
     },
     {
-      name: 'Will PSG win the champions league',
+      name: 'Will PSG win the champions league?',
       outcomes: ['Yes', 'No'],
       category: 'Sports;Football',
       image: 'QmVbL7tKGeJUcv7KCMYSmz961JdzeMnVAoicnMqNSjyReh',
-      closesAt: 1653782400,
+      closesAt: 1704067200,
     },
     {
-      name: 'Will Ethereum price be above $10,000 by January 1st 2022?',
+      name: 'Will Ethereum price be above $10,000 by January 1st 2024?',
       outcomes: ['Yes', 'No'],
       category: 'Crypto;Ethereum',
       image: 'QmQMWVzqkXrizpiLFqGLvx6ruWzTWUGiUpP2r26jVtDoqT',
-      closesAt: 1640995200,
+      closesAt: 1704067200,
     },
     {
       name: 'Hello world',
