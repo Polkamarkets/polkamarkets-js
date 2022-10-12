@@ -276,7 +276,7 @@ class PredictionMarketContract extends IContract {
             const marketData = await this.params.contract.getContract().methods.getMarketData(marketId).call();
             if (parseInt(marketData[0]) === 2) {
               // market resolved, computing if user has winnings to claim
-              claimStatus[0] = marketShares[parseInt(marketData[5]) + 1] > 0;
+              claimStatus[0] = marketShares[1][parseInt(marketData[5])] > 0;
               if (claimStatus[0]) {
                 const events = await this.getEvents('MarketActionTx', { marketId, user, action: 4 });
                 claimStatus[1] = events.length > 0;
@@ -289,21 +289,22 @@ class PredictionMarketContract extends IContract {
           }
         }
 
+        const outcomeShares = Object.fromEntries(marketShares[1].map((item, index) => {
+          return [
+            index,
+            {
+              shares: Numbers.fromDecimalsNumber(item, 18),
+              price: this.getAverageOutcomeBuyPrice({events, marketId, outcomeId: index})
+            }
+          ];
+        }));
+
         portfolio = {
           liquidity: {
             shares: Numbers.fromDecimalsNumber(marketShares[0], 18),
             price: this.getAverageAddLiquidityPrice({events, marketId}),
           },
-          outcomes: {
-            0: {
-              shares: Numbers.fromDecimalsNumber(marketShares[1], 18),
-              price: this.getAverageOutcomeBuyPrice({events, marketId, outcomeId: 0}),
-            },
-            1: {
-              shares: Numbers.fromDecimalsNumber(marketShares[2], 18),
-              price: this.getAverageOutcomeBuyPrice({events, marketId, outcomeId: 1}),
-            },
-          },
+          outcomes: outcomeShares,
           claimStatus: {
             winningsToClaim: claimStatus[0],
             winningsClaimed: claimStatus[1],
@@ -333,13 +334,11 @@ class PredictionMarketContract extends IContract {
     if (!account) return [];
 
     const marketShares = await this.getContract().methods.getUserMarketShares(marketId, account).call();
+    const outcomeShares = Object.fromEntries(marketShares[1].map((item, index) => [index, Numbers.fromDecimalsNumber(item, 18)] ));
 
     return  {
       liquidityShares: Numbers.fromDecimalsNumber(marketShares[0], 18),
-      outcomeShares: {
-        0: Numbers.fromDecimalsNumber(marketShares[1], 18),
-        1: Numbers.fromDecimalsNumber(marketShares[2], 18),
-      }
+      outcomeShares
     };
   }
 
