@@ -6,6 +6,6 @@ const {
 
 module.exports = async function (deployer) {
   await deployer.deploy(RealitioERC20);
-  // const realitio = await RealitioERC20.deployed(RealitioERC20);
-  // await realitio.setToken('TOKEN');
+  const realitio = await RealitioERC20.deployed(RealitioERC20);
+  await realitio.setToken(TOKEN);
 };
