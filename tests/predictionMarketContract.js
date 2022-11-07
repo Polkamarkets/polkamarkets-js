@@ -10,21 +10,21 @@ context('Prediction Market Contract', async () => {
   require('dotenv').config();
 
   let app;
-  let accountAddress;
   let predictionMarketContract;
   let realitioERC20Contract
-  let requiredBalanceERC20Contract;
-  let tokenERC20Contract;
+  let ERC20Contract;
 
   // market / outcome ids we'll make unit tests with
+  let marketId = 0;
   let outcomeIds = [0, 1];
-  const value = 0.01;
+  const ethAmount = 0.01;
+  let closeDateTime;
 
   context('Contract Deployment', async () => {
     it('should start the Application', mochaAsync(async () => {
       app = new Application({
         web3Provider: process.env.WEB3_PROVIDER,
-        web3PrivateKey: process.env.WEB3_PRIVATE_KEY
+        web3PrivateKey: process.env.WEB3_PRIVATE_KEY,
       });
       expect(app).to.not.equal(null);
     }));
@@ -33,21 +33,19 @@ context('Prediction Market Contract', async () => {
       // Create Contract
       predictionMarketContract = app.getPredictionMarketContract({});
       realitioERC20Contract = app.getRealitioERC20Contract({});
-      requiredBalanceERC20Contract = app.getERC20Contract({});
-      tokenERC20Contract = app.getERC20Contract({});
-
-      // Deploy
+      ERC20Contract = app.getERC20Contract({});
+      // // Deploy
       await realitioERC20Contract.deploy({});
-      await requiredBalanceERC20Contract.deploy({params: ['Polkamarkets', 'POLK']});
+      await ERC20Contract.deploy({ params: ['Polkamarkets', 'POLK'] });
 
       const realitioContractAddress = realitioERC20Contract.getAddress();
-      const requiredBalanceERC20ContractAddress = requiredBalanceERC20Contract.getAddress();
-      accountAddress = await predictionMarketContract.getMyAccount();
+      const ERC20ContractAddress = ERC20Contract.getAddress();
+      const accountAddress = await predictionMarketContract.getMyAccount();
 
       await predictionMarketContract.deploy({
         params: [
           0,
-          requiredBalanceERC20ContractAddress,
+          ERC20ContractAddress,
           0,
           realitioContractAddress,
           86400
@@ -57,20 +55,6 @@ context('Prediction Market Contract', async () => {
 
       expect(predictionMarketContractAddress).to.not.equal(null);
       expect(realitioContractAddress).to.not.equal(null);
-
-      await tokenERC20Contract.deploy({params: ['Test Token', 'TEST']});
-
-      // minting tokens for market interaction
-      await tokenERC20Contract.getContract().methods.mint(accountAddress, '100000000000000000000000000').send({ from: accountAddress });
-
-      const balance = await tokenERC20Contract.getContract().methods.balanceOf(accountAddress).call();
-      const supply = await tokenERC20Contract.getContract().methods.totalSupply().call();
-
-      expect(balance).to.equal('100000000000000000000000000');
-      expect(balance).to.equal(supply);
-
-      // approve tokens for market interaction
-      await tokenERC20Contract.getContract().methods.approve(predictionMarketContractAddress, '100000000000000000000000000').send({ from: accountAddress });
 
       // setting predictionMarket ownable vars
       // await predictionMarketContract.getContract().methods.initialize().send({ from: accountAddress });
@@ -83,23 +67,21 @@ context('Prediction Market Contract', async () => {
   });
 
   context('Market Creation', async () => {
-    let marketId;
-
     it('should create a Market', mochaAsync(async () => {
+      closeDateTime = moment().add(1, 'day').startOf('day').format('YYYY-MM-DD HH:mm');
       try {
         const res = await predictionMarketContract.createMarket({
-          value,
-          name: 'Will BTC price close above 100k$ on May 1st 2024',
+          name: 'Will BTC price close above 100k$ on May 1st 2022',
           image: 'foo-bar',
           category: 'Foo;Bar',
           oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-          duration: moment('2024-05-01').unix(),
+          duration: moment(closeDateTime).unix(),
           outcomes: ['Yes', 'No'],
-          token: tokenERC20Contract.getAddress(),
+          ethAmount: ethAmount
         });
         expect(res.status).to.equal(true);
-      } catch(e) {
-        console.log(e);
+      } catch (e) {
+        // TODO: review this
       }
 
       const marketIds = await predictionMarketContract.getMarkets();
@@ -110,14 +92,13 @@ context('Prediction Market Contract', async () => {
 
     it('should create another Market', mochaAsync(async () => {
       const res = await predictionMarketContract.createMarket({
-        name: 'Will ETH price close above 10k$ on May 1st 2024',
+        name: 'Will ETH price close above 10k$ on May 1st 2022',
         image: 'foo-bar',
         category: 'Foo;Bar',
         oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-        duration: moment('2024-05-01').unix(),
+        duration: moment(closeDateTime).unix(),
         outcomes: ['Yes', 'No'],
-        value: 0.001,
-        token: tokenERC20Contract.getAddress(),
+        ethAmount: 0.001
       });
       expect(res.status).to.equal(true);
 
@@ -127,12 +108,11 @@ context('Prediction Market Contract', async () => {
   });
 
   context('Market Data', async () => {
-    let marketId = 0;
     it('should get Market data', mochaAsync(async () => {
-      const res = await predictionMarketContract.getMarketData({marketId});
+      const res = await predictionMarketContract.getMarketData({ marketId: 0 });
       expect(res).to.eql({
         name: '',
-        closeDateTime: '2024-05-01 00:00',
+        closeDateTime,
         state: 0,
         oracleAddress: '0x0000000000000000000000000000000000000000',
         liquidity: 0.01,
@@ -141,9 +121,9 @@ context('Prediction Market Contract', async () => {
     }));
 
     it('should get Market details', mochaAsync(async () => {
-      const res = await predictionMarketContract.getMarketDetails({marketId});
+      const res = await predictionMarketContract.getMarketDetails({ marketId: 0 });
       expect(res).to.eql({
-        name: 'Will BTC price close above 100k$ on May 1st 2024',
+        name: 'Will BTC price close above 100k$ on May 1st 2022',
         category: 'Foo',
         subcategory: 'Bar',
         outcomes: ['Yes', 'No'],
@@ -152,13 +132,13 @@ context('Prediction Market Contract', async () => {
     }));
 
     it('should get Market Outcomes data', mochaAsync(async () => {
-      const outcome1Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[0]});
+      const outcome1Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[0] });
       expect(outcome1Data).to.include({
         price: 0.5,
         shares: 0.01
       });
 
-      const outcome2Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[1]});
+      const outcome2Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[1] });
       expect(outcome2Data).to.include({
         price: 0.5,
         shares: 0.01
@@ -166,36 +146,35 @@ context('Prediction Market Contract', async () => {
 
       // outcomes share prices should sum to 1
       expect(outcome1Data.price + outcome2Data.price).to.equal(1);
-      // outcomes number of shares should dum to value * 2
-      expect(outcome1Data.shares + outcome2Data.shares).to.equal(value * 2);
+      // outcomes number of shares should dum to ethAmount * 2
+      expect(outcome1Data.shares + outcome2Data.shares).to.equal(ethAmount * 2);
     }));
   });
 
   context('Market Interaction - Balanced Market (Same Outcome Odds)', async () => {
-    let marketId = 0;
     it('should add liquidity without changing shares balance', mochaAsync(async () => {
-      const myShares = await predictionMarketContract.getMyMarketShares({marketId});
-      const marketData = await predictionMarketContract.getMarketData({marketId});
-      const outcome1Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[0]});
-      const outcome2Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[1]});
+      const myShares = await predictionMarketContract.getMyMarketShares({ marketId });
+      const marketData = await predictionMarketContract.getMarketData({ marketId });
+      const outcome1Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[0] });
+      const outcome2Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[1] });
 
       // balanced market - same price in all outcomoes
       expect(outcome1Data.price).to.equal(outcome2Data.price);
 
       try {
-        const res = await predictionMarketContract.addLiquidity({marketId, value})
+        const res = await predictionMarketContract.addLiquidity({ marketId, ethAmount })
         expect(res.status).to.equal(true);
-      } catch(e) {
-        console.log(e);
+      } catch (e) {
+        // TODO: review this
       }
 
-      const myNewShares = await predictionMarketContract.getMyMarketShares({marketId});
-      const newMarketData = await predictionMarketContract.getMarketData({marketId});
-      const newOutcome1Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[0]});
-      const newOutcome2Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[1]});
+      const myNewShares = await predictionMarketContract.getMyMarketShares({ marketId });
+      const newMarketData = await predictionMarketContract.getMarketData({ marketId });
+      const newOutcome1Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[0] });
+      const newOutcome2Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[1] });
 
       expect(newMarketData.liquidity).to.above(marketData.liquidity);
-      expect(newMarketData.liquidity).to.equal(marketData.liquidity + value);
+      expect(newMarketData.liquidity).to.equal(marketData.liquidity + ethAmount);
 
       // Outcome prices shoud remain the same after providing liquidity
       expect(newOutcome1Data.price).to.equal(outcome1Data.price);
@@ -203,37 +182,37 @@ context('Prediction Market Contract', async () => {
 
       // Price balances are 0.5-0.5, liquidity will be added solely through liquidity shares
       expect(myNewShares.liquidityShares).to.above(myShares.liquidityShares);
-      expect(myNewShares.liquidityShares).to.equal(myShares.liquidityShares + value);
+      expect(myNewShares.liquidityShares).to.equal(myShares.liquidityShares + ethAmount);
       // shares balance remains the same
       expect(myNewShares.outcomeShares[0]).to.equal(myShares.outcomeShares[0]);
       expect(myNewShares.outcomeShares[1]).to.equal(myShares.outcomeShares[1]);
     }));
 
     it('should remove liquidity without changing shares balance', mochaAsync(async () => {
-      const myShares = await predictionMarketContract.getMyMarketShares({marketId});
-      const marketData = await predictionMarketContract.getMarketData({marketId});
-      const outcome1Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[0]});
-      const outcome2Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[1]});
-      const contractBalance = await tokenERC20Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const myShares = await predictionMarketContract.getMyMarketShares({ marketId });
+      const marketData = await predictionMarketContract.getMarketData({ marketId });
+      const outcome1Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[0] });
+      const outcome2Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[1] });
+      const contractBalance = Number(await predictionMarketContract.getBalance());
 
       // balanced market - same price in all outcomoes
       expect(outcome1Data.price).to.equal(outcome2Data.price);
 
       try {
-        const res = await predictionMarketContract.removeLiquidity({marketId, shares: value})
+        const res = await predictionMarketContract.removeLiquidity({ marketId, shares: ethAmount })
         expect(res.status).to.equal(true);
-      } catch(e) {
-        console.log(e);
+      } catch (e) {
+        // TODO: review this
       }
 
-      const myNewShares = await predictionMarketContract.getMyMarketShares({marketId});
-      const newMarketData = await predictionMarketContract.getMarketData({marketId});
-      const newOutcome1Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[0]});
-      const newOutcome2Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[1]});
-      const newContractBalance = await tokenERC20Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const myNewShares = await predictionMarketContract.getMyMarketShares({ marketId });
+      const newMarketData = await predictionMarketContract.getMarketData({ marketId });
+      const newOutcome1Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[0] });
+      const newOutcome2Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[1] });
+      const newContractBalance = Number(await predictionMarketContract.getBalance());
 
       expect(newMarketData.liquidity).to.below(marketData.liquidity);
-      expect(newMarketData.liquidity).to.equal(marketData.liquidity - value);
+      expect(newMarketData.liquidity).to.equal(marketData.liquidity - ethAmount);
 
       // Outcome prices shoud remain the same after providing liquidity
       expect(newOutcome1Data.price).to.equal(outcome1Data.price);
@@ -241,22 +220,22 @@ context('Prediction Market Contract', async () => {
 
       // Price balances are 0.5-0.5, liquidity will be added solely through liquidity shares
       expect(myNewShares.liquidityShares).to.below(myShares.liquidityShares);
-      expect(myNewShares.liquidityShares).to.equal(myShares.liquidityShares - value);
+      expect(myNewShares.liquidityShares).to.equal(myShares.liquidityShares - ethAmount);
       // shares balance remains the same
       expect(myNewShares.outcomeShares[0]).to.equal(myShares.outcomeShares[0]);
       expect(myNewShares.outcomeShares[1]).to.equal(myShares.outcomeShares[1]);
 
       // User gets liquidity tokens back in ETH
       expect(newContractBalance).to.below(contractBalance);
+      // TODO: check amountTransferred from internal transactions
       const amountTransferred = Number((contractBalance - newContractBalance).toFixed(5));
-      expect(amountTransferred).to.equal(value);
+      expect(amountTransferred).to.equal(ethAmount);
     }));
   });
 
   context('Market Interaction - Unbalanced Market (Different Outcome Odds)', async () => {
-    let marketId = 0;
     it('should display my shares', mochaAsync(async () => {
-      const res = await predictionMarketContract.getMyMarketShares({marketId});
+      const res = await predictionMarketContract.getMyMarketShares({ marketId });
       // currently holding liquidity tokens from market creation
       expect(res).to.eql({
         liquidityShares: 0.01,
@@ -271,22 +250,22 @@ context('Prediction Market Contract', async () => {
       const outcomeId = 0;
       const minOutcomeSharesToBuy = 0.015;
 
-      const marketData = await predictionMarketContract.getMarketData({marketId});
-      const outcome1Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[0]});
-      const outcome2Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[1]});
-      const contractBalance = await tokenERC20Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const marketData = await predictionMarketContract.getMarketData({ marketId });
+      const outcome1Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[0] });
+      const outcome2Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[1] });
+      const contractBalance = Number(await predictionMarketContract.getBalance());
 
       try {
-        const res = await predictionMarketContract.buy({marketId, outcomeId, value, minOutcomeSharesToBuy});
+        const res = await predictionMarketContract.buy({ marketId, outcomeId, ethAmount, minOutcomeSharesToBuy });
         expect(res.status).to.equal(true);
-      } catch(e) {
-        console.log(e);
+      } catch (e) {
+        // TODO: review this
       }
 
-      const newMarketData = await predictionMarketContract.getMarketData({marketId});
-      const newOutcome1Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[0]});
-      const newOutcome2Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[1]});
-      const newContractBalance = await tokenERC20Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const newMarketData = await predictionMarketContract.getMarketData({ marketId });
+      const newOutcome1Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[0] });
+      const newOutcome2Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[1] });
+      const newContractBalance = Number(await predictionMarketContract.getBalance());
 
       // outcome price should increase
       expect(newOutcome1Data.price).to.above(outcome1Data.price);
@@ -295,7 +274,7 @@ context('Prediction Market Contract', async () => {
       expect(newOutcome2Data.price).to.below(outcome2Data.price);
       expect(newOutcome2Data.price).to.equal(0.2);
       // Prices sum = 1
-      // 0.5 + 0.5 = 1
+      // 0.05 + 0.05 = 1
       expect(newOutcome1Data.price + newOutcome2Data.price).to.equal(1);
 
       // Liquidity value remains the same
@@ -309,10 +288,10 @@ context('Prediction Market Contract', async () => {
       expect(newOutcome2Data.shares).to.equal(0.02);
       // # Shares Product = Liquidity^2
       // 0.005 * 0.02 = 0.01^2
-      expect(outcome1Data.shares * outcome2Data.shares).to.equal(newMarketData.liquidity**2);
-      expect(newOutcome1Data.shares * newOutcome2Data.shares).to.equal(newMarketData.liquidity**2);
+      expect(outcome1Data.shares * outcome2Data.shares).to.equal(newMarketData.liquidity ** 2);
+      expect(newOutcome1Data.shares * newOutcome2Data.shares).to.equal(newMarketData.liquidity ** 2);
 
-      const myShares = await predictionMarketContract.getMyMarketShares({marketId});
+      const myShares = await predictionMarketContract.getMyMarketShares({ marketId });
       expect(myShares).to.eql({
         liquidityShares: 0.01,
         outcomeShares: {
@@ -321,30 +300,30 @@ context('Prediction Market Contract', async () => {
         }
       });
 
-      // Contract adds value to balance
+      // Contract adds ethAmount to balance
       expect(newContractBalance).to.above(contractBalance);
       // TODO: check amountReceived from internal transactions
       const amountReceived = Number((newContractBalance - contractBalance).toFixed(5));
-      expect(amountReceived).to.equal(value);
+      expect(amountReceived).to.equal(ethAmount);
     }));
 
     it('should add liquidity', mochaAsync(async () => {
-      const myShares = await predictionMarketContract.getMyMarketShares({marketId});
-      const marketData = await predictionMarketContract.getMarketData({marketId});
-      const outcome1Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[0]});
-      const outcome2Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[1]});
+      const myShares = await predictionMarketContract.getMyMarketShares({ marketId });
+      const marketData = await predictionMarketContract.getMarketData({ marketId });
+      const outcome1Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[0] });
+      const outcome2Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[1] });
 
       try {
-        const res = await predictionMarketContract.addLiquidity({marketId, value})
+        const res = await predictionMarketContract.addLiquidity({ marketId, ethAmount })
         expect(res.status).to.equal(true);
-      } catch(e) {
-        console.log(e);
+      } catch (e) {
+        // TODO: review this
       }
 
-      const myNewShares = await predictionMarketContract.getMyMarketShares({marketId});
-      const newMarketData = await predictionMarketContract.getMarketData({marketId});
-      const newOutcome1Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[0]});
-      const newOutcome2Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[1]});
+      const myNewShares = await predictionMarketContract.getMyMarketShares({ marketId });
+      const newMarketData = await predictionMarketContract.getMarketData({ marketId });
+      const newOutcome1Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[0] });
+      const newOutcome2Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[1] });
 
       // Outcome prices shoud remain the same after providing liquidity
       expect(newOutcome1Data.price).to.equal(outcome1Data.price);
@@ -358,7 +337,7 @@ context('Prediction Market Contract', async () => {
       expect(newOutcome1Data.shares).to.equal(0.0075);
       expect(newOutcome2Data.shares).to.above(outcome2Data.shares);
       expect(newOutcome2Data.shares).to.equal(0.03);
-      expect(newOutcome1Data.shares * newOutcome2Data.shares).to.equal(newMarketData.liquidity**2);
+      expect(newOutcome1Data.shares * newOutcome2Data.shares).to.equal(newMarketData.liquidity ** 2);
 
       // Price balances are not 0.5-0.5, liquidity will be added through shares + liquidity
       expect(myNewShares.liquidityShares).to.above(myShares.liquidityShares);
@@ -372,25 +351,25 @@ context('Prediction Market Contract', async () => {
     }));
 
     it('should remove liquidity', mochaAsync(async () => {
-      const myShares = await predictionMarketContract.getMyMarketShares({marketId});
-      const marketData = await predictionMarketContract.getMarketData({marketId});
-      const outcome1Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[0]});
-      const outcome2Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[1]});
-      const contractBalance = await tokenERC20Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const myShares = await predictionMarketContract.getMyMarketShares({ marketId });
+      const marketData = await predictionMarketContract.getMarketData({ marketId });
+      const outcome1Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[0] });
+      const outcome2Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[1] });
+      const contractBalance = Number(await predictionMarketContract.getBalance());
       const liquiditySharesToRemove = 0.005;
 
       try {
-        const res = await predictionMarketContract.removeLiquidity({marketId, shares: liquiditySharesToRemove});
+        const res = await predictionMarketContract.removeLiquidity({ marketId, shares: liquiditySharesToRemove });
         expect(res.status).to.equal(true);
-      } catch(e) {
-        console.log(e);
+      } catch (e) {
+        // TODO: review this
       }
 
-      const myNewShares = await predictionMarketContract.getMyMarketShares({marketId});
-      const newMarketData = await predictionMarketContract.getMarketData({marketId});
-      const newOutcome1Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[0]});
-      const newOutcome2Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[1]});
-      const newContractBalance = await tokenERC20Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const myNewShares = await predictionMarketContract.getMyMarketShares({ marketId });
+      const newMarketData = await predictionMarketContract.getMarketData({ marketId });
+      const newOutcome1Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[0] });
+      const newOutcome2Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[1] });
+      const newContractBalance = Number(await predictionMarketContract.getBalance());
 
       // Outcome prices shoud remain the same after removing liquidity
       expect(newOutcome1Data.price).to.equal(outcome1Data.price);
@@ -404,7 +383,7 @@ context('Prediction Market Contract', async () => {
       expect(newOutcome1Data.shares).to.equal(0.005);
       expect(newOutcome2Data.shares).to.below(outcome2Data.shares);
       expect(newOutcome2Data.shares).to.equal(0.02);
-      expect(newOutcome1Data.shares * newOutcome2Data.shares).to.equal(newMarketData.liquidity**2);
+      expect(newOutcome1Data.shares * newOutcome2Data.shares).to.equal(newMarketData.liquidity ** 2);
 
       // Price balances are not 0.5-0.5, liquidity will be added through shares + liquidity
       expect(myNewShares.liquidityShares).to.below(myShares.liquidityShares);
@@ -418,6 +397,7 @@ context('Prediction Market Contract', async () => {
 
       // User gets part of the liquidity tokens back in ETH
       expect(newContractBalance).to.below(contractBalance);
+      // TODO: check amountTransferred from internal transactions
       const amountTransferred = Number((contractBalance - newContractBalance).toFixed(5));
       expect(amountTransferred).to.equal(0.0025);
     }));
@@ -426,22 +406,22 @@ context('Prediction Market Contract', async () => {
       const outcomeId = 0;
       const maxOutcomeSharesToSell = 0.015;
 
-      const marketData = await predictionMarketContract.getMarketData({marketId});
-      const outcome1Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[0]});
-      const outcome2Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[1]});
-      const contractBalance = await tokenERC20Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const marketData = await predictionMarketContract.getMarketData({ marketId });
+      const outcome1Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[0] });
+      const outcome2Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[1] });
+      const contractBalance = Number(await predictionMarketContract.getBalance());
 
       try {
-        const res = await predictionMarketContract.sell({marketId, outcomeId, value, maxOutcomeSharesToSell});
+        const res = await predictionMarketContract.sell({ marketId, outcomeId, ethAmount, maxOutcomeSharesToSell });
         expect(res.status).to.equal(true);
-      } catch(e) {
-        console.log(e);
+      } catch (e) {
+        // TODO: review this
       }
 
-      const newMarketData = await predictionMarketContract.getMarketData({marketId});
-      const newOutcome1Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[0]});
-      const newOutcome2Data = await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[1]});
-      const newContractBalance = await tokenERC20Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const newMarketData = await predictionMarketContract.getMarketData({ marketId });
+      const newOutcome1Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[0] });
+      const newOutcome2Data = await predictionMarketContract.getOutcomeData({ marketId, outcomeId: outcomeIds[1] });
+      const newContractBalance = Number(await predictionMarketContract.getBalance());
 
       // outcome price should decrease
       expect(newOutcome1Data.price).to.below(outcome1Data.price);
@@ -450,7 +430,7 @@ context('Prediction Market Contract', async () => {
       expect(newOutcome2Data.price).to.above(outcome2Data.price);
       expect(newOutcome2Data.price).to.equal(0.5);
       // Prices sum = 1
-      // 0.5 + 0.5 = 1
+      // 0.05 + 0.05 = 1
       expect(newOutcome1Data.price + newOutcome2Data.price).to.equal(1);
 
       // Liquidity value remains the same
@@ -464,10 +444,10 @@ context('Prediction Market Contract', async () => {
       expect(newOutcome2Data.shares).to.equal(0.01);
       // # Shares Product = Liquidity^2
       // 0.01 * 0.01 = 0.01^2
-      expect(outcome1Data.shares * outcome2Data.shares).to.equal(newMarketData.liquidity**2);
-      expect(newOutcome1Data.shares * newOutcome2Data.shares).to.equal(newMarketData.liquidity**2);
+      expect(outcome1Data.shares * outcome2Data.shares).to.equal(newMarketData.liquidity ** 2);
+      expect(newOutcome1Data.shares * newOutcome2Data.shares).to.equal(newMarketData.liquidity ** 2);
 
-      const myShares = await predictionMarketContract.getMyMarketShares({marketId});
+      const myShares = await predictionMarketContract.getMyMarketShares({ marketId });
       expect(myShares).to.eql({
         liquidityShares: 0.01,
         outcomeShares: {
@@ -478,363 +458,9 @@ context('Prediction Market Contract', async () => {
 
       // User gets shares value back in ETH
       expect(newContractBalance).to.below(contractBalance);
+      // TODO: check amountTransferred from internal transactions
       const amountTransferred = Number((contractBalance - newContractBalance).toFixed(5));
       expect(amountTransferred).to.equal(0.01);
     }));
-  });
-
-  context('Multiple Outcomes', async () => {
-    let marketId = 0;
-    context('Market Creation', async () => {
-      it('should create a Market with 3 outcomes', mochaAsync(async () => {
-        try {
-          const res = await predictionMarketContract.createMarket({
-            value,
-            name: 'Market with 3 outcomes',
-            image: 'foo-bar',
-            category: 'Foo;Bar',
-            oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-            duration: moment('2024-05-01').unix(),
-            outcomes: ['A', 'B', 'C'],
-            token: tokenERC20Contract.getAddress(),
-          });
-          expect(res.status).to.equal(true);
-        } catch(e) {
-          console.log(e);
-        }
-
-        const marketIds = await predictionMarketContract.getMarkets();
-        marketId = marketIds[marketIds.length - 1];
-
-        const res = await predictionMarketContract.getMarketData({marketId});
-        expect(res.outcomeIds.length).to.eql(3);
-        expect(res.outcomeIds).to.eql([0, 1, 2]);
-      }));
-
-      it('should create a Market with 256 outcomes', mochaAsync(async () => {
-        // Array with outcomes with outcome id as name
-        // TODO: improve gas optimization for markets with 10+ outcomes
-        const outcomeCount = 8;
-        const outcomes = Array.from(Array(outcomeCount).keys());
-
-        try {
-          const res = await predictionMarketContract.createMarket({
-            value,
-            name: `Market with ${outcomeCount} outcomes`,
-            image: 'foo-bar',
-            category: 'Foo;Bar',
-            oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-            duration: moment('2024-05-01').unix(),
-            outcomes,
-            token: tokenERC20Contract.getAddress(),
-          });
-          expect(res.status).to.equal(true);
-        } catch(e) {
-          console.log(e);
-        }
-
-        const marketIds = await predictionMarketContract.getMarkets();
-        marketId = marketIds[marketIds.length - 1];
-
-        const res = await predictionMarketContract.getMarketData({marketId});
-        expect(res.outcomeIds.length).to.eql(outcomeCount);
-        expect(res.outcomeIds).to.eql(outcomes);
-      }));
-
-      it('should not create a Market with more than 256 outcomes', mochaAsync(async () => {
-        const oldMarketIds = await predictionMarketContract.getMarkets();
-        try {
-          const outcomes = Array.from(Array(257).keys());
-
-          const res = await predictionMarketContract.createMarket({
-            value,
-            name: 'Market with 257 outcomes',
-            image: 'foo-bar',
-            category: 'Foo;Bar',
-            oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-            duration: moment('2024-05-01').unix(),
-            outcomes,
-            token: tokenERC20Contract.getAddress(),
-          });
-          expect(res.status).to.equal(true);
-        } catch(e) {
-          // not logging error, as tx is expected to fail
-          // console.log(e);
-        }
-
-        const currentMarketIds = await predictionMarketContract.getMarkets();
-
-        expect(currentMarketIds.length).to.eql(oldMarketIds.length);
-      }));
-    });
-
-    context('Market Interaction', async () => {
-      let marketId;
-      let outcomeIds = [0, 1, 2];
-
-      before(mochaAsync(async () => {
-        try {
-          const res = await predictionMarketContract.createMarket({
-            value,
-            name: 'Market with 3 outcomes',
-            image: 'foo-bar',
-            category: 'Foo;Bar',
-            oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-            duration: moment('2024-05-01').unix(),
-            outcomes: ['D', 'E', 'F'],
-            token: tokenERC20Contract.getAddress(),
-          });
-          expect(res.status).to.equal(true);
-        } catch(e) {
-          console.log(e);
-        }
-
-        const marketIds = await predictionMarketContract.getMarkets();
-        marketId = marketIds[marketIds.length - 1];
-      }));
-
-      it('should buy outcome shares', mochaAsync(async () => {
-        const outcomeId = 0;
-        const minOutcomeSharesToBuy = 0.015;
-
-        const marketData = await predictionMarketContract.getMarketData({marketId});
-        const outcomeData = await Promise.all(outcomeIds.map(async (outcomeId) => {
-          return await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[outcomeId]});
-        }));
-        const contractBalance = await tokenERC20Contract.balanceOf({address: predictionMarketContract.getAddress()});
-
-        try {
-          const res = await predictionMarketContract.buy({marketId, outcomeId, value, minOutcomeSharesToBuy});
-          expect(res.status).to.equal(true);
-        } catch(e) {
-          console.log(e);
-        }
-
-        const newMarketData = await predictionMarketContract.getMarketData({marketId});
-        const newOutcomeData = await Promise.all(outcomeIds.map(async (outcomeId) => {
-          return await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[outcomeId]});
-        }));
-        const newContractBalance = await tokenERC20Contract.balanceOf({address: predictionMarketContract.getAddress()});
-
-        // outcome price should increase
-        expect(newOutcomeData[0].price).to.above(outcomeData[0].price);
-        expect(newOutcomeData[0].price).to.equal(0.8);
-        // opposite outcome price should decrease
-        expect(newOutcomeData[1].price).to.below(outcomeData[1].price);
-        expect(newOutcomeData[1].price).to.equal(0.1);
-        expect(newOutcomeData[2].price).to.below(outcomeData[2].price);
-        expect(newOutcomeData[2].price).to.equal(0.1);
-        // Prices sum = 1
-        // 0.1 + 0.1 + 0.8 = 1
-        expect(newOutcomeData[0].price + newOutcomeData[1].price + newOutcomeData[2].price).to.equal(1);
-
-        // Liquidity value remains the same
-        expect(newMarketData.liquidity).to.equal(marketData.liquidity);
-
-        // outcome shares should decrease
-        expect(newOutcomeData[0].shares).to.below(outcomeData[0].shares);
-        expect(newOutcomeData[0].shares).to.equal(0.0025);
-        // opposite outcome shares should increase
-        expect(newOutcomeData[1].shares).to.above(outcomeData[1].shares);
-        expect(newOutcomeData[1].shares).to.equal(0.02);
-        expect(newOutcomeData[2].shares).to.above(outcomeData[2].shares);
-        expect(newOutcomeData[2].shares).to.equal(0.02);
-        // # Shares Product = Liquidity^2
-        // 0.0025 * 0.02 * 0.02 = 0.01^3
-        expect(outcomeData[0].shares * outcomeData[1].shares * outcomeData[2].shares).to.equal(newMarketData.liquidity ** 3);
-        expect(newOutcomeData[0].shares * newOutcomeData[1].shares * newOutcomeData[2].shares).to.equal(newMarketData.liquidity ** 3);
-
-        const myShares = await predictionMarketContract.getMyMarketShares({marketId});
-        expect(myShares).to.eql({
-          liquidityShares: 0.01,
-          outcomeShares: {
-            0: 0.0175,
-            1: 0.00,
-            2: 0.00,
-          }
-        });
-
-        // Contract adds value to balance
-        expect(newContractBalance).to.above(contractBalance);
-        // TODO: check amountReceived from internal transactions
-        const amountReceived = Number((newContractBalance - contractBalance).toFixed(5));
-        expect(amountReceived).to.equal(value);
-      }));
-
-      it('should add liquidity', mochaAsync(async () => {
-        const myShares = await predictionMarketContract.getMyMarketShares({marketId});
-        const marketData = await predictionMarketContract.getMarketData({marketId});
-        const outcomeData = await Promise.all(outcomeIds.map(async (outcomeId) => {
-          return await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[outcomeId]});
-        }));
-
-        try {
-          const res = await predictionMarketContract.addLiquidity({marketId, value})
-          expect(res.status).to.equal(true);
-        } catch(e) {
-          console.log(e);
-        }
-
-        const myNewShares = await predictionMarketContract.getMyMarketShares({marketId});
-        const newMarketData = await predictionMarketContract.getMarketData({marketId});
-        const newOutcomeData = await Promise.all(outcomeIds.map(async (outcomeId) => {
-          return await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[outcomeId]});
-        }));
-
-        // Outcome prices shoud remain the same after providing liquidity
-        expect(newOutcomeData[0].price).to.equal(outcomeData[0].price);
-        expect(newOutcomeData[1].price).to.equal(outcomeData[1].price);
-        expect(newOutcomeData[2].price).to.equal(outcomeData[2].price);
-
-        // # Shares Product = Liquidity^2
-        // 0.00375 * 0.03 * 0.03 = 0.015^3
-        expect(newMarketData.liquidity).to.above(marketData.liquidity);
-        expect(newMarketData.liquidity).to.equal(0.015);
-        expect(newOutcomeData[0].shares).to.above(outcomeData[0].shares);
-        expect(newOutcomeData[0].shares).to.equal(0.00375);
-        expect(newOutcomeData[1].shares).to.above(outcomeData[1].shares);
-        expect(newOutcomeData[1].shares).to.equal(0.03);
-        expect(newOutcomeData[2].shares).to.above(outcomeData[2].shares);
-        expect(newOutcomeData[2].shares).to.equal(0.03);
-        expect(newOutcomeData[0].shares * newOutcomeData[1].shares * newOutcomeData[2].shares).to.be.closeTo(newMarketData.liquidity ** 3, 0.00000001);
-
-        // Price balances are not 0.5-0.5, liquidity will be added through shares + liquidity
-        expect(myNewShares.liquidityShares).to.above(myShares.liquidityShares);
-        expect(myNewShares.liquidityShares).to.equal(0.015);
-        // shares balance of higher odd outcome increases
-        expect(myNewShares.outcomeShares[0]).to.above(myShares.outcomeShares[0]);
-        expect(myNewShares.outcomeShares[0]).to.equal(0.02625);
-        // shares balance of lower odd outcome remains
-        expect(myNewShares.outcomeShares[1]).to.equal(myShares.outcomeShares[1]);
-        expect(myNewShares.outcomeShares[1]).to.equal(0);
-        expect(myNewShares.outcomeShares[2]).to.equal(myShares.outcomeShares[2]);
-        expect(myNewShares.outcomeShares[2]).to.equal(0);
-      }));
-
-      it('should remove liquidity', mochaAsync(async () => {
-        const myShares = await predictionMarketContract.getMyMarketShares({marketId});
-        const marketData = await predictionMarketContract.getMarketData({marketId});
-        const outcomeData = await Promise.all(outcomeIds.map(async (outcomeId) => {
-          return await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[outcomeId]});
-        }));
-        const contractBalance = await tokenERC20Contract.balanceOf({address: predictionMarketContract.getAddress()});
-        const liquiditySharesToRemove = 0.005;
-
-        try {
-          const res = await predictionMarketContract.removeLiquidity({marketId, shares: liquiditySharesToRemove});
-          expect(res.status).to.equal(true);
-        } catch(e) {
-          console.log(e);
-        }
-
-        const myNewShares = await predictionMarketContract.getMyMarketShares({marketId});
-        const newMarketData = await predictionMarketContract.getMarketData({marketId});
-        const newOutcomeData = await Promise.all(outcomeIds.map(async (outcomeId) => {
-          return await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[outcomeId]});
-        }));
-        const newContractBalance = await tokenERC20Contract.balanceOf({address: predictionMarketContract.getAddress()});
-
-        // Outcome prices shoud remain the same after removing liquidity
-        expect(newOutcomeData[0].price).to.equal(outcomeData[0].price);
-        expect(newOutcomeData[1].price).to.equal(outcomeData[1].price);
-        expect(newOutcomeData[2].price).to.equal(outcomeData[2].price);
-
-        // # Shares Product = Liquidity^3
-        // 0.0025 * 0.02 * 0.02 = 0.01^3
-        expect(newMarketData.liquidity).to.below(marketData.liquidity);
-        expect(newMarketData.liquidity).to.equal(0.01);
-        expect(newOutcomeData[0].shares).to.below(outcomeData[0].shares);
-        expect(newOutcomeData[0].shares).to.equal(0.0025);
-        expect(newOutcomeData[1].shares).to.below(outcomeData[1].shares);
-        expect(newOutcomeData[1].shares).to.equal(0.02);
-        expect(newOutcomeData[2].shares).to.below(outcomeData[2].shares);
-        expect(newOutcomeData[2].shares).to.equal(0.02);
-        expect(newOutcomeData[0].shares * newOutcomeData[1].shares * newOutcomeData[2].shares).to.equal(newMarketData.liquidity ** 3);
-
-        // Price balances are not 0.5-0.5, liquidity will be added through shares + liquidity
-        expect(myNewShares.liquidityShares).to.below(myShares.liquidityShares);
-        expect(myNewShares.liquidityShares).to.equal(0.01);
-        // shares balance of higher odd outcome remains
-        expect(myNewShares.outcomeShares[0]).to.equal(myShares.outcomeShares[0]);
-        expect(myNewShares.outcomeShares[0]).to.equal(0.02625);
-        // shares balance of lower odd outcome increases
-        expect(myNewShares.outcomeShares[1]).to.above(myShares.outcomeShares[1]);
-        expect(myNewShares.outcomeShares[1]).to.equal(0.00875);
-        expect(myNewShares.outcomeShares[2]).to.above(myShares.outcomeShares[2]);
-        expect(myNewShares.outcomeShares[2]).to.equal(0.00875);
-
-        // User gets part of the liquidity tokens back in ETH
-        expect(newContractBalance).to.below(contractBalance);
-        const amountTransferred = Number((contractBalance - newContractBalance).toFixed(5));
-        expect(amountTransferred).to.equal(0.00125);
-      }));
-
-      it('should sell outcome shares', mochaAsync(async () => {
-        const outcomeId = 0;
-        const maxOutcomeSharesToSell = 0.0175;
-
-        const marketData = await predictionMarketContract.getMarketData({marketId});
-        const outcomeData = await Promise.all(outcomeIds.map(async (outcomeId) => {
-          return await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[outcomeId]});
-        }));
-        const contractBalance = await tokenERC20Contract.balanceOf({address: predictionMarketContract.getAddress()});
-
-        try {
-          const res = await predictionMarketContract.sell({marketId, outcomeId, value, maxOutcomeSharesToSell});
-          expect(res.status).to.equal(true);
-        } catch(e) {
-          console.log(e);
-        }
-
-        const newMarketData = await predictionMarketContract.getMarketData({marketId});
-        const newOutcomeData = await Promise.all(outcomeIds.map(async (outcomeId) => {
-          return await predictionMarketContract.getOutcomeData({marketId, outcomeId: outcomeIds[outcomeId]});
-        }));
-        const newContractBalance = await tokenERC20Contract.balanceOf({address: predictionMarketContract.getAddress()});
-
-        // outcome price should decrease
-        expect(newOutcomeData[0].price).to.below(outcomeData[0].price);
-        expect(newOutcomeData[0].price).to.equal(1/3);
-        // opposite outcome price should increase
-        expect(newOutcomeData[1].price).to.above(outcomeData[1].price);
-        expect(newOutcomeData[1].price).to.equal(1/3);
-        expect(newOutcomeData[2].price).to.above(outcomeData[2].price);
-        expect(newOutcomeData[2].price).to.equal(1/3);
-        // Prices sum = 1
-        // 0.333 + 0.333 + 0.333 = 1
-        expect(newOutcomeData[0].price + newOutcomeData[1].price + newOutcomeData[2].price).to.equal(1);
-
-        // Liquidity value remains the same
-        expect(newMarketData.liquidity).to.equal(marketData.liquidity);
-
-        // outcome shares should increase
-        expect(newOutcomeData[0].shares).to.above(outcomeData[0].shares);
-        expect(newOutcomeData[0].shares).to.equal(0.01);
-        // opposite outcome shares should increase
-        expect(newOutcomeData[1].shares).to.below(outcomeData[1].shares);
-        expect(newOutcomeData[1].shares).to.equal(0.01);
-        expect(newOutcomeData[2].shares).to.below(outcomeData[2].shares);
-        expect(newOutcomeData[2].shares).to.equal(0.01);
-        // # Shares Product = Liquidity^2
-        // 0.01 * 0.01 = 0.01^2
-        expect(outcomeData[0].shares * outcomeData[1].shares * outcomeData[2].shares).to.equal(newMarketData.liquidity ** 3);
-        expect(newOutcomeData[0].shares * newOutcomeData[1].shares * newOutcomeData[2].shares).to.equal(newMarketData.liquidity ** 3);
-
-        const myShares = await predictionMarketContract.getMyMarketShares({marketId});
-        expect(myShares).to.eql({
-          liquidityShares: 0.01,
-          outcomeShares: {
-            0: 0.00875,
-            1: 0.00875,
-            2: 0.00875,
-          }
-        });
-
-        // User gets shares value back in ETH
-        expect(newContractBalance).to.below(contractBalance);
-        const amountTransferred = Number((contractBalance - newContractBalance).toFixed(5));
-        expect(amountTransferred).to.equal(0.01);
-      }));
-    });
   });
 });

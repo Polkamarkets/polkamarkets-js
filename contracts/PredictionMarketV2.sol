@@ -15,7 +15,7 @@ library CeilDiv {
 }
 
 /// @title Market Contract Factory
-contract PredictionMarket {
+contract PredictionMarketV2 {
   using SafeMath for uint256;
   using CeilDiv for uint256;
 
@@ -80,6 +80,7 @@ contract PredictionMarket {
     // market outcomes
     uint256[] outcomeIds;
     mapping(uint256 => MarketOutcome) outcomes;
+    IERC20 token; // ERC20 token market will use for trading
   }
 
   struct MarketFees {
@@ -108,6 +109,17 @@ contract PredictionMarket {
     mapping(address => bool) voidedClaims; // wether user has claimed voided market shares
   }
 
+  struct CreateMarketArgs {
+    uint256 value;
+    uint256 closesAt;
+    uint256 outcomes;
+    IERC20 token;
+    uint256[] distribution;
+    string question;
+    string image;
+    address arbitrator;
+  }
+
   uint256[] marketIds;
   mapping(uint256 => Market) markets;
   uint256 public marketIndex;
@@ -118,7 +130,7 @@ contract PredictionMarket {
   address public realitioAddress;
   uint256 public realitioTimeout;
   // market creation
-  IERC20 public token; // token used for rewards / market creation
+  IERC20 public requiredBalanceToken; // token used for rewards / market creation
   uint256 public requiredBalance; // required balance for market creation
 
   // ------ Modifiers ------
@@ -151,7 +163,10 @@ contract PredictionMarket {
   }
 
   modifier mustHoldRequiredBalance() {
-    require(token.balanceOf(msg.sender) >= requiredBalance, "msg.sender must hold minimum erc20 balance");
+    require(
+      requiredBalance == 0 || requiredBalanceToken.balanceOf(msg.sender) >= requiredBalance,
+      "msg.sender must hold minimum erc20 balance"
+    );
     _;
   }
 
@@ -160,7 +175,7 @@ contract PredictionMarket {
   /// @dev protocol is immutable and has no ownership
   constructor(
     uint256 _fee,
-    IERC20 _token,
+    IERC20 _requiredBalanceToken,
     uint256 _requiredBalance,
     address _realitioAddress,
     uint256 _realitioTimeout
@@ -169,7 +184,7 @@ contract PredictionMarket {
     require(_realitioTimeout > 0, "timeout must be positive");
 
     fee = _fee;
-    token = _token;
+    requiredBalanceToken = _requiredBalanceToken;
     requiredBalance = _requiredBalance;
     realitioAddress = _realitioAddress;
     realitioTimeout = _realitioTimeout;
@@ -178,32 +193,26 @@ contract PredictionMarket {
   // ------ Core Functions ------
 
   /// @dev Creates a market, initializes the outcome shares pool and submits a question in Realitio
-  function createMarket(
-    string calldata question,
-    string calldata image,
-    uint256 closesAt,
-    address arbitrator,
-    uint256 outcomes
-  ) external payable mustHoldRequiredBalance returns (uint256) {
+  function createMarket(CreateMarketArgs calldata args) external mustHoldRequiredBalance returns (uint256) {
     uint256 marketId = marketIndex;
     marketIds.push(marketId);
 
     Market storage market = markets[marketId];
 
-    require(msg.value > 0, "stake needs to be > 0");
-    require(closesAt > now, "market must resolve after the current date");
-    require(arbitrator != address(0), "invalid arbitrator address");
-    // v1 - only binary markets
-    require(outcomes == 2, "number of outcomes has to be 2");
+    require(args.value > 0, "stake needs to be > 0");
+    require(args.closesAt > now, "market must resolve after the current date");
+    require(args.arbitrator != address(0), "invalid arbitrator address");
+    require(args.outcomes <= 2 ** 8, "number of outcomes has to be less or equal than 256");
 
-    market.closesAtTimestamp = closesAt;
+    market.token = args.token;
+    market.closesAtTimestamp = args.closesAt;
     market.state = MarketState.open;
     market.fees.value = fee;
     // setting intial value to an integer that does not map to any outcomeId
     market.resolution.outcomeId = MAX_UINT_256;
 
     // creating market outcomes
-    for (uint256 i = 0; i < outcomes; i++) {
+    for (uint256 i = 0; i < args.outcomes; i++) {
       market.outcomeIds.push(i);
       MarketOutcome storage outcome = market.outcomes[i];
 
@@ -212,23 +221,21 @@ contract PredictionMarket {
     }
 
     // creating question in realitio
-    RealitioERC20 realitio = RealitioERC20(realitioAddress);
-
-    market.resolution.questionId = realitio.askQuestionERC20(
+    RealitioERC20(realitioAddress).askQuestionERC20(
       2,
-      question,
-      arbitrator,
+      args.question,
+      args.arbitrator,
       uint32(realitioTimeout),
-      uint32(closesAt),
+      uint32(args.closesAt),
       0,
       0
     );
 
-    addLiquidity(marketId, msg.value);
+    addLiquidity(marketId, args.value, args.distribution);
 
     // emiting initial price events
     emitMarketOutcomePriceEvents(marketId);
-    emit MarketCreated(msg.sender, marketId, outcomes, question, image);
+    emit MarketCreated(msg.sender, marketId, args.outcomes, args.question, args.image);
 
     // incrementing market array index
     marketIndex = marketIndex + 1;
@@ -286,11 +293,11 @@ contract PredictionMarket {
   function buy(
     uint256 marketId,
     uint256 outcomeId,
-    uint256 minOutcomeSharesToBuy
-  ) external payable timeTransitions(marketId) atState(marketId, MarketState.open) {
+    uint256 minOutcomeSharesToBuy,
+    uint256 value
+  ) external timeTransitions(marketId) atState(marketId, MarketState.open) {
     Market storage market = markets[marketId];
 
-    uint256 value = msg.value;
     uint256 shares = calcBuyAmount(value, marketId, outcomeId);
     require(shares >= minOutcomeSharesToBuy, "minimum buy amount not reached");
     require(shares > 0, "shares amount is 0");
@@ -309,6 +316,8 @@ contract PredictionMarket {
 
     transferOutcomeSharesfromPool(msg.sender, marketId, outcomeId, shares);
 
+    require(market.token.transferFrom(msg.sender, address(this), value), "erc20 transfer failed");
+
     emit MarketActionTx(msg.sender, MarketAction.buy, marketId, outcomeId, shares, value, now);
     emitMarketOutcomePriceEvents(marketId);
   }
@@ -319,7 +328,7 @@ contract PredictionMarket {
     uint256 outcomeId,
     uint256 value,
     uint256 maxOutcomeSharesToSell
-  ) external payable timeTransitions(marketId) atState(marketId, MarketState.open) {
+  ) external timeTransitions(marketId) atState(marketId, MarketState.open) {
     Market storage market = markets[marketId];
     MarketOutcome storage outcome = market.outcomes[outcomeId];
 
@@ -342,28 +351,18 @@ contract PredictionMarket {
     removeSharesFromMarket(marketId, valuePlusFees);
 
     // Transferring funds to user
-    msg.sender.transfer(value);
+    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
 
     emit MarketActionTx(msg.sender, MarketAction.sell, marketId, outcomeId, shares, value, now);
     emitMarketOutcomePriceEvents(marketId);
   }
 
   /// @dev Adds liquidity to a market - external
-  function addLiquidity(uint256 marketId)
-    external
-    payable
-    timeTransitions(marketId)
-    atState(marketId, MarketState.open)
-  {
-    addLiquidity(marketId, msg.value);
-  }
-
-  /// @dev Private function, used by addLiquidity and CreateMarket
-  function addLiquidity(uint256 marketId, uint256 value)
-    private
-    timeTransitions(marketId)
-    atState(marketId, MarketState.open)
-  {
+  function addLiquidity(
+    uint256 marketId,
+    uint256 value,
+    uint256[] memory distribution
+  ) public timeTransitions(marketId) atState(marketId, MarketState.open) {
     Market storage market = markets[marketId];
 
     require(value > 0, "stake has to be greater than 0.");
@@ -375,6 +374,8 @@ contract PredictionMarket {
     uint256 poolWeight = 0;
 
     if (market.liquidity > 0) {
+      require(distribution.length == 0, "market already has liquidity, can't distribute liquidity");
+
       // part of the liquidity is exchanged for outcome shares if market is not balanced
       for (uint256 i = 0; i < outcomesShares.length; i++) {
         uint256 outcomeShares = outcomesShares[i];
@@ -392,6 +393,23 @@ contract PredictionMarket {
       rebalanceFeesPool(marketId, liquidityAmount, MarketAction.addLiquidity);
     } else {
       // funding market with no liquidity
+      if (distribution.length > 0) {
+        require(distribution.length == outcomesShares.length, "weight distribution length does not match");
+
+        uint256 maxHint = 0;
+        for (uint256 i = 0; i < distribution.length; i++) {
+          uint256 hint = distribution[i];
+          if (maxHint < hint) maxHint = hint;
+        }
+
+        for (uint256 i = 0; i < distribution.length; i++) {
+          uint256 remaining = value.mul(distribution[i]) / maxHint;
+          require(remaining > 0, "must hint a valid distribution");
+          sendBackAmounts[i] = value.sub(remaining);
+        }
+      }
+
+      // funding market with total liquidity amount
       liquidityAmount = value;
     }
 
@@ -421,6 +439,9 @@ contract PredictionMarket {
 
     uint256 liquidityPrice = getMarketLiquidityPrice(marketId);
     uint256 liquidityValue = liquidityPrice.mul(liquidityAmount) / ONE;
+
+    require(market.token.transferFrom(msg.sender, address(this), value), "erc20 transfer failed");
+
     emit MarketActionTx(msg.sender, MarketAction.addLiquidity, marketId, 0, liquidityAmount, liquidityValue, now);
     emit MarketLiquidity(marketId, market.liquidity, liquidityPrice, now);
   }
@@ -428,7 +449,6 @@ contract PredictionMarket {
   /// @dev Removes liquidity to a market - external
   function removeLiquidity(uint256 marketId, uint256 shares)
     external
-    payable
     timeTransitions(marketId)
     atState(marketId, MarketState.open)
   {
@@ -483,7 +503,7 @@ contract PredictionMarket {
     }
 
     // transferring user funds from liquidity removed
-    msg.sender.transfer(liquidityAmount);
+    require(market.token.transfer(msg.sender, liquidityAmount), "erc20 transfer failed");
 
     emit MarketActionTx(msg.sender, MarketAction.removeLiquidity, marketId, 0, shares, liquidityAmount, now);
     emit MarketLiquidity(marketId, market.liquidity, getMarketLiquidityPrice(marketId), now);
@@ -538,7 +558,7 @@ contract PredictionMarket {
       now
     );
 
-    msg.sender.transfer(value);
+    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
   }
 
   /// @dev Allows holders of voided outcome shares to claim balance back.
@@ -572,7 +592,7 @@ contract PredictionMarket {
       now
     );
 
-    msg.sender.transfer(value);
+    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
   }
 
   /// @dev Allows liquidity providers to claim earnings from liquidity providing.
@@ -605,18 +625,18 @@ contract PredictionMarket {
       now
     );
 
-    msg.sender.transfer(value);
+    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
   }
 
   /// @dev Allows liquidity providers to claim their fees share from fees pool
-  function claimFees(uint256 marketId) public payable {
+  function claimFees(uint256 marketId) public {
     Market storage market = markets[marketId];
 
     uint256 claimableFees = getUserClaimableFees(marketId, msg.sender);
 
     if (claimableFees > 0) {
       market.fees.claimed[msg.sender] = market.fees.claimed[msg.sender].add(claimableFees);
-      msg.sender.transfer(claimableFees);
+      require(market.token.transfer(msg.sender, claimableFees), "erc20 transfer failed");
     }
 
     emit MarketActionTx(
@@ -742,16 +762,19 @@ contract PredictionMarket {
     view
     returns (
       uint256,
-      uint256,
-      uint256
+      uint256[] memory
     )
   {
     Market storage market = markets[marketId];
+    uint256[] memory outcomeShares = new uint256[](market.outcomeIds.length);
+
+    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+      outcomeShares[i] = market.outcomes[i].shares.holders[user];
+    }
 
     return (
       market.liquidityShares[user],
-      market.outcomes[0].shares.holders[user],
-      market.outcomes[1].shares.holders[user]
+      outcomeShares
     );
   }
 
@@ -865,13 +888,23 @@ contract PredictionMarket {
     Market storage market = markets[marketId];
 
     if (market.state == MarketState.resolved && !isMarketVoided(marketId)) {
-      // resolved market, price is either 0 or 1
+      // resolved market, outcome prices are either 0 or 1
       // final liquidity price = outcome shares / liquidity shares
       return market.outcomes[market.resolution.outcomeId].shares.available.mul(ONE).div(market.liquidity);
     }
 
-    // liquidity price = # liquidity shares / # outcome shares * # outcomes
-    return market.liquidity.mul(ONE * market.outcomeIds.length).div(market.sharesAvailable);
+    // liquidity price = product(every outcome shares) / sum (every outcomeOddsWeight) * # outcomes / liquidity shares
+    uint256 marketSharesProduct = ONE;
+    uint256 marketSharesSum = 0;
+
+    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+      MarketOutcome storage outcome = market.outcomes[i];
+
+      marketSharesProduct = marketSharesProduct.mul(outcome.shares.available).div(ONE);
+      marketSharesSum = marketSharesSum.add(getOutcomeOddsWeight(marketId, i));
+    }
+
+    return marketSharesProduct.mul(market.outcomeIds.length).mul(ONE).div(marketSharesSum).mul(ONE).div(market.liquidity);
   }
 
   function getMarketResolvedOutcome(uint256 marketId) public view returns (int256) {
@@ -904,16 +937,35 @@ contract PredictionMarket {
     return market.outcomeIds;
   }
 
+  function getOutcomeOddsWeight(uint256 marketId, uint256 outcomeId) public view returns (uint256) {
+    Market storage market = markets[marketId];
+
+    uint256 productWeight = ONE;
+
+    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+      if (i == outcomeId) continue;
+
+      productWeight = productWeight.mul(market.outcomes[i].shares.available).div(ONE);
+    }
+
+    return productWeight;
+  }
+
   function getMarketOutcomePrice(uint256 marketId, uint256 outcomeId) public view returns (uint256) {
     Market storage market = markets[marketId];
-    MarketOutcome storage outcome = market.outcomes[outcomeId];
 
     if (market.state == MarketState.resolved && !isMarketVoided(marketId)) {
       // resolved market, price is either 0 or 1
       return outcomeId == market.resolution.outcomeId ? ONE : 0;
     }
 
-    return (market.sharesAvailable.sub(outcome.shares.available)).mul(ONE).div(market.sharesAvailable);
+    uint256 sumOutcomeOddsWeight = 0;
+    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+      sumOutcomeOddsWeight = sumOutcomeOddsWeight.add(getOutcomeOddsWeight(marketId, i));
+    }
+
+    // outcome price = outcomeOddsWeight / sum(every outcomeOddsWeight)
+    return getOutcomeOddsWeight(marketId, outcomeId).mul(ONE).div(sumOutcomeOddsWeight);
   }
 
   function getMarketOutcomeData(uint256 marketId, uint256 outcomeId)
