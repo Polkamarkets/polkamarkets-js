@@ -2,7 +2,7 @@ pragma solidity ^0.6.0;
 pragma experimental ABIEncoderV2;
 
 import "./RealitioERC20.sol";
-import "./PredictionMarket.sol";
+import "./PredictionMarketV2.sol";
 
 // openzeppelin imports
 import "@openzeppelin/contracts/math/SafeMath.sol";
@@ -16,7 +16,7 @@ contract Achievements is ERC721 {
 
   /// @dev protocol is immutable and has no ownership
   RealitioERC20 public realitioERC20;
-  PredictionMarket public predictionMarket;
+  PredictionMarketV2 public predictionMarket;
 
   event LogNewAchievement(uint256 indexed achievementId, address indexed user, string content);
 
@@ -45,7 +45,7 @@ contract Achievements is ERC721 {
 
   constructor(string memory token, string memory ticker) public ERC721(token, ticker) {}
 
-  function setContracts(PredictionMarket _predictionMarket, RealitioERC20 _realitioERC20) public {
+  function setContracts(PredictionMarketV2 _predictionMarket, RealitioERC20 _realitioERC20) public {
     require(address(predictionMarket) == address(0), "predictionMarket can only be initialized once");
     require(address(realitioERC20) == address(0), "realitioERC20 can only be initialized once");
 
