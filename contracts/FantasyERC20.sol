@@ -37,7 +37,7 @@ contract FantasyERC20 is ERC20PresetMinterPauser {
   function claimTokens(address user) external {
     require(usersClaimed[user] == false, "FantasyERC20: address already claimed the tokens");
 
-    _transfer(tokenManager, user, tokenAmountToClaim);
+    mint(user, tokenAmountToClaim);
 
     usersClaimed[user] = true;
 
