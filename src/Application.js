@@ -48,6 +48,7 @@ class Application {
    */
   start() {
     this.web3 = new Web3(new Web3.providers.HttpProvider(this.web3Provider));
+    this.web3.eth.handleRevert = true;
     if (typeof window !== "undefined") {
       window.web3 = this.web3;
     }
