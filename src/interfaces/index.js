@@ -5,6 +5,7 @@ let index = {
   predictionV2: require("../../build/contracts/PredictionMarketV2.json"),
   realitio: require("../../build/contracts/RealitioERC20.json"),
   voting: require("../../build/contracts/Voting.json"),
+  fantasyerc20: require("../../build/contracts/FantasyERC20.json"),
 };
 
 module.exports = index;

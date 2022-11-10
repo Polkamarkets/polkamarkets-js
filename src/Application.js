@@ -6,6 +6,7 @@ const PredictionMarketV2Contract = require("./models/index").PredictionMarketV2C
 const AchievementsContract = require("./models/index").AchievementsContract;
 const RealitioERC20Contract = require("./models/index").RealitioERC20Contract;
 const VotingContract = require("./models/index").VotingContract;
+const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
 
 const Account = require('./utils/Account');
 
@@ -48,6 +49,7 @@ class Application {
    */
   start() {
     this.web3 = new Web3(new Web3.providers.HttpProvider(this.web3Provider));
+    this.web3.eth.handleRevert = true;
     if (typeof window !== "undefined") {
       window.web3 = this.web3;
     }
@@ -67,7 +69,7 @@ class Application {
         return true;
       }
       return false;
-    } catch(err) {
+    } catch (err) {
       throw err;
     }
   };
@@ -76,13 +78,13 @@ class Application {
    * @name isLoggedIn
    * @description Returns wether metamask account is connected to service or not
    */
-  async isLoggedIn () {
+  async isLoggedIn() {
     try {
       if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
       const accounts = await ethereum.request({ method: 'eth_accounts' });
 
       return accounts.length > 0;
-    } catch(err) {
+    } catch (err) {
       return false;
     }
   };
@@ -96,16 +98,16 @@ class Application {
    * @param {Address} ContractAddress (Opt) If it is deployed
    * @description Create a PredictionMarket Contract
    */
-   getPredictionMarketContract({ contractAddress = null }={}) {
+  getPredictionMarketContract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketContract({
         web3: this.web3,
         contractAddress,
-        acc : this.account,
+        acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice
       });
-    } catch(err) {
+    } catch (err) {
       throw err;
     }
   };
@@ -134,22 +136,22 @@ class Application {
    * @param {Address} ContractAddress (Opt) If it is deployed
    * @description Create a PredictionMarket Contract
    */
-   getAchievementsContract({
-     contractAddress = null,
-     predictionMarketContractAddress = null,
-     realitioERC20ContractAddress = null
-    } = {}) {
+  getAchievementsContract({
+    contractAddress = null,
+    predictionMarketContractAddress = null,
+    realitioERC20ContractAddress = null
+  } = {}) {
     try {
       return new AchievementsContract({
         web3: this.web3,
         contractAddress,
         predictionMarketContractAddress,
         realitioERC20ContractAddress,
-        acc : this.account,
+        acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice
       });
-    } catch(err) {
+    } catch (err) {
       throw err;
     }
   };
@@ -174,20 +176,39 @@ class Application {
   };
 
   /**
+   * @name getFantasyERC20Contract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a Fantasy ERC20 Contract
+   */
+  getFantasyERC20Contract({ contractAddress = null } = {}) {
+    try {
+      return new FantasyERC20Contract({
+        web3: this.web3,
+        contractAddress,
+        acc: this.account,
+        web3EventsProvider: this.web3EventsProvider,
+        gasPrice: this.gasPrice
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
    * @name getRealitioERC20Contract
    * @param {Address} ContractAddress (Opt) If it is deployed
    * @description Create a RealitioERC20 Contract
    */
-   getRealitioERC20Contract({ contractAddress = null }={}) {
+  getRealitioERC20Contract({ contractAddress = null } = {}) {
     try {
       return new RealitioERC20Contract({
         web3: this.web3,
         contractAddress,
-        acc : this.account,
+        acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice
       });
-    } catch(err) {
+    } catch (err) {
       throw err;
     }
   };
@@ -197,16 +218,16 @@ class Application {
    * @param {Address} ContractAddress (Opt) If it is deployed
    * @description Create a ERC20 Contract
    */
-  getERC20Contract({contractAddress=null}) {
+  getERC20Contract({ contractAddress = null }) {
     try {
       return new ERC20Contract({
         web3: this.web3,
         contractAddress: contractAddress,
-        acc : this.account,
+        acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice
       });
-    } catch(err) {
+    } catch (err) {
       throw err;
     }
   };

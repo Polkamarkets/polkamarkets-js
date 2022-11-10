@@ -1,10 +1,10 @@
-const _ =  require("lodash");
+const _ = require("lodash");
 const moment = require("moment");
 
 const prediction = require("../interfaces").prediction;
 
-const Numbers = require( "../utils/Numbers");
-const IContract = require( './IContract');
+const Numbers = require("../utils/Numbers");
+const IContract = require('./IContract');
 
 const realitioLib = require('@reality.eth/reality-eth-lib/formatters/question');
 
@@ -29,7 +29,7 @@ const actions = {
 
 class PredictionMarketContract extends IContract {
   constructor(params) {
-    super({...params, abi: prediction});
+    super({ abi: prediction, ...params });
     this.contractName = 'predictionMarket';
   }
 
@@ -91,7 +91,7 @@ class PredictionMarketContract extends IContract {
    * @returns {Integer} liquidity
    * @returns {Array} outcomeIds
    */
-  async getMarketData({marketId}) {
+  async getMarketData({ marketId }) {
     const marketData = await this.params.contract.getContract().methods.getMarketData(marketId).call();
     const outcomeIds = await this.__sendTx(this.getContract().methods.getMarketOutcomeIds(marketId), true);
 
@@ -114,7 +114,7 @@ class PredictionMarketContract extends IContract {
    * @returns {Integer} price
    * @returns {Integer} sahres
    */
-  async getOutcomeData({marketId, outcomeId}) {
+  async getOutcomeData({ marketId, outcomeId }) {
     const outcomeData = await this.params.contract.getContract().methods.getMarketOutcomeData(marketId, outcomeId).call();
 
     return {
@@ -134,7 +134,7 @@ class PredictionMarketContract extends IContract {
    * @returns {String} image
    * @returns {Array} outcomes
    */
-  async getMarketDetails({marketId}) {
+  async getMarketDetails({ marketId }) {
     const marketData = await this.params.contract.getContract().methods.getMarketData(marketId).call();
     const outcomeIds = await this.__sendTx(this.getContract().methods.getMarketOutcomeIds(marketId), true);
 
@@ -160,7 +160,7 @@ class PredictionMarketContract extends IContract {
     };
   }
 
-  async getMarketIdsFromQuestions({questions}) {
+  async getMarketIdsFromQuestions({ questions }) {
     const events = await this.getEvents('MarketCreated');
 
     return events.filter((event) => {
@@ -174,7 +174,7 @@ class PredictionMarketContract extends IContract {
    * @param {Integer} marketId
    * @returns {Bytes32} questionId
    */
-  async getMarketQuestionId({marketId}) {
+  async getMarketQuestionId({ marketId }) {
     const marketAltData = await this.params.contract.getContract().methods.getMarketAltData(marketId).call();
 
     return marketAltData[1];
@@ -188,7 +188,7 @@ class PredictionMarketContract extends IContract {
    * @param {Integer} outcomeId
    * @returns {Integer} price
    */
-  getAverageOutcomeBuyPrice({events, marketId, outcomeId}) {
+  getAverageOutcomeBuyPrice({ events, marketId, outcomeId }) {
     // filtering by marketId + outcomeId + buy action
     events = events.filter(event => {
       return (
@@ -213,7 +213,7 @@ class PredictionMarketContract extends IContract {
    * @param {Integer} marketId
    * @returns {Integer} price
    */
-   getAverageAddLiquidityPrice({events, marketId}) {
+  getAverageAddLiquidityPrice({ events, marketId }) {
     // filtering by marketId + add liquidity action
     events = events.filter(event => {
       return (
@@ -300,16 +300,16 @@ class PredictionMarketContract extends IContract {
         portfolio = {
           liquidity: {
             shares: Numbers.fromDecimalsNumber(marketShares[0], 18),
-            price: this.getAverageAddLiquidityPrice({events, marketId}),
+            price: this.getAverageAddLiquidityPrice({ events, marketId }),
           },
           outcomes: {
             0: {
               shares: Numbers.fromDecimalsNumber(marketShares[1], 18),
-              price: this.getAverageOutcomeBuyPrice({events, marketId, outcomeId: 0}),
+              price: this.getAverageOutcomeBuyPrice({ events, marketId, outcomeId: 0 }),
             },
             1: {
               shares: Numbers.fromDecimalsNumber(marketShares[2], 18),
-              price: this.getAverageOutcomeBuyPrice({events, marketId, outcomeId: 1}),
+              price: this.getAverageOutcomeBuyPrice({ events, marketId, outcomeId: 1 }),
             },
           },
           claimStatus: {
@@ -336,13 +336,13 @@ class PredictionMarketContract extends IContract {
    * @returns {Integer} Liquidity Shares
    * @returns {Array} Outcome Shares
    */
-  async getMyMarketShares({marketId}) {
+  async getMyMarketShares({ marketId }) {
     const account = await this.getMyAccount();
     if (!account) return [];
 
     const marketShares = await this.getContract().methods.getUserMarketShares(marketId, account).call();
 
-    return  {
+    return {
       liquidityShares: Numbers.fromDecimalsNumber(marketShares[0], 18),
       outcomeShares: {
         0: Numbers.fromDecimalsNumber(marketShares[1], 18),
@@ -382,7 +382,7 @@ class PredictionMarketContract extends IContract {
    * @param {Integer} outcomeId
    * @return {Integer} price
    */
-  async getMarketOutcomePrice({marketId, outcomeId}) {
+  async getMarketOutcomePrice({ marketId, outcomeId }) {
     return Numbers.fromDecimals(
       await this.__sendTx(
         this.getContract().methods.getMarketOutcomePrice(marketId, outcomeId),
@@ -398,7 +398,7 @@ class PredictionMarketContract extends IContract {
    * @param {Integer} marketId
    * @return {Object} prices
    */
-  async getMarketPrices({marketId}) {
+  async getMarketPrices({ marketId }) {
     const marketPrices = await this.getContract().methods.getMarketPrices(marketId).call();
 
     return {
@@ -422,7 +422,7 @@ class PredictionMarketContract extends IContract {
    * @param {String} outcome2Name
    * @param {Integer} ethAmount
    */
-  async createMarket ({name, image, duration, oracleAddress, outcomes, category, ethAmount}) {
+  async createMarket({ name, image, duration, oracleAddress, outcomes, category, ethAmount }) {
     let ethToWei = Numbers.toSmartContractDecimals(ethAmount, 18);
     const question = realitioLib.encodeText('single-select', name, outcomes, category);
 
@@ -445,7 +445,7 @@ class PredictionMarketContract extends IContract {
    * @param {Integer} marketId
    * @param {Integer} ethAmount
    */
-  async addLiquidity({marketId, ethAmount}) {
+  async addLiquidity({ marketId, ethAmount }) {
     let ethToWei = Numbers.toSmartContractDecimals(ethAmount, 18);
     return await this.__sendTx(
       this.getContract().methods.addLiquidity(marketId),
@@ -460,7 +460,7 @@ class PredictionMarketContract extends IContract {
    * @param {Integer} marketId
    * @param {Integer} shares
    */
-  async removeLiquidity({marketId, shares}) {
+  async removeLiquidity({ marketId, shares }) {
     shares = Numbers.toSmartContractDecimals(shares, 18);
     return await this.__sendTx(
       this.getContract().methods.removeLiquidity(marketId, shares)
@@ -475,7 +475,7 @@ class PredictionMarketContract extends IContract {
    * @param {Integer} outcomeId
    * @param {Integer} ethAmount
    */
-  async buy ({ marketId, outcomeId, ethAmount, minOutcomeSharesToBuy}) {
+  async buy({ marketId, outcomeId, ethAmount, minOutcomeSharesToBuy }) {
     let ethToWei = Numbers.toSmartContractDecimals(ethAmount, 18);
     minOutcomeSharesToBuy = Numbers.toSmartContractDecimals(minOutcomeSharesToBuy, 18);
 
@@ -493,7 +493,7 @@ class PredictionMarketContract extends IContract {
    * @param {Integer} outcomeId
    * @param {Integer} shares
    */
-  async sell({marketId, outcomeId, ethAmount, maxOutcomeSharesToSell}) {
+  async sell({ marketId, outcomeId, ethAmount, maxOutcomeSharesToSell }) {
     ethAmount = Numbers.toSmartContractDecimals(ethAmount, 18);
     maxOutcomeSharesToSell = Numbers.toSmartContractDecimals(maxOutcomeSharesToSell, 18);
     return await this.__sendTx(
@@ -502,28 +502,28 @@ class PredictionMarketContract extends IContract {
     );
   };
 
-  async resolveMarketOutcome({marketId}) {
+  async resolveMarketOutcome({ marketId }) {
     return await this.__sendTx(
       this.getContract().methods.resolveMarketOutcome(marketId),
       false,
     );
   };
 
-  async claimWinnings({marketId}) {
+  async claimWinnings({ marketId }) {
     return await this.__sendTx(
       this.getContract().methods.claimWinnings(marketId),
       false,
     );
   };
 
-  async claimVoidedOutcomeShares({marketId, outcomeId}) {
+  async claimVoidedOutcomeShares({ marketId, outcomeId }) {
     return await this.__sendTx(
       this.getContract().methods.claimVoidedOutcomeShares(marketId, outcomeId),
       false,
     );
   };
 
-  async claimLiquidity({marketId}) {
+  async claimLiquidity({ marketId }) {
     return await this.__sendTx(
       this.getContract().methods.claimLiquidity(marketId),
       false,

@@ -12792,8 +12792,13 @@
       "transactionHash": "0x3359e8b032ce62ad4e00727ceda22d36d5d9303bdf75b4ed13c8d8d0b416ec95"
     }
   },
+<<<<<<< HEAD
   "schemaVersion": "3.4.4",
   "updatedAt": "2022-11-07T18:00:13.597Z",
+=======
+  "schemaVersion": "3.4.10",
+  "updatedAt": "2022-11-09T16:59:01.859Z",
+>>>>>>> main
   "devdoc": {
     "methods": {
       "constructor": {

@@ -1,9 +1,8 @@
-const _ =  require("lodash");
-const moment = require("moment");
+const _ = require("lodash");
 
 const realitio = require("../interfaces").realitio;
-const Numbers = require( "../utils/Numbers");
-const IContract = require( './IContract');
+const Numbers = require("../utils/Numbers");
+const IContract = require('./IContract');
 
 /**
  * RealitioERC20 Contract Object
@@ -15,7 +14,7 @@ const IContract = require( './IContract');
 
 class RealitioERC20Contract extends IContract {
   constructor(params) {
-    super({...params, abi: realitio});
+    super({ abi: realitio, ...params });
     this.contractName = 'realitio';
   }
 
@@ -181,7 +180,7 @@ class RealitioERC20Contract extends IContract {
    * @description Get My Questions
    * @returns {Array} Questions
    */
-   async getMyQuestions() {
+  async getMyQuestions() {
     const account = await this.getMyAccount();
     if (!account) return [];
 
