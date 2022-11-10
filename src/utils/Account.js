@@ -1,4 +1,4 @@
-class Account{
+class Account {
 
   constructor(web3, account) {
     this.web3 = web3;
@@ -23,12 +23,12 @@ class Account{
     return this.account
   }
 
-  async sendEther(amount, address, data=null) {
+  async sendEther(amount, address, data = null) {
     let tx = {
-      data : data,
-      from  : this.getAddress(),
-      to : address,
-      gas : 443000,
+      data: data,
+      from: this.getAddress(),
+      to: address,
+      gas: 443000,
       value: amount
     };
     let result = await this.account.signTransaction(tx);
