@@ -12,8 +12,22 @@ const ERC20Contract = require("./ERC20Contract");
 
 class FantasyERC20Contract extends ERC20Contract {
   constructor(params) {
-    super({ ...params, abi: fantasyerc20 });
+    super({ abi: fantasyerc20, ...params });
     this.contractName = 'fantasyerc20';
+  }
+
+  /* Get Functions */
+  /**
+   * @function hasUserClaimedTokens
+   * @description Returns if the user has already claimed the tokens
+   * @returns {Boolean} claimedTokens
+   */
+  async hasUserClaimedTokens({ address }) {
+    return await this.params.contract
+      .getContract()
+      .methods
+      .hasUserClaimedTokens(address)
+      .call();
   }
 
   /* POST User Functions */
