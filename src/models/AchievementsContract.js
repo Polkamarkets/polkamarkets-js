@@ -1,9 +1,9 @@
 const achievements = require("../interfaces").achievements;
 
-const Numbers = require( "../utils/Numbers");
-const IContract = require( './IContract');
-const PredictionMarketContract = require( './PredictionMarketContract');
-const RealitioERC20Contract = require( './RealitioERC20Contract');
+const Numbers = require("../utils/Numbers");
+const IContract = require('./IContract');
+const PredictionMarketContract = require('./PredictionMarketContract');
+const RealitioERC20Contract = require('./RealitioERC20Contract');
 
 const axios = require('axios');
 
@@ -24,10 +24,10 @@ const actions = {
  */
 
 class AchievementsContract extends IContract {
-	constructor(params) {
-    super({...params, abi: achievements});
-		this.contractName = 'achievements';
-	}
+  constructor(params) {
+    super({ abi: achievements, ...params });
+    this.contractName = 'achievements';
+  }
 
   async getUserStats({ user }) {
     await this.initializePredictionMarketContract();

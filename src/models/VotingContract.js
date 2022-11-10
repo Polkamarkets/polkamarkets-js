@@ -23,7 +23,7 @@ const actions = {
 
 class VotingContract extends IContract {
   constructor(params) {
-    super({ ...params, abi: voting });
+    super({ abi: voting, ...params });
     this.contractName = 'voting';
   }
 
