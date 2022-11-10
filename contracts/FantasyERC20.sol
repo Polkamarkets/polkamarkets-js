@@ -24,23 +24,30 @@ contract FantasyERC20 is ERC20PresetMinterPauser {
       tokenManager = _tokenManager;
     }
 
-  function _beforeTokenTransfer(
+  /// @dev Validates if the transfer is from or to the tokenManager, blocking it otherwise
+  function _transfer(
     address from,
     address to,
     uint256 amount
   ) internal override {
-    super._beforeTokenTransfer(from, to, amount);
-
     require(from == tokenManager || to == tokenManager, "FantasyERC20: token transfer not allowed between the addresses");
+
+    super._transfer(from, to, amount);
   }
 
+  /// @dev Allows user to claim the amount of tokens by minting them
   function claimTokens(address user) external {
     require(usersClaimed[user] == false, "FantasyERC20: address already claimed the tokens");
 
-    mint(user, tokenAmountToClaim);
+    _mint(user, tokenAmountToClaim);
 
     usersClaimed[user] = true;
 
     emit TokensClaimed(user, tokenAmountToClaim, now);
+  }
+
+  /// @dev Returns if the address has already claimed or not the tokens
+  function hasUserClaimedTokens(address user) external view returns (bool) {
+    return usersClaimed[user];
   }
 }
