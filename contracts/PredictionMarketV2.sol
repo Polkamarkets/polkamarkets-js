@@ -877,11 +877,17 @@ contract PredictionMarketV2 {
     view
     returns (
       uint256,
-      uint256,
-      uint256
+      uint256[] memory
     )
   {
-    return (getMarketLiquidityPrice(marketId), getMarketOutcomePrice(marketId, 0), getMarketOutcomePrice(marketId, 1));
+    Market storage market = markets[marketId];
+    uint256[] memory prices = new uint256[](market.outcomeIds.length);
+
+    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+      prices[i] = getMarketOutcomePrice(marketId, i);
+    }
+
+    return (getMarketLiquidityPrice(marketId), prices);
   }
 
   function getMarketLiquidityPrice(uint256 marketId) public view returns (uint256) {
