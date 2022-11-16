@@ -71,6 +71,7 @@ context('FantasyERC20 Contract', async () => {
       let user2HasClaimedTokens;
       let user2TokenAmount;
       let totalSupply;
+      let isApproved;
 
       // check if address hasn't claimed tokens
       user2HasClaimedTokens = await user2FantasyERC20Contract2.hasUserClaimedTokens({ address: USER2_ADDRESS });
@@ -82,8 +83,11 @@ context('FantasyERC20 Contract', async () => {
       totalSupply = await user2FantasyERC20Contract2.totalSupply();
       expect(totalSupply).to.equal('0');
 
+      isApproved = await user2FantasyERC20Contract2.isApproved({ address: USER2_ADDRESS, amount: TOKEN_AMOUNT_TO_CLAIM, spenderAddress: TOKEN_MANAGER_ADDRESS });
+      expect(isApproved).to.equal(false);
+
       // claim tokens
-      const res = await user2FantasyERC20Contract2.claimTokens({ address: USER2_ADDRESS });
+      const res = await user2FantasyERC20Contract2.claimAndApproveTokens();
       expect(res.status).to.equal(true);
 
       // check if address hasn't claimed tokens
@@ -97,6 +101,9 @@ context('FantasyERC20 Contract', async () => {
 
       totalSupply = await user2FantasyERC20Contract2.totalSupply();
       expect(totalSupply).to.equal(TOKEN_AMOUNT_TO_CLAIM);
+
+      isApproved = await user2FantasyERC20Contract2.isApproved({ address: USER2_ADDRESS, amount: TOKEN_AMOUNT_TO_CLAIM, spenderAddress: TOKEN_MANAGER_ADDRESS });
+      expect(isApproved).to.equal(true);
     }));
 
     it('should not claim tokens for address that has already claimed tokens', mochaAsync(async () => {
@@ -114,7 +121,7 @@ context('FantasyERC20 Contract', async () => {
       let res;
       let reason;
       try {
-        res = await user2FantasyERC20Contract2.claimTokens({ address: USER2_ADDRESS });
+        res = await user2FantasyERC20Contract2.claimAndApproveTokens();
       } catch (error) {
         res = error.receipt;
         reason = error.reason;
