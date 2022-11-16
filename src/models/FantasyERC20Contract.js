@@ -34,12 +34,21 @@ class FantasyERC20Contract extends ERC20Contract {
 
   /**
    * @function claimTokens
-   * @description Claim tokens for address
-   * @param {Address} address
+   * @description Claim tokens for sender
    */
-  async claimTokens({ address }) {
+  async claimTokens() {
     return await this.__sendTx(
-      this.getContract().methods.claimTokens(address)
+      this.getContract().methods.claimTokens()
+    );
+  };
+
+  /**
+   * @function claimAndApproveTokens
+   * @description Claim and approve tokens for sender
+   */
+  async claimAndApproveTokens() {
+    return await this.__sendTx(
+      this.getContract().methods.claimAndApproveTokens()
     );
   };
 }
