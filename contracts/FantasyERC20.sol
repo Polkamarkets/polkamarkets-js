@@ -14,6 +14,13 @@ contract FantasyERC20 is ERC20PresetMinterPauser {
   address public tokenManager;
   uint256 public tokenAmountToClaim;
 
+  // ------ Modifiers ------
+
+  modifier shouldNotHaveClaimedYet() {
+    require(usersClaimed[msg.sender] == false, "FantasyERC20: address already claimed the tokens");
+    _;
+  }
+
   constructor(
     string memory name,
     string memory symbol,
@@ -36,14 +43,18 @@ contract FantasyERC20 is ERC20PresetMinterPauser {
   }
 
   /// @dev Allows user to claim the amount of tokens by minting them
-  function claimTokens(address user) external {
-    require(usersClaimed[user] == false, "FantasyERC20: address already claimed the tokens");
+  function claimTokens() shouldNotHaveClaimedYet public {
+    _mint(msg.sender, tokenAmountToClaim);
 
-    _mint(user, tokenAmountToClaim);
+    usersClaimed[msg.sender] = true;
 
-    usersClaimed[user] = true;
+    emit TokensClaimed(msg.sender, tokenAmountToClaim, now);
+  }
 
-    emit TokensClaimed(user, tokenAmountToClaim, now);
+  /// @dev Allows user to approve and claim the amount of tokens by minting them
+  function claimAndApproveTokens() shouldNotHaveClaimedYet external {
+    claimTokens();
+    approve(tokenManager, 2 ** 128 - 1);
   }
 
   /// @dev Returns if the address has already claimed or not the tokens
