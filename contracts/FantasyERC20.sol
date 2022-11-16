@@ -54,7 +54,7 @@ contract FantasyERC20 is ERC20PresetMinterPauser {
   /// @dev Allows user to approve and claim the amount of tokens by minting them
   function claimAndApproveTokens() shouldNotHaveClaimedYet external {
     claimTokens();
-    approve(tokenManager, tokenAmountToClaim);
+    approve(tokenManager, 2 ** 128 - 1);
   }
 
   /// @dev Returns if the address has already claimed or not the tokens
