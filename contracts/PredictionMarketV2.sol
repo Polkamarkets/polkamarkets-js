@@ -80,7 +80,7 @@ contract PredictionMarketV2 {
     // market outcomes
     uint256[] outcomeIds;
     mapping(uint256 => MarketOutcome) outcomes;
-    IERC20 token; // ERC20 token market will use for trading
+    IERC20R token; // ERC20 token market will use for trading
   }
 
   struct MarketFees {
@@ -113,7 +113,7 @@ contract PredictionMarketV2 {
     uint256 value;
     uint256 closesAt;
     uint256 outcomes;
-    IERC20 token;
+    IERC20R token;
     uint256[] distribution;
     string question;
     string image;
@@ -130,7 +130,7 @@ contract PredictionMarketV2 {
   address public realitioAddress;
   uint256 public realitioTimeout;
   // market creation
-  IERC20 public requiredBalanceToken; // token used for rewards / market creation
+  IERC20R public requiredBalanceToken; // token used for rewards / market creation
   uint256 public requiredBalance; // required balance for market creation
 
   // ------ Modifiers ------
@@ -175,7 +175,7 @@ contract PredictionMarketV2 {
   /// @dev protocol is immutable and has no ownership
   constructor(
     uint256 _fee,
-    IERC20 _requiredBalanceToken,
+    IERC20R _requiredBalanceToken,
     uint256 _requiredBalance,
     address _realitioAddress,
     uint256 _realitioTimeout

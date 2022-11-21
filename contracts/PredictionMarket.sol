@@ -118,7 +118,7 @@ contract PredictionMarket {
   address public realitioAddress;
   uint256 public realitioTimeout;
   // market creation
-  IERC20 public token; // token used for rewards / market creation
+  IERC20R public token; // token used for rewards / market creation
   uint256 public requiredBalance; // required balance for market creation
 
   // ------ Modifiers ------
@@ -160,7 +160,7 @@ contract PredictionMarket {
   /// @dev protocol is immutable and has no ownership
   constructor(
     uint256 _fee,
-    IERC20 _token,
+    IERC20R _token,
     uint256 _requiredBalance,
     address _realitioAddress,
     uint256 _realitioTimeout

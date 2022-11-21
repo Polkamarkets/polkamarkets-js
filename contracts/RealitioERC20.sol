@@ -8,7 +8,7 @@ pragma solidity >0.4.24;
  * @title ERC20 interface
  * @dev see https://github.com/ethereum/EIPs/issues/20
  */
-interface IERC20 {
+interface IERC20R {
     function totalSupply() external view returns (uint256);
 
     function balanceOf(address who) external view returns (uint256);
@@ -79,7 +79,7 @@ pragma solidity >0.4.18;
 
 contract BalanceHolder {
 
-    IERC20 public token;
+    IERC20R public token;
 
     mapping(address => uint256) public balanceOf;
 
@@ -277,10 +277,10 @@ contract RealitioERC20 is BalanceHolder {
         _;
     }
 
-    function setToken(IERC20 _token)
+    function setToken(IERC20R _token)
     public
     {
-        require(token == IERC20(0x0), "Token can only be initialized once");
+        require(token == IERC20R(0x0), "Token can only be initialized once");
         token = _token;
     }
 
