@@ -3,6 +3,7 @@ pragma experimental ABIEncoderV2;
 
 import "./RealitioERC20.sol";
 import "./PredictionMarketV2.sol";
+import "./PredictionMarketResolver.sol";
 
 // openzeppelin imports
 import "@openzeppelin/contracts/math/SafeMath.sol";
@@ -17,6 +18,7 @@ contract Achievements is ERC721 {
   /// @dev protocol is immutable and has no ownership
   RealitioERC20 public realitioERC20;
   PredictionMarketV2 public predictionMarket;
+  PredictionMarketResolver public predictionMarketResolver;
 
   event LogNewAchievement(uint256 indexed achievementId, address indexed user, string content);
 
@@ -45,14 +47,21 @@ contract Achievements is ERC721 {
 
   constructor(string memory token, string memory ticker) public ERC721(token, ticker) {}
 
-  function setContracts(PredictionMarketV2 _predictionMarket, RealitioERC20 _realitioERC20) public {
+  function setContracts(
+    PredictionMarketV2 _predictionMarket,
+    PredictionMarketResolver _predictionMarketResolver,
+    RealitioERC20 _realitioERC20
+  ) public {
     require(address(predictionMarket) == address(0), "predictionMarket can only be initialized once");
+    require(address(predictionMarketResolver) == address(0), "predictionMarket can only be initialized once");
     require(address(realitioERC20) == address(0), "realitioERC20 can only be initialized once");
 
     require(address(_predictionMarket) != address(0), "_predictionMarket address is 0");
+    require(address(_predictionMarketResolver) != address(0), "_predictionMarketResolver address is 0");
     require(address(_realitioERC20) != address(0), "_realitioERC20 address is 0");
 
     predictionMarket = _predictionMarket;
+    predictionMarketResolver = _predictionMarketResolver;
     realitioERC20 = _realitioERC20;
   }
 
@@ -144,10 +153,14 @@ contract Achievements is ERC721 {
   function hasUserClaimedWinnings(address user, uint256 marketId) public view returns (bool) {
     uint256[] memory outcomeShares;
     (, outcomeShares) = predictionMarket.getUserMarketShares(marketId, user);
-    int256 resolvedOutcomeId = predictionMarket.getMarketResolvedOutcome(marketId);
+    PredictionMarketResolver.MarketResolution memory marketResolution = predictionMarketResolver.getMarketResolution(
+      marketId
+    );
 
-    require(resolvedOutcomeId >= 0, "market is still not resolved");
-    require(outcomeShares[uint256(resolvedOutcomeId)] > 0, "user does not hold winning outcome shares");
+    uint256 resolvedOutcomeId = marketResolution.outcomeId;
+
+    require(marketResolution.resolved == true, "market has not been resolved");
+    require(outcomeShares[resolvedOutcomeId] > 0, "user does not hold winning outcome shares");
 
     return true;
   }
