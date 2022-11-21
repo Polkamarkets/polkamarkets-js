@@ -2,7 +2,8 @@ const achievements = require("../interfaces").achievements;
 
 const Numbers = require("../utils/Numbers");
 const IContract = require('./IContract');
-const PredictionMarketContract = require('./PredictionMarketContract');
+const PredictionMarketContract = require('./PredictionMarketV2Contract');
+const PredictionMarketResolverContract = require('./PredictionMarketResolverContract');
 const RealitioERC20Contract = require('./RealitioERC20Contract');
 
 const axios = require('axios');
@@ -31,17 +32,29 @@ class AchievementsContract extends IContract {
 
   async getUserStats({ user }) {
     await this.initializePredictionMarketContract();
+    await this.initializePredictionMarketResolverContract();
     await this.initializeRealitioERC20Contract();
 
     const portfolio = await this.predictionMarket.getPortfolio({ user });
+    const marketIds = Object.keys(portfolio);
+
     // fetching unique buy actions per market
-    const buyMarkets = Object.keys(portfolio).filter(marketId => {
+    const buyMarkets = marketIds.filter(marketId => {
       return portfolio[marketId].outcomes[0].shares > 0 || portfolio[marketId].outcomes[1].shares > 0
     });
     // fetching unique liquidity actions per market
-    const liquidityMarkets = Object.keys(portfolio).filter(marketId => portfolio[marketId].liquidity.shares > 0);
+    const liquidityMarkets = marketIds.filter(marketId => portfolio[marketId].liquidity.shares > 0);
     // fetching unique claim winnings actions per market
-    const winningsMarkets = Object.keys(portfolio).filter(marketId => portfolio[marketId].claimStatus.winningsClaimed);
+    const marketClaims = await marketIds.reduce(async (obj, marketId) => {
+      const hasClaimed = await this.predictionMarketResolver.hasUserClaimedMarket({ marketId, user });
+
+      return await {
+        ...(await obj),
+        [marketId]: hasClaimed,
+      };
+    }, {});
+
+    const winningsMarkets = marketIds.filter(marketId => marketClaims[marketId]);
 
     // fetching create market actions
     const createMarketEvents = await this.predictionMarket.getEvents('MarketCreated', { user });
@@ -202,6 +215,15 @@ class AchievementsContract extends IContract {
     const contractAddress = await this.getContract().methods.predictionMarket().call();
 
     this.predictionMarket = new PredictionMarketContract({ ...this.params, contractAddress });
+  }
+
+  async initializePredictionMarketResolverContract() {
+    // predictionMarketResolver already initialized
+    if (this.predictionMarketResolver) return;
+
+    const contractAddress = await this.getContract().methods.predictionMarketResolver().call();
+
+    this.predictionMarketResolver = new PredictionMarketResolverContract({ ...this.params, contractAddress });
   }
 
   async initializeRealitioERC20Contract() {

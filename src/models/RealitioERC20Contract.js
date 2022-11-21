@@ -14,7 +14,7 @@ const IContract = require('./IContract');
 
 class RealitioERC20Contract extends IContract {
   constructor(params) {
-    super({ abi: realitio, ...params });
+    super({ ...params, abi: realitio });
     this.contractName = 'realitio';
   }
 
