@@ -19,13 +19,16 @@ class PredictionMarketResolverContract extends IContract {
     return await this.getContract().methods.hasUserClaimedMarket(marketId, user).call();
   }
 
-  async getMarketsResolved() {
-    const events = await this.getEvents('MarketResolved');
+  async resolveMarket({ marketId, outcomeId }) {
+    return await this.__sendTx(
+      this.getContract().methods.resolveMarket(marketId, outcomeId)
+    );
+  }
 
-    return events.map(event => ({
-      marketId: event.returnValues.marketId,
-      outcomeId: event.returnValues.outcomeId,
-    }));
+  async claimMultiple({ marketId, users }) {
+    return await this.__sendTx(
+      this.getContract().methods.claimMultiple(marketId, users)
+    );
   }
 }
 
