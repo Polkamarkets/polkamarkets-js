@@ -115,7 +115,18 @@ class AchievementsContract extends IContract {
 
     return await achievementIds.reduce(async (obj, achievementId) => {
       const achievement = await this.getAchievement({ achievementId });
-      const canClaim = userStats[achievement.actionId].occurrences >= achievement.occurrences;
+
+      let stats = {...userStats[achievement.actionId]};
+      // for achievements with id >= 9, filtering occurences and markets by markets with id >= 57
+      if (achievementId >= 9 && achievement.action === 'Claim Winnings') {
+        stats = {
+          ...stats,
+          markets: stats.markets.filter(marketId => marketId >= 57),
+          occurrences: stats.markets.filter(marketId => marketId >= 57).length,
+        }
+      }
+
+      const canClaim = stats.occurrences >= achievement.occurrences;
       const claimed = canClaim && (await this.getContract().methods.hasUserClaimedAchievement(user, achievementId).call());
       const token = userTokens && userTokens.find(token => token.achievementId == achievementId);
 
@@ -159,6 +170,15 @@ class AchievementsContract extends IContract {
 
     const achievement = await this.getAchievement({ achievementId });
     const userStats = await this.getUserStats({ user });
+
+    // for achievements with id >= 9, filtering occurences and markets by markets with id >= 57
+    if (achievementId >= 9 && achievement.action === 'Claim Winnings') {
+      userStats[achievement.actionId] = {
+        ...userStats[achievement.actionId],
+        markets: userStats[achievement.actionId].markets.filter(marketId => marketId >= 57),
+        occurrences: userStats[achievement.actionId].markets.filter(marketId => marketId >= 57).length,
+      }
+    }
 
     // user not eligible to claim
     if (userStats[achievement.actionId].occurrences < achievement.occurrences) return false;
