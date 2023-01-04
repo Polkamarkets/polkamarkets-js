@@ -221,7 +221,7 @@ contract PredictionMarketV2 {
     }
 
     // creating question in realitio
-    RealitioERC20(realitioAddress).askQuestionERC20(
+    market.resolution.questionId = RealitioERC20(realitioAddress).askQuestionERC20(
       2,
       args.question,
       args.arbitrator,
