@@ -33,6 +33,13 @@ contract PredictionMarketV2 {
     uint256 timestamp
   );
 
+  event MarketShares(
+    uint256 indexed marketId,
+    uint256 timestamp,
+    uint256[] outcomeShares,
+    uint256 liquidity
+  );
+
   event MarketOutcomePrice(uint256 indexed marketId, uint256 indexed outcomeId, uint256 value, uint256 timestamp);
 
   event MarketLiquidity(
@@ -670,13 +677,13 @@ contract PredictionMarketV2 {
   /// @dev Emits a outcome price event for every outcome
   function emitMarketOutcomePriceEvents(uint256 marketId) private {
     Market storage market = markets[marketId];
+    uint256[] memory outcomeShares = new uint256[](market.outcomeCount);
 
     for (uint256 i = 0; i < market.outcomeCount; i++) {
-      emit MarketOutcomePrice(marketId, i, getMarketOutcomePrice(marketId, i), now);
+      outcomeShares[i] = market.outcomes[i].shares.available;
     }
 
-    // liquidity shares also change value
-    emit MarketLiquidity(marketId, market.liquidity, getMarketLiquidityPrice(marketId), now);
+    emit MarketShares(marketId, now, outcomeShares, market.liquidity);
   }
 
   /// @dev Adds outcome shares to shares pool
@@ -882,6 +889,24 @@ contract PredictionMarketV2 {
     return (getMarketLiquidityPrice(marketId), prices);
   }
 
+  function getMarketShares(uint256 marketId)
+    external
+    view
+    returns (
+      uint256,
+      uint256[] memory
+    )
+  {
+    Market storage market = markets[marketId];
+    uint256[] memory outcomeShares = new uint256[](market.outcomeCount);
+
+    for (uint256 i = 0; i < market.outcomeCount; i++) {
+      outcomeShares[i] = market.outcomes[i].shares.available;
+    }
+
+    return (market.liquidity, outcomeShares);
+  }
+
   function getMarketLiquidityPrice(uint256 marketId) public view returns (uint256) {
     Market storage market = markets[marketId];
 
@@ -891,18 +916,16 @@ contract PredictionMarketV2 {
       return market.outcomes[market.resolution.outcomeId].shares.available.mul(ONE).div(market.liquidity);
     }
 
-    // liquidity price = product(every outcome shares) / sum (every outcomeOddsWeight) * # outcomes / liquidity shares
-    uint256 marketSharesProduct = ONE;
+    // liquidity price = # outcomes / (liquidity * sum (1 / every outcome shares)
     uint256 marketSharesSum = 0;
 
     for (uint256 i = 0; i < market.outcomeCount; i++) {
       MarketOutcome storage outcome = market.outcomes[i];
 
-      marketSharesProduct = marketSharesProduct.mul(outcome.shares.available).div(ONE);
-      marketSharesSum = marketSharesSum.add(getOutcomeOddsWeight(marketId, i));
+      marketSharesSum = marketSharesSum.add(ONE.mul(ONE).div(outcome.shares.available));
     }
 
-    return marketSharesProduct.mul(market.outcomeCount).mul(ONE).div(marketSharesSum).mul(ONE).div(market.liquidity);
+    return market.outcomeCount.mul(ONE).mul(ONE).mul(ONE).div(market.liquidity).div(marketSharesSum);
   }
 
   function getMarketResolvedOutcome(uint256 marketId) public view returns (int256) {
@@ -941,20 +964,6 @@ contract PredictionMarketV2 {
     return outcomeIds;
   }
 
-  function getOutcomeOddsWeight(uint256 marketId, uint256 outcomeId) public view returns (uint256) {
-    Market storage market = markets[marketId];
-
-    uint256 productWeight = ONE;
-
-    for (uint256 i = 0; i < market.outcomeCount; i++) {
-      if (i == outcomeId) continue;
-
-      productWeight = productWeight.mul(market.outcomes[i].shares.available).div(ONE);
-    }
-
-    return productWeight;
-  }
-
   function getMarketOutcomePrice(uint256 marketId, uint256 outcomeId) public view returns (uint256) {
     Market storage market = markets[marketId];
 
@@ -963,13 +972,15 @@ contract PredictionMarketV2 {
       return outcomeId == market.resolution.outcomeId ? ONE : 0;
     }
 
-    uint256 sumOutcomeOddsWeight = 0;
+    uint256 div = ONE;
+    // outcome price = 1 / (1 + sum(every outcome shares / outcome shares))
     for (uint256 i = 0; i < market.outcomeCount; i++) {
-      sumOutcomeOddsWeight = sumOutcomeOddsWeight.add(getOutcomeOddsWeight(marketId, i));
+      if (i == outcomeId) continue;
+
+      div = div.add(market.outcomes[outcomeId].shares.available.mul(ONE).div(market.outcomes[i].shares.available));
     }
 
-    // outcome price = outcomeOddsWeight / sum(every outcomeOddsWeight)
-    return getOutcomeOddsWeight(marketId, outcomeId).mul(ONE).div(sumOutcomeOddsWeight);
+    return ONE.mul(ONE).div(div);
   }
 
   function getMarketOutcomeData(uint256 marketId, uint256 outcomeId)
