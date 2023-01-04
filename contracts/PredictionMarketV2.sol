@@ -78,7 +78,7 @@ contract PredictionMarketV2 {
     MarketResolution resolution; // fees
     MarketFees fees;
     // market outcomes
-    uint256[] outcomeIds;
+    uint256 outcomeCount;
     mapping(uint256 => MarketOutcome) outcomes;
     IERC20 token; // ERC20 token market will use for trading
   }
@@ -210,15 +210,7 @@ contract PredictionMarketV2 {
     market.fees.value = fee;
     // setting intial value to an integer that does not map to any outcomeId
     market.resolution.outcomeId = MAX_UINT_256;
-
-    // creating market outcomes
-    for (uint256 i = 0; i < args.outcomes; i++) {
-      market.outcomeIds.push(i);
-      MarketOutcome storage outcome = market.outcomes[i];
-
-      outcome.marketId = marketId;
-      outcome.id = i;
-    }
+    market.outcomeCount = args.outcomes;
 
     // creating question in realitio
     market.resolution.questionId = RealitioERC20(realitioAddress).askQuestionERC20(
@@ -679,7 +671,7 @@ contract PredictionMarketV2 {
   function emitMarketOutcomePriceEvents(uint256 marketId) private {
     Market storage market = markets[marketId];
 
-    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+    for (uint256 i = 0; i < market.outcomeCount; i++) {
       emit MarketOutcomePrice(marketId, i, getMarketOutcomePrice(marketId, i), now);
     }
 
@@ -691,7 +683,7 @@ contract PredictionMarketV2 {
   function addSharesToMarket(uint256 marketId, uint256 shares) private {
     Market storage market = markets[marketId];
 
-    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+    for (uint256 i = 0; i < market.outcomeCount; i++) {
       MarketOutcome storage outcome = market.outcomes[i];
 
       outcome.shares.available = outcome.shares.available.add(shares);
@@ -708,7 +700,7 @@ contract PredictionMarketV2 {
   function removeSharesFromMarket(uint256 marketId, uint256 shares) private {
     Market storage market = markets[marketId];
 
-    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+    for (uint256 i = 0; i < market.outcomeCount; i++) {
       MarketOutcome storage outcome = market.outcomes[i];
 
       outcome.shares.available = outcome.shares.available.sub(shares);
@@ -766,9 +758,9 @@ contract PredictionMarketV2 {
     )
   {
     Market storage market = markets[marketId];
-    uint256[] memory outcomeShares = new uint256[](market.outcomeIds.length);
+    uint256[] memory outcomeShares = new uint256[](market.outcomeCount);
 
-    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+    for (uint256 i = 0; i < market.outcomeCount; i++) {
       outcomeShares[i] = market.outcomes[i].shares.holders[user];
     }
 
@@ -881,9 +873,9 @@ contract PredictionMarketV2 {
     )
   {
     Market storage market = markets[marketId];
-    uint256[] memory prices = new uint256[](market.outcomeIds.length);
+    uint256[] memory prices = new uint256[](market.outcomeCount);
 
-    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+    for (uint256 i = 0; i < market.outcomeCount; i++) {
       prices[i] = getMarketOutcomePrice(marketId, i);
     }
 
@@ -903,14 +895,14 @@ contract PredictionMarketV2 {
     uint256 marketSharesProduct = ONE;
     uint256 marketSharesSum = 0;
 
-    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+    for (uint256 i = 0; i < market.outcomeCount; i++) {
       MarketOutcome storage outcome = market.outcomes[i];
 
       marketSharesProduct = marketSharesProduct.mul(outcome.shares.available).div(ONE);
       marketSharesSum = marketSharesSum.add(getOutcomeOddsWeight(marketId, i));
     }
 
-    return marketSharesProduct.mul(market.outcomeIds.length).mul(ONE).div(marketSharesSum).mul(ONE).div(market.liquidity);
+    return marketSharesProduct.mul(market.outcomeCount).mul(ONE).div(marketSharesSum).mul(ONE).div(market.liquidity);
   }
 
   function getMarketResolvedOutcome(uint256 marketId) public view returns (int256) {
@@ -933,14 +925,20 @@ contract PredictionMarketV2 {
     }
 
     // resolved market id does not match any of the market ids
-    return market.resolution.outcomeId >= market.outcomeIds.length;
+    return market.resolution.outcomeId >= market.outcomeCount;
   }
 
   // ------ Outcome Getters ------
 
   function getMarketOutcomeIds(uint256 marketId) external view returns (uint256[] memory) {
     Market storage market = markets[marketId];
-    return market.outcomeIds;
+    uint256[] memory outcomeIds = new uint256[](market.outcomeCount);
+
+    for (uint256 i = 0; i < market.outcomeCount; i++) {
+      outcomeIds[i] = i;
+    }
+
+    return outcomeIds;
   }
 
   function getOutcomeOddsWeight(uint256 marketId, uint256 outcomeId) public view returns (uint256) {
@@ -948,7 +946,7 @@ contract PredictionMarketV2 {
 
     uint256 productWeight = ONE;
 
-    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+    for (uint256 i = 0; i < market.outcomeCount; i++) {
       if (i == outcomeId) continue;
 
       productWeight = productWeight.mul(market.outcomes[i].shares.available).div(ONE);
@@ -966,7 +964,7 @@ contract PredictionMarketV2 {
     }
 
     uint256 sumOutcomeOddsWeight = 0;
-    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+    for (uint256 i = 0; i < market.outcomeCount; i++) {
       sumOutcomeOddsWeight = sumOutcomeOddsWeight.add(getOutcomeOddsWeight(marketId, i));
     }
 
@@ -992,8 +990,8 @@ contract PredictionMarketV2 {
   function getMarketOutcomesShares(uint256 marketId) private view returns (uint256[] memory) {
     Market storage market = markets[marketId];
 
-    uint256[] memory shares = new uint256[](market.outcomeIds.length);
-    for (uint256 i = 0; i < market.outcomeIds.length; i++) {
+    uint256[] memory shares = new uint256[](market.outcomeCount);
+    for (uint256 i = 0; i < market.outcomeCount; i++) {
       shares[i] = market.outcomes[i].shares.available;
     }
 
