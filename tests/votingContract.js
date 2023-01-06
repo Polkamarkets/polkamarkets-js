@@ -39,8 +39,6 @@ context('Voting Contract', async () => {
       });
       const votingContractAddress = votingContract.getAddress();
 
-      console.log('votingContractAddress:', votingContractAddress);
-
       expect(votingContractAddress).to.not.equal(null);
     }));
   });

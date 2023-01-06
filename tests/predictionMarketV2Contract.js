@@ -90,6 +90,7 @@ context('Prediction Market Contract V2', async () => {
         const res = await predictionMarketContract.createMarket({
           value,
           name: 'Will BTC price close above 100k$ on May 1st 2024',
+          description: 'This is a description',
           image: 'foo-bar',
           category: 'Foo;Bar',
           oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
@@ -144,6 +145,7 @@ context('Prediction Market Contract V2', async () => {
       const res = await predictionMarketContract.getMarketDetails({marketId});
       expect(res).to.eql({
         name: 'Will BTC price close above 100k$ on May 1st 2024',
+        description: 'This is a description',
         category: 'Foo',
         subcategory: 'Bar',
         outcomes: ['Yes', 'No'],
