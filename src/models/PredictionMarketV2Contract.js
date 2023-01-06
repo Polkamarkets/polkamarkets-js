@@ -402,10 +402,22 @@ class PredictionMarketV2Contract extends IContract {
 
     return {
       liquidity: Numbers.fromDecimalsNumber(marketPrices[0], 18),
-      outcomes: {
-        0: Numbers.fromDecimalsNumber(marketPrices[1], 18),
-        1: Numbers.fromDecimalsNumber(marketPrices[2], 18)
-      }
+      outcomes: Object.fromEntries(marketPrices[1].map((item, index) => [index, Numbers.fromDecimalsNumber(item, 18)] ))
+    };
+  }
+
+  /**
+   * @function getMarketShares
+   * @description Get Market Shares
+   * @param {Integer} marketId
+   * @return {Object} shares
+   */
+  async getMarketShares({marketId}) {
+    const marketShares = await this.getContract().methods.getMarketShares(marketId).call();
+
+    return {
+      liquidity: Numbers.fromDecimalsNumber(marketShares[0], 18),
+      outcomes: Object.fromEntries(marketShares[1].map((item, index) => [index, Numbers.fromDecimalsNumber(item, 18)] ))
     };
   }
 
@@ -420,7 +432,17 @@ class PredictionMarketV2Contract extends IContract {
    * @param {Address} oracleAddress
    * @param {Array} outcomes
    */
-  async createMarket ({value, name, image, duration, oracleAddress, outcomes, category, token}) {
+  async createMarket ({
+    value,
+    name,
+    image,
+    duration,
+    oracleAddress,
+    outcomes,
+    category,
+    token,
+    distribution = [],
+  }) {
     const valueToWei = Numbers.toSmartContractDecimals(value, 18);
     const question = realitioLib.encodeText('single-select', name, outcomes, category);
 
@@ -429,8 +451,8 @@ class PredictionMarketV2Contract extends IContract {
         value: valueToWei,
         closesAt: duration,
         outcomes: outcomes.length,
-        token: token,
-        distribution: [],
+        token,
+        distribution,
         question,
         image,
         arbitrator: oracleAddress,
@@ -550,6 +572,17 @@ class PredictionMarketV2Contract extends IContract {
       .call();
 
     return Numbers.fromDecimalsNumber(amount, 18);
+  }
+
+  calcDistribution({ odds }) {
+    const distribution = [];
+    const prod = odds.reduce((a, b) => a * b, 1);
+
+    for (let i = 0; i < odds.length; i++) {
+      distribution.push(Math.round(prod / odds[i] * 1000000));
+    }
+
+    return distribution;
   }
 }
 
