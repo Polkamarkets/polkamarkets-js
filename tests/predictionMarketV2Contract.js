@@ -507,10 +507,10 @@ context('Prediction Market Contract V2', async () => {
         expect(res.outcomeIds).to.eql([0, 1, 2]);
       }));
 
-      it('should create a Market with 256 outcomes', mochaAsync(async () => {
+      it('should create a Market with 32 outcomes', mochaAsync(async () => {
         // Array with outcomes with outcome id as name
         // TODO: improve gas optimization for markets with 10+ outcomes
-        const outcomeCount = 64;
+        const outcomeCount = 32;
         const outcomes = Array.from(Array(outcomeCount).keys());
 
         try {
@@ -537,10 +537,10 @@ context('Prediction Market Contract V2', async () => {
         expect(res.outcomeIds).to.eql(outcomes);
       }));
 
-      it('should not create a Market with more than 256 outcomes', mochaAsync(async () => {
+      it('should not create a Market with more than 32 outcomes', mochaAsync(async () => {
         const oldMarketIds = await predictionMarketContract.getMarkets();
         try {
-          const outcomes = Array.from(Array(257).keys());
+          const outcomes = Array.from(Array(33).keys());
 
           const res = await predictionMarketContract.createMarket({
             value,
