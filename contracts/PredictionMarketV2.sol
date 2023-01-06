@@ -33,12 +33,7 @@ contract PredictionMarketV2 {
     uint256 timestamp
   );
 
-  event MarketShares(
-    uint256 indexed marketId,
-    uint256 timestamp,
-    uint256[] outcomeShares,
-    uint256 liquidity
-  );
+  event MarketShares(uint256 indexed marketId, uint256 timestamp, uint256[] outcomeShares, uint256 liquidity);
 
   event MarketOutcomePrice(uint256 indexed marketId, uint256 indexed outcomeId, uint256 value, uint256 timestamp);
 
@@ -209,7 +204,7 @@ contract PredictionMarketV2 {
     require(args.value > 0, "stake needs to be > 0");
     require(args.closesAt > now, "market must resolve after the current date");
     require(args.arbitrator != address(0), "invalid arbitrator address");
-    require(args.outcomes <= 2 ** 5, "number of outcomes has to be less or equal than 32");
+    require(args.outcomes <= 2**5, "number of outcomes has to be less or equal than 32");
 
     market.token = args.token;
     market.closesAtTimestamp = args.closesAt;
@@ -756,14 +751,7 @@ contract PredictionMarketV2 {
 
   // ------ Getters ------
 
-  function getUserMarketShares(uint256 marketId, address user)
-    external
-    view
-    returns (
-      uint256,
-      uint256[] memory
-    )
-  {
+  function getUserMarketShares(uint256 marketId, address user) external view returns (uint256, uint256[] memory) {
     Market storage market = markets[marketId];
     uint256[] memory outcomeShares = new uint256[](market.outcomeCount);
 
@@ -771,10 +759,7 @@ contract PredictionMarketV2 {
       outcomeShares[i] = market.outcomes[i].shares.holders[user];
     }
 
-    return (
-      market.liquidityShares[user],
-      outcomeShares
-    );
+    return (market.liquidityShares[user], outcomeShares);
   }
 
   function getUserClaimStatus(uint256 marketId, address user)
@@ -871,14 +856,7 @@ contract PredictionMarketV2 {
     return (market.resolution.questionId);
   }
 
-  function getMarketPrices(uint256 marketId)
-    external
-    view
-    returns (
-      uint256,
-      uint256[] memory
-    )
-  {
+  function getMarketPrices(uint256 marketId) external view returns (uint256, uint256[] memory) {
     Market storage market = markets[marketId];
     uint256[] memory prices = new uint256[](market.outcomeCount);
 
@@ -889,14 +867,7 @@ contract PredictionMarketV2 {
     return (getMarketLiquidityPrice(marketId), prices);
   }
 
-  function getMarketShares(uint256 marketId)
-    external
-    view
-    returns (
-      uint256,
-      uint256[] memory
-    )
-  {
+  function getMarketShares(uint256 marketId) external view returns (uint256, uint256[] memory) {
     Market storage market = markets[marketId];
     uint256[] memory outcomeShares = new uint256[](market.outcomeCount);
 
