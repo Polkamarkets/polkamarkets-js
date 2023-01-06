@@ -824,5 +824,92 @@ context('Prediction Market Contract V2', async () => {
         expect(amountTransferred).to.equal(0.01);
       }));
     });
+    context('Distributed probabilites', async () => {
+      let marketId;
+      let outcomeIds = [0, 1, 2];
+
+      const initialOdds = [
+        [
+          [50, 50],
+          [50000000, 50000000]
+        ],
+        [
+          [40, 60],
+          [60000000, 40000000]
+        ],
+        [
+          [15, 20, 65],
+          [1300000000, 975000000, 300000000]
+        ],
+        [
+          [65, 15, 20],
+          [300000000, 1300000000, 975000000]
+        ],
+        [
+          [10, 20, 30, 40],
+          [24000000000, 12000000000, 8000000000, 6000000000]
+        ]
+      ];
+
+      for (const [odds, expectedDistribution] of initialOdds) {
+        context(`Odds: ${odds}`, async () => {
+          before(mochaAsync(async () => {
+            const distribution = await predictionMarketContract.calcDistribution({odds});
+
+            expect(distribution).to.eql(expectedDistribution);
+
+            try {
+              const res = await predictionMarketContract.createMarket({
+                value,
+                name: `Market with ${odds} odds`,
+                image: 'foo-bar',
+                category: 'Foo;Bar',
+                oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
+                duration: moment('2024-05-01').unix(),
+                outcomes: ['A', 'B', 'C', 'D', 'E'].slice(0, odds.length),
+                token: tokenERC20Contract.getAddress(),
+                distribution,
+              });
+              expect(res.status).to.equal(true);
+            } catch(e) {
+              console.log(e);
+            }
+
+            const marketIds = await predictionMarketContract.getMarkets();
+            marketId = marketIds[marketIds.length - 1];
+          }));
+
+          it('market prices should match odds', mochaAsync(async () => {
+            const outcomePrices = await predictionMarketContract.getMarketPrices({marketId});
+
+            for (let i = 0; i < odds.length; i++) {
+              const price = outcomePrices.outcomes[i];
+              const expectedPrice = odds[i] / 100;
+
+              expect(price).to.closeTo(expectedPrice, 0.00000001);
+            }
+          }));
+
+          it('market shares should match shares', mochaAsync(async () => {
+            const outcomeShares = await predictionMarketContract.getMarketShares({marketId});
+
+            for (let i = 0; i < odds.length; i++) {
+              const shares = outcomeShares.outcomes[i];
+              const minOdds = Math.min(...odds);
+              const expectedShares = value * minOdds / odds[i];
+
+              expect(shares).to.closeTo(expectedShares, 0.00000001);
+            }
+          }));
+
+          it('market liquidity should match liquidity', mochaAsync(async () => {
+            const marketData = await predictionMarketContract.getMarketData({marketId});
+            const expectedLiquidity = value;
+
+            expect(marketData.liquidity).to.equal(expectedLiquidity);
+          }));
+        });
+      }
+    });
   });
 });
