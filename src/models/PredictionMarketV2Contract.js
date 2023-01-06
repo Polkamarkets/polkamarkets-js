@@ -151,8 +151,13 @@ class PredictionMarketV2Contract extends IContract {
       events[0].returnValues.question
     );
 
+    // splitting name and description with the first occurrence of ';' character
+    const name = question.title.split(';')[0];
+    const description = question.title.split(';').slice(1).join(';');
+
     return {
-      name: question.title,
+      name,
+      description,
       category: question.category.split(';')[0],
       subcategory: question.category.split(';')[1],
       outcomes: question.outcomes,
@@ -435,6 +440,7 @@ class PredictionMarketV2Contract extends IContract {
   async createMarket ({
     value,
     name,
+    description = '',
     image,
     duration,
     oracleAddress,
@@ -444,7 +450,8 @@ class PredictionMarketV2Contract extends IContract {
     distribution = [],
   }) {
     const valueToWei = Numbers.toSmartContractDecimals(value, 18);
-    const question = realitioLib.encodeText('single-select', name, outcomes, category);
+    const title = `${name};${description}`;
+    const question = realitioLib.encodeText('single-select', title, outcomes, category);
 
     return await this.__sendTx(
       this.getContract().methods.createMarket({
