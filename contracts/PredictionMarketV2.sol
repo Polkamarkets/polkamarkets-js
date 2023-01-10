@@ -33,14 +33,14 @@ contract PredictionMarketV2 {
     uint256 timestamp
   );
 
-  event MarketShares(uint256 indexed marketId, uint256 timestamp, uint256[] outcomeShares, uint256 liquidity);
+  event MarketOutcomeShares(uint256 indexed marketId, uint256 timestamp, uint256[] outcomeShares, uint256 liquidity);
 
   event MarketOutcomePrice(uint256 indexed marketId, uint256 indexed outcomeId, uint256 value, uint256 timestamp);
 
   event MarketLiquidity(
     uint256 indexed marketId,
     uint256 value, // total liquidity
-    uint256 price, // value of one liquidity share; max: 1 (50-50 situation)
+    uint256 price, // value of one liquidity share; max: 1 (even odds situation)
     uint256 timestamp
   );
 
@@ -228,7 +228,7 @@ contract PredictionMarketV2 {
     addLiquidity(marketId, args.value, args.distribution);
 
     // emiting initial price events
-    emitMarketOutcomePriceEvents(marketId);
+    emitMarketActionEvents(marketId);
     emit MarketCreated(msg.sender, marketId, args.outcomes, args.question, args.image);
 
     // incrementing market array index
@@ -313,7 +313,7 @@ contract PredictionMarketV2 {
     require(market.token.transferFrom(msg.sender, address(this), value), "erc20 transfer failed");
 
     emit MarketActionTx(msg.sender, MarketAction.buy, marketId, outcomeId, shares, value, now);
-    emitMarketOutcomePriceEvents(marketId);
+    emitMarketActionEvents(marketId);
   }
 
   /// @dev Sell shares of a market outcome
@@ -348,7 +348,7 @@ contract PredictionMarketV2 {
     require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
 
     emit MarketActionTx(msg.sender, MarketAction.sell, marketId, outcomeId, shares, value, now);
-    emitMarketOutcomePriceEvents(marketId);
+    emitMarketActionEvents(marketId);
   }
 
   /// @dev Adds liquidity to a market - external
@@ -520,7 +520,7 @@ contract PredictionMarketV2 {
     market.resolution.outcomeId = outcomeId;
 
     emit MarketResolved(msg.sender, marketId, outcomeId, now);
-    emitMarketOutcomePriceEvents(marketId);
+    emitMarketActionEvents(marketId);
 
     return market.resolution.outcomeId;
   }
@@ -670,7 +670,7 @@ contract PredictionMarketV2 {
   }
 
   /// @dev Emits a outcome price event for every outcome
-  function emitMarketOutcomePriceEvents(uint256 marketId) private {
+  function emitMarketActionEvents(uint256 marketId) private {
     Market storage market = markets[marketId];
     uint256[] memory outcomeShares = new uint256[](market.outcomeCount);
 
@@ -678,7 +678,7 @@ contract PredictionMarketV2 {
       outcomeShares[i] = market.outcomes[i].shares.available;
     }
 
-    emit MarketShares(marketId, now, outcomeShares, market.liquidity);
+    emit MarketOutcomeShares(marketId, now, outcomeShares, market.liquidity);
   }
 
   /// @dev Adds outcome shares to shares pool
