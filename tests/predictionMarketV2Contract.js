@@ -870,7 +870,7 @@ context('Prediction Market Contract V2', async () => {
                 duration: moment('2024-05-01').unix(),
                 outcomes: ['A', 'B', 'C', 'D', 'E'].slice(0, odds.length),
                 token: tokenERC20Contract.getAddress(),
-                distribution,
+                odds,
               });
               expect(res.status).to.equal(true);
             } catch(e) {
