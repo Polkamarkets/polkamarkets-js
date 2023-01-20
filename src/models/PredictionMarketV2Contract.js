@@ -447,11 +447,26 @@ class PredictionMarketV2Contract extends IContract {
     outcomes,
     category,
     token,
-    distribution = [],
+    odds = [],
   }) {
     const valueToWei = Numbers.toSmartContractDecimals(value, 18);
     const title = `${name};${description}`;
     const question = realitioLib.encodeText('single-select', title, outcomes, category);
+    let distribution = [];
+
+    if (odds.length > 0) {
+      if (odds.length !== outcomes.length) {
+        throw new Error('Odds and outcomes must have the same length');
+      }
+
+      const oddsSum = odds.reduce((a, b) => a + b, 0);
+      // odds must match 100 (0.1 margin)
+      if (oddsSum < 99.9 || oddsSum > 100.1) {
+        throw new Error('Odds must sum 100');
+      }
+
+      distribution = this.calcDistribution({ odds });
+    }
 
     return await this.__sendTx(
       this.getContract().methods.createMarket({
