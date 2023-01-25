@@ -413,21 +413,34 @@ contract PredictionMarketV2 {
 
     addSharesToMarket(marketId, value);
 
-    // transform sendBackAmounts to array of amounts added
-    for (uint256 i = 0; i < sendBackAmounts.length; i++) {
-      if (sendBackAmounts[i] > 0) {
-        uint256 marketShares = market.sharesAvailable;
-        uint256 outcomeShares = market.outcomes[i].shares.available;
-        transferOutcomeSharesfromPool(msg.sender, marketId, i, sendBackAmounts[i]);
-        emit MarketActionTx(
-          msg.sender,
-          MarketAction.buy,
-          marketId,
-          i,
-          sendBackAmounts[i],
-          (marketShares.sub(outcomeShares)).mul(sendBackAmounts[i]).div(market.sharesAvailable), // price * shares
-          now
-        );
+    {
+      // transform sendBackAmounts to array of amounts added
+      for (uint256 i = 0; i < sendBackAmounts.length; i++) {
+        if (sendBackAmounts[i] > 0) {
+          transferOutcomeSharesfromPool(msg.sender, marketId, i, sendBackAmounts[i]);
+        }
+      }
+
+      // emitting events, using outcome 0 for price reference
+      uint256 referencePrice = getMarketOutcomePrice(marketId, 0);
+
+      for (uint256 i = 0; i < sendBackAmounts.length; i++) {
+        if (sendBackAmounts[i] > 0) {
+          // outcome price = outcome shares / reference outcome shares * reference outcome price
+          uint256 outcomePrice = referencePrice.mul(market.outcomes[0].shares.available).div(
+            market.outcomes[i].shares.available
+          );
+
+          emit MarketActionTx(
+            msg.sender,
+            MarketAction.buy,
+            marketId,
+            i,
+            sendBackAmounts[i],
+            sendBackAmounts[i].mul(outcomePrice).div(ONE), // price * shares
+            now
+          );
+        }
       }
     }
 
@@ -480,17 +493,27 @@ contract PredictionMarketV2 {
 
     for (uint256 i = 0; i < outcomesShares.length; i++) {
       if (sendAmounts[i] > 0) {
-        uint256 marketShares = market.sharesAvailable;
-        uint256 outcomeShares = market.outcomes[i].shares.available;
-
         transferOutcomeSharesfromPool(msg.sender, marketId, i, sendAmounts[i]);
+      }
+    }
+
+    // emitting events, using outcome 0 for price reference
+    uint256 referencePrice = getMarketOutcomePrice(marketId, 0);
+
+    for (uint256 i = 0; i < outcomesShares.length; i++) {
+      if (sendAmounts[i] > 0) {
+        // outcome price = outcome shares / reference outcome shares * reference outcome price
+        uint256 outcomePrice = referencePrice.mul(market.outcomes[0].shares.available).div(
+          market.outcomes[i].shares.available
+        );
+
         emit MarketActionTx(
           msg.sender,
           MarketAction.buy,
           marketId,
           i,
           sendAmounts[i],
-          (marketShares.sub(outcomeShares)).mul(sendAmounts[i]).div(market.sharesAvailable), // price * shares
+          sendAmounts[i].mul(outcomePrice).div(ONE), // price * shares
           now
         );
       }
