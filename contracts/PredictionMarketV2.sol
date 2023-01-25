@@ -204,7 +204,7 @@ contract PredictionMarketV2 {
     require(args.value > 0, "stake needs to be > 0");
     require(args.closesAt > now, "market must resolve after the current date");
     require(args.arbitrator != address(0), "invalid arbitrator address");
-    require(args.outcomes <= 2**5, "number of outcomes has to be less or equal than 32");
+    require(args.outcomes > 0 && args.outcomes <= 2**5, "number of outcomes has to between 1-32");
 
     market.token = args.token;
     market.closesAtTimestamp = args.closesAt;
