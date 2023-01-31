@@ -21,7 +21,14 @@ contract PredictionMarketV2 {
 
   // ------ Events ------
 
-  event MarketCreated(address indexed user, uint256 indexed marketId, uint256 outcomes, string question, string image);
+  event MarketCreated(
+    address indexed user,
+    uint256 indexed marketId,
+    uint256 outcomes,
+    string question,
+    string image,
+    IERC20 token
+  );
 
   event MarketActionTx(
     address indexed user,
@@ -229,7 +236,7 @@ contract PredictionMarketV2 {
 
     // emiting initial price events
     emitMarketActionEvents(marketId);
-    emit MarketCreated(msg.sender, marketId, args.outcomes, args.question, args.image);
+    emit MarketCreated(msg.sender, marketId, args.outcomes, args.question, args.image, args.token);
 
     // incrementing market array index
     marketIndex = marketIndex + 1;
@@ -865,12 +872,13 @@ contract PredictionMarketV2 {
     returns (
       uint256,
       bytes32,
-      uint256
+      uint256,
+      IERC20
     )
   {
     Market storage market = markets[marketId];
 
-    return (market.fees.value, market.resolution.questionId, uint256(market.resolution.questionId));
+    return (market.fees.value, market.resolution.questionId, uint256(market.resolution.questionId), market.token);
   }
 
   function getMarketQuestion(uint256 marketId) external view returns (bytes32) {
