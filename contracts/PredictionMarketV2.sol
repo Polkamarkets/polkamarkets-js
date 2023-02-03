@@ -14,6 +14,16 @@ library CeilDiv {
   }
 }
 
+interface IWETH {
+  function deposit() external payable;
+
+  function transfer(address to, uint256 value) external returns (bool);
+
+  function withdraw(uint256) external;
+
+  function approve(address guy, uint256 wad) external returns (bool);
+}
+
 /// @title Market Contract Factory
 contract PredictionMarketV2 {
   using SafeMath for uint256;
@@ -141,6 +151,8 @@ contract PredictionMarketV2 {
   // market creation
   IERC20 public requiredBalanceToken; // token used for rewards / market creation
   uint256 public requiredBalance; // required balance for market creation
+  // weth configs
+  IWETH public WETH;
 
   // ------ Modifiers ------
 
@@ -179,6 +191,11 @@ contract PredictionMarketV2 {
     _;
   }
 
+  modifier isWETHMarket(uint256 marketId) {
+    require(address(markets[marketId].token) == address(WETH), "Market token is not WETH");
+    _;
+  }
+
   // ------ Modifiers End ------
 
   /// @dev protocol is immutable and has no ownership
@@ -187,7 +204,8 @@ contract PredictionMarketV2 {
     IERC20 _requiredBalanceToken,
     uint256 _requiredBalance,
     address _realitioAddress,
-    uint256 _realitioTimeout
+    uint256 _realitioTimeout,
+    IWETH _WETH
   ) public {
     require(_realitioAddress != address(0), "_realitioAddress is address 0");
     require(_realitioTimeout > 0, "timeout must be positive");
@@ -197,6 +215,7 @@ contract PredictionMarketV2 {
     requiredBalance = _requiredBalance;
     realitioAddress = _realitioAddress;
     realitioTimeout = _realitioTimeout;
+    WETH = _WETH;
   }
 
   // ------ Core Functions ------

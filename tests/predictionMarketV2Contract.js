@@ -50,7 +50,8 @@ context('Prediction Market Contract V2', async () => {
           requiredBalanceERC20ContractAddress,
           0,
           realitioContractAddress,
-          86400
+          86400,
+          '0x0000000000000000000000000000000000000000'
         ]
       });
       const predictionMarketContractAddress = predictionMarketContract.getAddress();

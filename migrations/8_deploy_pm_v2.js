@@ -5,6 +5,7 @@ const {
   REQUIRED_BALANCE,
   REALITIO_ADDRESS,
   REALITIO_TIMEOUT,
+  WETH,
 } = process.env;
 
 
@@ -16,5 +17,6 @@ module.exports = async function(deployer) {
     REQUIRED_BALANCE, // requiredBalance
     REALITIO_ADDRESS, // realitioAddress
     REALITIO_TIMEOUT, // realitioTimeout,
+    WETH, // weth
   );
 };
