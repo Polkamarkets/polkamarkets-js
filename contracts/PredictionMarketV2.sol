@@ -298,7 +298,7 @@ contract PredictionMarketV2 {
       })
     );
     // transferring funds
-    WETH.deposit{value: msg.value}();
+    IWETH(WETH).deposit.value(msg.value)();
 
     return marketId;
   }
@@ -567,24 +567,25 @@ contract PredictionMarketV2 {
 
   function addLiquidity(
     uint256 marketId,
-    uint256 value,
-    uint256[] calldata distribution
+    uint256 value
   ) external {
+    uint256[] memory distribution = new uint256[](0);
     _addLiquidity(marketId, value, distribution);
 
     Market storage market = markets[marketId];
     require(market.token.transferFrom(msg.sender, address(this), value), "erc20 transfer failed");
   }
 
-  function addLiquidityWithETH(uint256 marketId, uint256[] calldata distribution)
+  function addLiquidityWithETH(uint256 marketId)
     external
     payable
     isWETHMarket(marketId)
   {
     uint256 value = msg.value;
+    uint256[] memory distribution = new uint256[](0);
     _addLiquidity(marketId, value, distribution);
     // wrapping and depositing funds
-    IWETH(WETH).deposit{value: value}();
+    IWETH(WETH).deposit.value(value)();
   }
 
   /// @dev Removes liquidity to a market - external
@@ -661,17 +662,17 @@ contract PredictionMarketV2 {
   }
 
   function removeLiquidity(uint256 marketId, uint256 shares) external {
-    uint256 liquidityAmount = _removeLiquidity(marketId, shares);
+    uint256 value = _removeLiquidity(marketId, shares);
     // transferring user funds from liquidity removed
     Market storage market = markets[marketId];
-    require(market.token.transfer(msg.sender, liquidityAmount), "erc20 transfer failed");
+    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
   }
 
   function removeLiquidityToETH(uint256 marketId, uint256 shares) external isWETHMarket(marketId) {
-    uint256 liquidityAmount = _removeLiquidity(marketId, shares);
+    uint256 value = _removeLiquidity(marketId, shares);
     // unwrapping and transferring user funds from liquidity removed
-    IWETH(WETH).withdraw(liquidityAmount);
-    msg.sender.transfer(liquidityAmount);
+    IWETH(WETH).withdraw(shares);
+    msg.sender.transfer(value);
   }
 
   /// @dev Fetches winning outcome from Realitio and resolves the market
