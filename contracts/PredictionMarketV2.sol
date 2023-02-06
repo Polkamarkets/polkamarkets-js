@@ -218,6 +218,10 @@ contract PredictionMarketV2 {
     WETH = _WETH;
   }
 
+  receive() external payable {
+    assert(msg.sender == address(WETH)); // only accept ETH via fallback from the WETH contract
+  }
+
   // ------ Core Functions ------
 
   /// @dev Creates a market, initializes the outcome shares pool and submits a question in Realitio
