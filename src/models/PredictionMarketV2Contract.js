@@ -65,6 +65,17 @@ class PredictionMarketV2Contract extends IContract {
     return Numbers.fromDecimalsNumber(fee, 18)
   }
 
+    /**
+   * @function getWETHAddress
+   * @description Returns WETH Address
+   * @returns {address}
+   */
+  async getWETHAddress() {
+    const WETHAddress = await this.params.contract.getContract().methods.WETH().call();
+
+    return WETHAddress;
+  }
+
   /* Get Functions */
   /**
    * @function getMarkets
@@ -427,7 +438,6 @@ class PredictionMarketV2Contract extends IContract {
   }
 
   /* POST User Functions */
-
   /**
    * @function createMarket
    * @description Create a µarket
@@ -482,6 +492,64 @@ class PredictionMarketV2Contract extends IContract {
     );
   };
 
+/**
+   * @function createMarketWithETH
+   * @description Create a market
+   * @param {Integer} value
+   * @param {String} name
+   * @param {Integer} duration
+   * @param {Address} oracleAddress
+   * @param {Array} outcomes
+   */
+  async createMarketWithETH ({
+    value,
+    name,
+    description = '',
+    image,
+    duration,
+    oracleAddress,
+    outcomes,
+    category,
+    odds = [],
+  }) {
+    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    const title = `${name};${description}`;
+    const question = realitioLib.encodeText('single-select', title, outcomes, category);
+    let distribution = [];
+    const token = await this.getWETHAddress();
+
+    if (odds.length > 0) {
+      if (odds.length !== outcomes.length) {
+        throw new Error('Odds and outcomes must have the same length');
+      }
+
+      const oddsSum = odds.reduce((a, b) => a + b, 0);
+      // odds must match 100 (0.1 margin)
+      if (oddsSum < 99.9 || oddsSum > 100.1) {
+        throw new Error('Odds must sum 100');
+      }
+
+      distribution = this.calcDistribution({ odds });
+    }
+
+    return await this.__sendTx(
+      this.getContract().methods.createMarketWithETH(
+        {
+          value: valueToWei,
+          closesAt: duration,
+          outcomes: outcomes.length,
+          token,
+          distribution,
+          question,
+          image,
+          arbitrator: oracleAddress,
+        }
+      ),
+      false,
+      valueToWei
+    );
+  };
+
   /**
    * @function addLiquidity
    * @description Add Liquidity from Market
@@ -491,7 +559,22 @@ class PredictionMarketV2Contract extends IContract {
   async addLiquidity({marketId, value}) {
     const valueToWei = Numbers.toSmartContractDecimals(value, 18);
     return await this.__sendTx(
-      this.getContract().methods.addLiquidity(marketId, valueToWei, []),
+      this.getContract().methods.addLiquidity(marketId, valueToWei),
+    );
+  };
+
+  /**
+   * @function addLiquidityWithETH
+   * @description Add Liquidity from Market
+   * @param {Integer} marketId
+   * @param {Integer} value
+   */
+  async addLiquidityWithETH({marketId, value}) {
+    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    return await this.__sendTx(
+      this.getContract().methods.addLiquidityWithETH(marketId),
+      false,
+      valueToWei
     );
   };
 
@@ -508,6 +591,19 @@ class PredictionMarketV2Contract extends IContract {
     );
   };
 
+  /**
+   * @function removeLiquidityToETH
+   * @description Remove Liquidity from Market
+   * @param {Integer} marketId
+   * @param {Integer} shares
+   */
+  async removeLiquidityToETH({marketId, shares}) {
+    shares = Numbers.toSmartContractDecimals(shares, 18);
+    return await this.__sendTx(
+      this.getContract().methods.removeLiquidityToETH(marketId, shares),
+      null
+    );
+  };
 
   /**
    * @function buy
@@ -526,6 +622,24 @@ class PredictionMarketV2Contract extends IContract {
   };
 
   /**
+   * @function buyWithETH
+   * @description Buy Shares of a Market Outcome
+   * @param {Integer} marketId
+   * @param {Integer} outcomeId
+   * @param {Integer} value
+   */
+  async buyWithETH ({ marketId, outcomeId, value, minOutcomeSharesToBuy}) {
+    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    minOutcomeSharesToBuy = Numbers.toSmartContractDecimals(minOutcomeSharesToBuy, 18);
+
+    return await this.__sendTx(
+      this.getContract().methods.buyWithETH(marketId, outcomeId, minOutcomeSharesToBuy, valueToWei),
+      false,
+      valueToWei,
+    );
+  };
+
+  /**
    * @function sell
    * @description Sell Shares of a Market Outcome
    * @param {Integer} marketId
@@ -537,6 +651,22 @@ class PredictionMarketV2Contract extends IContract {
     maxOutcomeSharesToSell = Numbers.toSmartContractDecimals(maxOutcomeSharesToSell, 18);
     return await this.__sendTx(
       this.getContract().methods.sell(marketId, outcomeId, valueToWei, maxOutcomeSharesToSell),
+    );
+  };
+
+  /**
+   * @function sellToETH
+   * @description Sell Shares of a Market Outcome
+   * @param {Integer} marketId
+   * @param {Integer} outcomeId
+   * @param {Integer} shares
+   */
+  async sellToETH({marketId, outcomeId, value, maxOutcomeSharesToSell}) {
+    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    maxOutcomeSharesToSell = Numbers.toSmartContractDecimals(maxOutcomeSharesToSell, 18);
+    return await this.__sendTx(
+      this.getContract().methods.sellToETH(marketId, outcomeId, valueToWei, maxOutcomeSharesToSell),
+      false,
     );
   };
 
