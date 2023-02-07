@@ -684,9 +684,23 @@ class PredictionMarketV2Contract extends IContract {
     );
   };
 
+  async claimWinningsToETH({marketId}) {
+    return await this.__sendTx(
+      this.getContract().methods.claimWinningsToETH(marketId),
+      false,
+    );
+  };
+
   async claimVoidedOutcomeShares({marketId, outcomeId}) {
     return await this.__sendTx(
       this.getContract().methods.claimVoidedOutcomeShares(marketId, outcomeId),
+      false,
+    );
+  };
+
+  async claimVoidedOutcomeSharesToETH({marketId, outcomeId}) {
+    return await this.__sendTx(
+      this.getContract().methods.claimVoidedOutcomeSharesToETH(marketId, outcomeId),
       false,
     );
   };
