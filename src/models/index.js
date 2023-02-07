@@ -5,6 +5,7 @@ const AchievementsContract = require('./AchievementsContract');
 const RealitioERC20Contract = require('./RealitioERC20Contract');
 const VotingContract = require('./VotingContract');
 const FantasyERC20Contract = require('./FantasyERC20Contract');
+const WETH9Contract = require('./WETH9Contract');
 
 module.exports = {
   ERC20Contract,
@@ -13,5 +14,6 @@ module.exports = {
   AchievementsContract,
   RealitioERC20Contract,
   VotingContract,
-  FantasyERC20Contract
+  FantasyERC20Contract,
+  WETH9Contract
 }

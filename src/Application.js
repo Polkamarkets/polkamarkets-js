@@ -7,6 +7,7 @@ const AchievementsContract = require("./models/index").AchievementsContract;
 const RealitioERC20Contract = require("./models/index").RealitioERC20Contract;
 const VotingContract = require("./models/index").VotingContract;
 const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
+const WETH9Contract = require("./models/index").WETH9Contract;
 
 const Account = require('./utils/Account');
 
@@ -221,6 +222,25 @@ class Application {
   getERC20Contract({ contractAddress = null }) {
     try {
       return new ERC20Contract({
+        web3: this.web3,
+        contractAddress: contractAddress,
+        acc: this.account,
+        web3EventsProvider: this.web3EventsProvider,
+        gasPrice: this.gasPrice
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name getWETH9Contract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a WETH9 Contract
+   */
+  getWETH9Contract({ contractAddress = null }) {
+    try {
+      return new WETH9Contract({
         web3: this.web3,
         contractAddress: contractAddress,
         acc: this.account,
