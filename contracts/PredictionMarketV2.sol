@@ -569,10 +569,7 @@ contract PredictionMarketV2 {
     emit MarketLiquidity(marketId, market.liquidity, liquidityPrice, now);
   }
 
-  function addLiquidity(
-    uint256 marketId,
-    uint256 value
-  ) external {
+  function addLiquidity(uint256 marketId, uint256 value) external {
     uint256[] memory distribution = new uint256[](0);
     _addLiquidity(marketId, value, distribution);
 
@@ -580,11 +577,7 @@ contract PredictionMarketV2 {
     require(market.token.transferFrom(msg.sender, address(this), value), "erc20 transfer failed");
   }
 
-  function addLiquidityWithETH(uint256 marketId)
-    external
-    payable
-    isWETHMarket(marketId)
-  {
+  function addLiquidityWithETH(uint256 marketId) external payable isWETHMarket(marketId) {
     uint256 value = msg.value;
     uint256[] memory distribution = new uint256[](0);
     _addLiquidity(marketId, value, distribution);
@@ -702,7 +695,7 @@ contract PredictionMarketV2 {
   }
 
   /// @dev Allows holders of resolved outcome shares to claim earnings.
-  function claimWinnings(uint256 marketId) external atState(marketId, MarketState.resolved) {
+  function _claimWinnings(uint256 marketId) private atState(marketId, MarketState.resolved) returns (uint256) {
     Market storage market = markets[marketId];
     MarketOutcome storage resolvedOutcome = market.outcomes[market.resolution.outcomeId];
 
@@ -728,13 +721,28 @@ contract PredictionMarketV2 {
       now
     );
 
+    return value;
+  }
+
+  function claimWinnings(uint256 marketId) external {
+    uint256 value = _claimWinnings(marketId);
+    // transferring user funds from winnings claimed
+    Market storage market = markets[marketId];
     require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
   }
 
+  function claimWinningsToETH(uint256 marketId) external isWETHMarket(marketId) {
+    uint256 value = _claimWinnings(marketId);
+    // unwrapping and transferring user funds from winnings claimed
+    IWETH(WETH).withdraw(value);
+    msg.sender.transfer(value);
+  }
+
   /// @dev Allows holders of voided outcome shares to claim balance back.
-  function claimVoidedOutcomeShares(uint256 marketId, uint256 outcomeId)
-    external
+  function _claimVoidedOutcomeShares(uint256 marketId, uint256 outcomeId)
+    private
     atState(marketId, MarketState.resolved)
+    returns (uint256)
   {
     Market storage market = markets[marketId];
     MarketOutcome storage outcome = market.outcomes[outcomeId];
@@ -762,7 +770,21 @@ contract PredictionMarketV2 {
       now
     );
 
+    return value;
+  }
+
+  function claimVoidedOutcomeShares(uint256 marketId, uint256 outcomeId) external {
+    uint256 value = _claimVoidedOutcomeShares(marketId, outcomeId);
+    // transferring user funds from voided outcome shares claimed
+    Market storage market = markets[marketId];
     require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
+  }
+
+  function claimVoidedOutcomeSharesToETH(uint256 marketId, uint256 outcomeId) external isWETHMarket(marketId) {
+    uint256 value = _claimVoidedOutcomeShares(marketId, outcomeId);
+    // unwrapping and transferring user funds from voided outcome shares claimed
+    IWETH(WETH).withdraw(value);
+    msg.sender.transfer(value);
   }
 
   /// @dev Allows liquidity providers to claim earnings from liquidity providing.
