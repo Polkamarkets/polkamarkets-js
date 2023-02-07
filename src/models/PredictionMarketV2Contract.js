@@ -633,7 +633,7 @@ class PredictionMarketV2Contract extends IContract {
     minOutcomeSharesToBuy = Numbers.toSmartContractDecimals(minOutcomeSharesToBuy, 18);
 
     return await this.__sendTx(
-      this.getContract().methods.buyWithETH(marketId, outcomeId, minOutcomeSharesToBuy, valueToWei),
+      this.getContract().methods.buyWithETH(marketId, outcomeId, minOutcomeSharesToBuy),
       false,
       valueToWei,
     );
