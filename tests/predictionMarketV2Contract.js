@@ -15,6 +15,7 @@ context('Prediction Market Contract V2', async () => {
   let realitioERC20Contract
   let requiredBalanceERC20Contract;
   let tokenERC20Contract;
+  let WETH9Contract;
 
   // market / outcome ids we'll make unit tests with
   let outcomeIds = [0, 1];
@@ -35,14 +36,17 @@ context('Prediction Market Contract V2', async () => {
       realitioERC20Contract = app.getRealitioERC20Contract({});
       requiredBalanceERC20Contract = app.getERC20Contract({});
       tokenERC20Contract = app.getERC20Contract({});
+      WETH9Contract = app.getWETH9Contract({});
 
       // Deploy
       await realitioERC20Contract.deploy({});
       await requiredBalanceERC20Contract.deploy({params: ['Polkamarkets', 'POLK']});
+      await WETH9Contract.deploy({});
 
       const realitioContractAddress = realitioERC20Contract.getAddress();
       const requiredBalanceERC20ContractAddress = requiredBalanceERC20Contract.getAddress();
       accountAddress = await predictionMarketContract.getMyAccount();
+      const WETH9ContractAddress = WETH9Contract.getAddress();
 
       await predictionMarketContract.deploy({
         params: [
@@ -51,7 +55,7 @@ context('Prediction Market Contract V2', async () => {
           0,
           realitioContractAddress,
           86400,
-          '0x0000000000000000000000000000000000000000'
+          WETH9ContractAddress
         ]
       });
       const predictionMarketContractAddress = predictionMarketContract.getAddress();
@@ -171,6 +175,125 @@ context('Prediction Market Contract V2', async () => {
       expect(outcome1Data.price + outcome2Data.price).to.equal(1);
       // outcomes number of shares should dum to value * 2
       expect(outcome1Data.shares + outcome2Data.shares).to.equal(value * 2);
+    }));
+  });
+
+  context('Market Interaction - WETH Market', async () => {
+    let marketId;
+
+    before(mochaAsync(async () => {
+      try {
+        const res = await predictionMarketContract.createMarketWithETH({
+          value,
+          name: 'WETH Market',
+          image: 'foo-bar',
+          category: 'Foo;Bar',
+          oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
+          duration: moment('2024-05-01').unix(),
+          outcomes: ['A', 'B']
+        });
+        expect(res.status).to.equal(true);
+      } catch(e) {
+        console.log(e);
+      }
+
+      const marketIds = await predictionMarketContract.getMarkets();
+      marketId = marketIds[marketIds.length - 1];
+    }));
+
+    it('should match WETH supply', mochaAsync(async () => {
+      const ETHBalance = Number(await WETH9Contract.getBalance());
+      expect(Number(ETHBalance)).to.equal(value);
+
+      const WETHSupply = await WETH9Contract.totalSupply();
+      expect(Number(WETHSupply)).to.equal(value);
+    }));
+
+    it('should match market WETH balance', mochaAsync(async () => {
+      const contractBalance = await WETH9Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      expect(contractBalance).to.equal(value);
+    }));
+
+    it('should add liquidity', mochaAsync(async () => {
+      const contractBalance = await WETH9Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const WETHBalance = Number(await WETH9Contract.getBalance());
+
+      try {
+        const res = await predictionMarketContract.addLiquidityWithETH({marketId, value})
+        expect(res.status).to.equal(true);
+      } catch(e) {
+        console.log(e);
+      }
+
+      const newContractBalance = await WETH9Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const NewWETHBalance = Number(await WETH9Contract.getBalance());
+      const amountTransferred = Number((newContractBalance - contractBalance).toFixed(5));
+
+      expect(amountTransferred).to.equal(value);
+      expect(NewWETHBalance).to.equal(WETHBalance + value);
+    }));
+
+    it('should remove liquidity', mochaAsync(async () => {
+      const contractBalance = await WETH9Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const WETHBalance = Number(await WETH9Contract.getBalance());
+
+      try {
+        const res = await predictionMarketContract.removeLiquidityToETH({marketId, shares: value})
+        expect(res.status).to.equal(true);
+      } catch(e) {
+        console.log(e);
+      }
+
+      const newContractBalance = await WETH9Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const NewWETHBalance = Number(await WETH9Contract.getBalance());
+      const amountTransferred = Number((contractBalance - newContractBalance).toFixed(5));
+
+      expect(amountTransferred).to.equal(value);
+      expect(NewWETHBalance).to.equal(WETHBalance - value);
+    }));
+
+    it('should buy outcome shares', mochaAsync(async () => {
+      const outcomeId = 0;
+      const minOutcomeSharesToBuy = 0.015;
+
+      const contractBalance = await WETH9Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const WETHBalance = Number(await WETH9Contract.getBalance());
+
+      try {
+        const res = await predictionMarketContract.buyWithETH({marketId, outcomeId, value, minOutcomeSharesToBuy});
+        expect(res.status).to.equal(true);
+      } catch(e) {
+        console.log(e);
+      }
+
+      const newContractBalance = await WETH9Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const NewWETHBalance = Number(await WETH9Contract.getBalance());
+      const amountTransferred = Number((newContractBalance - contractBalance).toFixed(5));
+
+      expect(amountTransferred).to.equal(value);
+      expect(NewWETHBalance).to.equal(WETHBalance + value);
+    }));
+
+    it('should sell outcome shares', mochaAsync(async () => {
+      const outcomeId = 0;
+      const maxOutcomeSharesToSell = 0.015;
+
+      const contractBalance = await WETH9Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const WETHBalance = Number(await WETH9Contract.getBalance());
+
+      try {
+        const res = await predictionMarketContract.sellToETH({marketId, outcomeId, value, maxOutcomeSharesToSell});
+        expect(res.status).to.equal(true);
+      } catch(e) {
+        console.log(e);
+      }
+
+      const newContractBalance = await WETH9Contract.balanceOf({address: predictionMarketContract.getAddress()});
+      const NewWETHBalance = Number(await WETH9Contract.getBalance());
+      const amountTransferred = Number((contractBalance - newContractBalance).toFixed(5));
+
+      expect(amountTransferred).to.equal(value);
+      expect(NewWETHBalance).to.equal(WETHBalance - value);
     }));
   });
 
