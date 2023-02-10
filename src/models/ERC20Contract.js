@@ -81,6 +81,23 @@ class ERC20Contract extends IContract {
       throw err;
     }
   }
+
+  async name() {
+    return await this.getContract().methods.name().call();
+  }
+
+  async symbol() {
+    return await this.getContract().methods.symbol().call();
+  }
+
+  async getTokenInfo() {
+    return {
+      name: await this.name(),
+      address: this.getAddress(),
+      ticker: await this.symbol(),
+      decimals: await this.getDecimalsAsync(),
+    };
+  }
 }
 
 module.exports = ERC20Contract;
