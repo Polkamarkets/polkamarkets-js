@@ -569,25 +569,19 @@ class PredictionMarketV2Contract extends IContract {
    * @param {Integer} marketId
    * @param {Integer} value
    */
-  async addLiquidity({marketId, value}) {
+  async addLiquidity({marketId, value, wrapped = false}) {
     const valueToWei = Numbers.toSmartContractDecimals(value, 18);
+
+    if (wrapped) {
+      return await this.__sendTx(
+        this.getContract().methods.addLiquidityWithETH(marketId),
+        false,
+        valueToWei
+      );
+    }
+
     return await this.__sendTx(
       this.getContract().methods.addLiquidity(marketId, valueToWei),
-    );
-  };
-
-  /**
-   * @function addLiquidityWithETH
-   * @description Add Liquidity from Market
-   * @param {Integer} marketId
-   * @param {Integer} value
-   */
-  async addLiquidityWithETH({marketId, value}) {
-    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
-    return await this.__sendTx(
-      this.getContract().methods.addLiquidityWithETH(marketId),
-      false,
-      valueToWei
     );
   };
 
@@ -597,24 +591,18 @@ class PredictionMarketV2Contract extends IContract {
    * @param {Integer} marketId
    * @param {Integer} shares
    */
-  async removeLiquidity({marketId, shares}) {
+  async removeLiquidity({marketId, shares, wrapped = false}) {
     shares = Numbers.toSmartContractDecimals(shares, 18);
+
+    if (wrapped) {
+      return await this.__sendTx(
+        this.getContract().methods.removeLiquidityToETH(marketId, shares),
+        null
+      );
+    }
+
     return await this.__sendTx(
       this.getContract().methods.removeLiquidity(marketId, shares)
-    );
-  };
-
-  /**
-   * @function removeLiquidityToETH
-   * @description Remove Liquidity from Market
-   * @param {Integer} marketId
-   * @param {Integer} shares
-   */
-  async removeLiquidityToETH({marketId, shares}) {
-    shares = Numbers.toSmartContractDecimals(shares, 18);
-    return await this.__sendTx(
-      this.getContract().methods.removeLiquidityToETH(marketId, shares),
-      null
     );
   };
 
@@ -625,30 +613,20 @@ class PredictionMarketV2Contract extends IContract {
    * @param {Integer} outcomeId
    * @param {Integer} value
    */
-  async buy ({ marketId, outcomeId, value, minOutcomeSharesToBuy}) {
+  async buy ({ marketId, outcomeId, value, minOutcomeSharesToBuy, wrapped = false}) {
     const valueToWei = Numbers.toSmartContractDecimals(value, 18);
     minOutcomeSharesToBuy = Numbers.toSmartContractDecimals(minOutcomeSharesToBuy, 18);
+
+    if (wrapped) {
+      return await this.__sendTx(
+        this.getContract().methods.buyWithETH(marketId, outcomeId, minOutcomeSharesToBuy),
+        false,
+        valueToWei,
+      );
+    }
 
     return await this.__sendTx(
       this.getContract().methods.buy(marketId, outcomeId, minOutcomeSharesToBuy, valueToWei),
-    );
-  };
-
-  /**
-   * @function buyWithETH
-   * @description Buy Shares of a Market Outcome
-   * @param {Integer} marketId
-   * @param {Integer} outcomeId
-   * @param {Integer} value
-   */
-  async buyWithETH ({ marketId, outcomeId, value, minOutcomeSharesToBuy}) {
-    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
-    minOutcomeSharesToBuy = Numbers.toSmartContractDecimals(minOutcomeSharesToBuy, 18);
-
-    return await this.__sendTx(
-      this.getContract().methods.buyWithETH(marketId, outcomeId, minOutcomeSharesToBuy),
-      false,
-      valueToWei,
     );
   };
 
@@ -659,27 +637,19 @@ class PredictionMarketV2Contract extends IContract {
    * @param {Integer} outcomeId
    * @param {Integer} shares
    */
-  async sell({marketId, outcomeId, value, maxOutcomeSharesToSell}) {
+  async sell({marketId, outcomeId, value, maxOutcomeSharesToSell, wrapped = false}) {
     const valueToWei = Numbers.toSmartContractDecimals(value, 18);
     maxOutcomeSharesToSell = Numbers.toSmartContractDecimals(maxOutcomeSharesToSell, 18);
+
+    if (wrapped) {
+      return await this.__sendTx(
+        this.getContract().methods.sellToETH(marketId, outcomeId, valueToWei, maxOutcomeSharesToSell),
+        false,
+      );
+    }
+
     return await this.__sendTx(
       this.getContract().methods.sell(marketId, outcomeId, valueToWei, maxOutcomeSharesToSell),
-    );
-  };
-
-  /**
-   * @function sellToETH
-   * @description Sell Shares of a Market Outcome
-   * @param {Integer} marketId
-   * @param {Integer} outcomeId
-   * @param {Integer} shares
-   */
-  async sellToETH({marketId, outcomeId, value, maxOutcomeSharesToSell}) {
-    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
-    maxOutcomeSharesToSell = Numbers.toSmartContractDecimals(maxOutcomeSharesToSell, 18);
-    return await this.__sendTx(
-      this.getContract().methods.sellToETH(marketId, outcomeId, valueToWei, maxOutcomeSharesToSell),
-      false,
     );
   };
 
@@ -690,30 +660,30 @@ class PredictionMarketV2Contract extends IContract {
     );
   };
 
-  async claimWinnings({marketId}) {
+  async claimWinnings({marketId, wrapped = false}) {
+    if (wrapped) {
+      return await this.__sendTx(
+        this.getContract().methods.claimWinningsToETH(marketId),
+        false,
+      );
+    }
+
     return await this.__sendTx(
       this.getContract().methods.claimWinnings(marketId),
       false,
     );
   };
 
-  async claimWinningsToETH({marketId}) {
-    return await this.__sendTx(
-      this.getContract().methods.claimWinningsToETH(marketId),
-      false,
-    );
-  };
+  async claimVoidedOutcomeShares({marketId, outcomeId, wrapped = false}) {
+    if (wrapped) {
+      return await this.__sendTx(
+        this.getContract().methods.claimVoidedOutcomeSharesToETH(marketId, outcomeId),
+        false,
+      );
+    }
 
-  async claimVoidedOutcomeShares({marketId, outcomeId}) {
     return await this.__sendTx(
       this.getContract().methods.claimVoidedOutcomeShares(marketId, outcomeId),
-      false,
-    );
-  };
-
-  async claimVoidedOutcomeSharesToETH({marketId, outcomeId}) {
-    return await this.__sendTx(
-      this.getContract().methods.claimVoidedOutcomeSharesToETH(marketId, outcomeId),
       false,
     );
   };
