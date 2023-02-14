@@ -180,6 +180,7 @@ context('Prediction Market Contract V2', async () => {
 
   context('Market Interaction - WETH Market', async () => {
     let marketId;
+    const wrapped = true;
 
     before(mochaAsync(async () => {
       try {
@@ -219,7 +220,7 @@ context('Prediction Market Contract V2', async () => {
       const WETHBalance = Number(await WETH9Contract.getBalance());
 
       try {
-        const res = await predictionMarketContract.addLiquidityWithETH({marketId, value})
+        const res = await predictionMarketContract.addLiquidity({marketId, value, wrapped})
         expect(res.status).to.equal(true);
       } catch(e) {
         console.log(e);
@@ -238,7 +239,7 @@ context('Prediction Market Contract V2', async () => {
       const WETHBalance = Number(await WETH9Contract.getBalance());
 
       try {
-        const res = await predictionMarketContract.removeLiquidityToETH({marketId, shares: value})
+        const res = await predictionMarketContract.removeLiquidity({marketId, shares: value, wrapped})
         expect(res.status).to.equal(true);
       } catch(e) {
         console.log(e);
@@ -260,7 +261,7 @@ context('Prediction Market Contract V2', async () => {
       const WETHBalance = Number(await WETH9Contract.getBalance());
 
       try {
-        const res = await predictionMarketContract.buyWithETH({marketId, outcomeId, value, minOutcomeSharesToBuy});
+        const res = await predictionMarketContract.buy({marketId, outcomeId, value, minOutcomeSharesToBuy, wrapped});
         expect(res.status).to.equal(true);
       } catch(e) {
         console.log(e);
@@ -282,7 +283,7 @@ context('Prediction Market Contract V2', async () => {
       const WETHBalance = Number(await WETH9Contract.getBalance());
 
       try {
-        const res = await predictionMarketContract.sellToETH({marketId, outcomeId, value, maxOutcomeSharesToSell});
+        const res = await predictionMarketContract.sell({marketId, outcomeId, value, maxOutcomeSharesToSell, wrapped});
         expect(res.status).to.equal(true);
       } catch(e) {
         console.log(e);
