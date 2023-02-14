@@ -247,6 +247,19 @@ class PredictionMarketV2Contract extends IContract {
   }
 
   /**
+   * @function isMarketERC20TokenWrapped
+   * @description Checks if market ERC20 token is wrapped
+   * @param {Integer} marketId
+   * @returns {Boolean} boolean
+   */
+  async isMarketERC20TokenWrapped({marketId}) {
+    const WETHAddress = await this.params.contract.getContract().methods.WETH().call();
+    const marketAltData = await this.params.contract.getContract().methods.getMarketAltData(marketId).call();
+
+    return marketAltData[3] === WETHAddress;
+  }
+
+  /**
    * @function getMyPortfolio
    * @description Get My Porfolio
    * @returns {Array} Outcome Shares
