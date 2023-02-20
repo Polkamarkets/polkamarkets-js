@@ -8,6 +8,7 @@ const VotingContract = require("./models/index").VotingContract;
 const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
 
 const Account = require('./utils/Account');
+const SocialLogin = require('@biconomy/web3-auth');
 
 const networksEnum = Object.freeze({
   1: "Main",
@@ -248,6 +249,17 @@ class Application {
     const address = await this.getAddress();
     let wei = await window.web3.eth.getBalance(address);
     return this.web3.utils.fromWei(wei, "ether");
+  };
+
+  async testSocialLogin() {
+    // create an instance of SocialLogin 
+    const socialLogin = new SocialLogin()
+
+    // init social login SDK, all params are optional
+    await socialLogin.init();
+
+    // pops up the UI widget
+    socialLogin.showWallet();
   };
 }
 
