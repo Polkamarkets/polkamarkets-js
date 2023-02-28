@@ -31,6 +31,9 @@ class Application {
     // fixed gas price for txs (optional)
     this.gasPrice = gasPrice;
 
+
+    this.socialLogin = new SocialLogin();
+
     // IMPORTANT: this parameter should only be used for testing purposes
     if (web3PrivateKey) {
       this.start();
@@ -251,16 +254,25 @@ class Application {
     return this.web3.utils.fromWei(wei, "ether");
   };
 
-  async testSocialLogin() {
-    // create an instance of SocialLogin 
-    const socialLogin = new SocialLogin()
+  async initSocialLogin(url) {
+    url = url || 'http://localhost:3000';
+    // get signature that corresponds to your website domains
+    const signature1 = await this.socialLogin.whitelistUrl(url);
+    // pass the signatures, you can pass one or many signatures you want to whitelist
+    await this.socialLogin.init({
+      whitelistUrls: {
+        [url]: signature1
+      }
+    });
 
-    // init social login SDK, all params are optional
-    await socialLogin.init();
-
-    // pops up the UI widget
-    socialLogin.showWallet();
+    return this.socialLogin;
   };
+
+  async showSocialLogin() {
+    if (!this.socialLogin?.provider) {
+      this.socialLogin.showWallet();
+    }
+  }
 }
 
 module.exports = Application;
