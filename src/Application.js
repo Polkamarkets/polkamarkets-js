@@ -8,7 +8,8 @@ const VotingContract = require("./models/index").VotingContract;
 const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
 
 const Account = require('./utils/Account');
-const SocialLogin = require('@biconomy/web3-auth');
+// const SocialLogin = require('@biconomy/web3-auth');
+import SocialLogin from '@biconomy/web3-auth';
 
 const networksEnum = Object.freeze({
   1: "Main",
