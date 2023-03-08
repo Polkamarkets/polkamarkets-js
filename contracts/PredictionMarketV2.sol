@@ -668,7 +668,8 @@ contract PredictionMarketV2 {
   function removeLiquidityToETH(uint256 marketId, uint256 shares) external isWETHMarket(marketId) {
     uint256 value = _removeLiquidity(marketId, shares);
     // unwrapping and transferring user funds from liquidity removed
-    IWETH(WETH).withdraw(shares);
+
+    IWETH(WETH).withdraw(value);
     msg.sender.transfer(value);
   }
 
