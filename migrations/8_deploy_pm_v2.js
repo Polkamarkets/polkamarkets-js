@@ -1,6 +1,5 @@
 const PredictionMarketV2 = artifacts.require("PredictionMarketV2");
 const {
-  FEE,
   TOKEN,
   REQUIRED_BALANCE,
   REALITIO_ADDRESS,
@@ -12,7 +11,6 @@ const {
 module.exports = async function(deployer) {
   await deployer.deploy(
     PredictionMarketV2,
-    FEE, // fee
     TOKEN, // token
     REQUIRED_BALANCE, // requiredBalance
     REALITIO_ADDRESS, // realitioAddress
