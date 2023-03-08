@@ -106,7 +106,6 @@ contract PredictionMarketV2 {
     uint256 fee; // fee % taken from every transaction
     uint256 poolWeight; // internal var used to ensure pro-rate fee distribution
     mapping(address => uint256) claimed;
-
     address treasury; // address to send treasury fees to
     uint256 treasuryFee; // fee % taken from every transaction to a treasury address
   }
@@ -140,8 +139,8 @@ contract PredictionMarketV2 {
     string question;
     string image;
     address arbitrator;
-    uint fee;
-    uint treasuryFee;
+    uint256 fee;
+    uint256 treasuryFee;
     address treasury;
   }
 
@@ -441,7 +440,7 @@ contract PredictionMarketV2 {
     transferOutcomeSharesToPool(msg.sender, marketId, outcomeId, shares);
 
     // adding fees to transaction value
-    uint fee = getMarketFee(marketId);
+    uint256 fee = getMarketFee(marketId);
     {
       uint256 feeAmount = value.mul(market.fees.fee) / (ONE.sub(fee));
       market.fees.poolWeight = market.fees.poolWeight.add(feeAmount);
@@ -1094,12 +1093,21 @@ contract PredictionMarketV2 {
       uint256,
       bytes32,
       uint256,
-      IERC20
+      IERC20,
+      uint256,
+      address
     )
   {
     Market storage market = markets[marketId];
 
-    return (market.fees.fee, market.resolution.questionId, uint256(market.resolution.questionId), market.token);
+    return (
+      market.fees.fee,
+      market.resolution.questionId,
+      uint256(market.resolution.questionId),
+      market.token,
+      market.fees.treasuryFee,
+      market.fees.treasury
+    );
   }
 
   function getMarketQuestion(uint256 marketId) external view returns (bytes32) {

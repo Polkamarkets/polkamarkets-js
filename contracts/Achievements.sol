@@ -121,7 +121,7 @@ contract Achievements is ERC721 {
   ) public view returns (bool) {
     bytes32 last_history_hash;
     bytes32 questionId;
-    (, questionId, , ) = predictionMarket.getMarketAltData(marketId);
+    (, questionId, , , , ) = predictionMarket.getMarketAltData(marketId);
     (, , , , , , , , last_history_hash, ) = realitioERC20.questions(questionId);
     bool bonded;
 
@@ -157,7 +157,7 @@ contract Achievements is ERC721 {
 
     bytes32 questionId;
     address arbitrator;
-    (, questionId, , ) = predictionMarket.getMarketAltData(marketId);
+    (, questionId, , , , ) = predictionMarket.getMarketAltData(marketId);
     (, arbitrator, , , , , , , , ) = realitioERC20.questions(questionId);
 
     require(user == arbitrator, "user did not create market");
