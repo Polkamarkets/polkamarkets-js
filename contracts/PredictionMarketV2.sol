@@ -69,6 +69,10 @@ contract PredictionMarketV2 {
 
   uint256 public constant ONE = 10**18;
 
+  uint256 public constant MAX_OUTCOMES = 2**5;
+
+  uint256 public constant MAX_FEE = 5 * 10**16; // 5%
+
   enum MarketState {
     open,
     closed,
@@ -235,7 +239,9 @@ contract PredictionMarketV2 {
     require(desc.value > 0, "stake needs to be > 0");
     require(desc.closesAt > now, "market must resolve after the current date");
     require(desc.arbitrator != address(0), "invalid arbitrator address");
-    require(desc.outcomes > 0 && desc.outcomes <= 2**5, "number of outcomes has to between 1-32");
+    require(desc.outcomes > 0 && desc.outcomes <= MAX_OUTCOMES, "number of outcomes has to between 1-32");
+    require(desc.fee <= MAX_FEE, "fee must be <= 5%");
+    require(desc.treasuryFee <= MAX_FEE, "treasury fee must be <= 5%");
 
     market.token = desc.token;
     market.closesAtTimestamp = desc.closesAt;
