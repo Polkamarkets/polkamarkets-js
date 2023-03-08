@@ -9,7 +9,9 @@ module.exports = {
     development: {
       host: "127.0.0.1",
       port: 8545,
-      network_id: "*" // Match any network id
+      network_id: "*", // Match any network id
+      gasLimit: 10000000,
+      gas: 10000000
     },
     live: {
       provider: new HDWalletProvider(mnemonic, "https://mainnet.infura.io/v3/" + INFURA_API_KEY),
@@ -33,6 +35,14 @@ module.exports = {
       provider: new HDWalletProvider(mnemonic, "https://node.leprichain.blockwell.ai"),
       network_id: 49777,
       gasPrice: 0
+    },
+    polygon: {
+      provider: new HDWalletProvider(mnemonic, "https://polygon-rpc.com"),
+      network_id: 137,
+    },
+    mumbai: {
+      provider: new HDWalletProvider(mnemonic, "https://rpc-mumbai.maticvigil.com"),
+      network_id: 80001,
     }
   },
   // Configure your compilers
@@ -50,7 +60,7 @@ module.exports = {
       settings: {
         optimizer: {
           enabled: true,
-          runs: 1
+          runs: 200
         }
       }
     }
