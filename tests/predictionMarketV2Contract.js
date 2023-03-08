@@ -50,7 +50,6 @@ context('Prediction Market Contract V2', async () => {
 
       await predictionMarketContract.deploy({
         params: [
-          0,
           requiredBalanceERC20ContractAddress,
           0,
           realitioContractAddress,
