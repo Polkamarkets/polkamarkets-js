@@ -789,7 +789,7 @@ contract PredictionMarketV2 {
   }
 
   /// @dev Allows liquidity providers to claim earnings from liquidity providing.
-  function claimLiquidity(uint256 marketId) external atState(marketId, MarketState.resolved) {
+  function _claimLiquidity(uint256 marketId) private atState(marketId, MarketState.resolved) returns (uint256) {
     Market storage market = markets[marketId];
 
     // claiming any pending fees
@@ -818,18 +818,31 @@ contract PredictionMarketV2 {
       now
     );
 
+    return value;
+  }
+
+  function claimLiquidity(uint256 marketId) external {
+    uint256 value = _claimLiquidity(marketId);
+    // transferring user funds from liquidity claimed
+    Market storage market = markets[marketId];
     require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
   }
 
+  function claimLiquidityToETH(uint256 marketId) external isWETHMarket(marketId) {
+    uint256 value = _claimLiquidity(marketId);
+    // unwrapping and transferring user funds from liquidity claimed
+    IWETH(WETH).withdraw(value);
+    msg.sender.transfer(value);
+  }
+
   /// @dev Allows liquidity providers to claim their fees share from fees pool
-  function claimFees(uint256 marketId) public {
+  function _claimFees(uint256 marketId) private returns (uint256) {
     Market storage market = markets[marketId];
 
     uint256 claimableFees = getUserClaimableFees(marketId, msg.sender);
 
     if (claimableFees > 0) {
       market.fees.claimed[msg.sender] = market.fees.claimed[msg.sender].add(claimableFees);
-      require(market.token.transfer(msg.sender, claimableFees), "erc20 transfer failed");
     }
 
     emit MarketActionTx(
@@ -841,6 +854,22 @@ contract PredictionMarketV2 {
       claimableFees,
       now
     );
+
+    return claimableFees;
+  }
+
+  function claimFees(uint256 marketId) public returns (uint256) {
+    uint256 value = _claimFees(marketId);
+    // transferring user funds from fees claimed
+    Market storage market = markets[marketId];
+    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
+  }
+
+  function claimFeesToETH(uint256 marketId) public isWETHMarket(marketId) {
+    uint256 value = _claimFees(marketId);
+    // unwrapping and transferring user funds from fees claimed
+    IWETH(WETH).withdraw(value);
+    msg.sender.transfer(value);
   }
 
   /// @dev Rebalances the fees pool. Needed in every AddLiquidity / RemoveLiquidity call
