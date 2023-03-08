@@ -49,22 +49,6 @@ class PredictionMarketV2Contract extends IContract {
     return Numbers.fromDecimalsNumber(requiredBalance, 18)
   }
 
-  /* Get Functions */
-  /**
-   * @function getFee
-   * @description Returns fee taken from every transaction to liquidity providers
-   * @returns {Integer} fee
-   */
-  async getFee() {
-    const fee = await this.params.contract
-      .getContract()
-      .methods
-      .fee()
-      .call();
-
-    return Numbers.fromDecimalsNumber(fee, 18)
-  }
-
     /**
    * @function getWETHAddress
    * @description Returns WETH Address
@@ -471,6 +455,9 @@ class PredictionMarketV2Contract extends IContract {
     category,
     token,
     odds = [],
+    fee = 0,
+    treasuryFee = 0,
+    treasury = '0x0000000000000000000000000000000000000000',
   }) {
     const valueToWei = Numbers.toSmartContractDecimals(value, 18);
     const title = `${name};${description}`;
@@ -501,6 +488,9 @@ class PredictionMarketV2Contract extends IContract {
         question,
         image,
         arbitrator: oracleAddress,
+        fee,
+        treasuryFee,
+        treasury,
       })
     );
   };
@@ -524,6 +514,9 @@ class PredictionMarketV2Contract extends IContract {
     outcomes,
     category,
     odds = [],
+    fee = 0,
+    treasuryFee = 0,
+    treasury = '0x0000000000000000000000000000000000000000',
   }) {
     const valueToWei = Numbers.toSmartContractDecimals(value, 18);
     const title = `${name};${description}`;
@@ -556,6 +549,9 @@ class PredictionMarketV2Contract extends IContract {
           question,
           image,
           arbitrator: oracleAddress,
+          fee,
+          treasuryFee,
+          treasury,
         }
       ),
       false,
