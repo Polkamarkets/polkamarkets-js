@@ -1,4 +1,5 @@
 const Web3 = require("web3");
+const PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
 
 const ERC20Contract = require("./models/index").ERC20Contract;
 const PredictionMarketContract = require("./models/index").PredictionMarketContract;
@@ -10,6 +11,8 @@ const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
 const WETH9Contract = require("./models/index").WETH9Contract;
 
 const Account = require('./utils/Account');
+require('@biconomy/web3-auth/dist/src/style.css'); // needed for the modal styles
+
 
 const networksEnum = Object.freeze({
   1: "Main",
@@ -24,7 +27,8 @@ class Application {
     web3Provider,
     web3PrivateKey,
     web3EventsProvider,
-    gasPrice
+    gasPrice,
+    isSocialLogin = false,
   }) {
     this.web3Provider = web3Provider;
     // evm logs http source (optional)
@@ -32,8 +36,14 @@ class Application {
     // fixed gas price for txs (optional)
     this.gasPrice = gasPrice;
 
+    this.isSocialLogin = isSocialLogin;
+
+    if (this.isSocialLogin) {
+      this.socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
+    }
+
     // IMPORTANT: this parameter should only be used for testing purposes
-    if (web3PrivateKey) {
+    if (web3PrivateKey && !this.isSocialLogin) {
       this.start();
       this.login();
       this.account = new Account(this.web3, this.web3.eth.accounts.privateKeyToAccount(web3PrivateKey));
@@ -61,17 +71,25 @@ class Application {
    * @description Login with Metamask or a web3 provider
    */
   async login() {
-    try {
-      if (typeof window === "undefined") { return false; }
-      if (window.ethereum) {
-        window.web3 = new Web3(window.ethereum);
-        this.web3 = window.web3;
-        await window.ethereum.enable();
+    if (this.isSocialLogin) {
+      if (!this.socialLogin?.provider) {
+        await this.socialLogin.showWallet();
+      } else {
         return true;
       }
-      return false;
-    } catch (err) {
-      throw err;
+    } else {
+      try {
+        if (typeof window === "undefined") { return false; }
+        if (window.ethereum) {
+          window.web3 = new Web3(window.ethereum);
+          this.web3 = window.web3;
+          await window.ethereum.enable();
+          return true;
+        }
+        return false;
+      } catch (err) {
+        throw err;
+      }
     }
   };
 
@@ -80,13 +98,17 @@ class Application {
    * @description Returns wether metamask account is connected to service or not
    */
   async isLoggedIn() {
-    try {
-      if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
-      const accounts = await ethereum.request({ method: 'eth_accounts' });
+    if (this.isSocialLogin) {
+      return !!this.socialLogin?.provider;
+    } else {
+      try {
+        if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
+        const accounts = await ethereum.request({ method: 'eth_accounts' });
 
-      return accounts.length > 0;
-    } catch (err) {
-      return false;
+        return accounts.length > 0;
+      } catch (err) {
+        return false;
+      }
     }
   };
 
@@ -262,6 +284,7 @@ class Application {
    * @returns {String} Eth Network
    */
   async getETHNetwork() {
+    // FIXME
     const netId = await this.web3.eth.net.getId();
     const networkName = networksEnum.hasOwnProperty(netId)
       ? networksEnum[netId]
@@ -275,8 +298,12 @@ class Application {
    * @returns {Address} Address
    */
   async getAddress() {
-    const accounts = await this.web3.eth.getAccounts();
-    return accounts[0];
+    if (this.isSocialLogin) {
+      return await this.socialLogin.getAddress();
+    } else {
+      const accounts = await this.web3.eth.getAccounts();
+      return accounts[0];
+    }
   };
 
   /**
@@ -285,10 +312,21 @@ class Application {
    * @returns {Integer} Balance
    */
   async getETHBalance() {
-    const address = await this.getAddress();
-    let wei = await window.web3.eth.getBalance(address);
-    return this.web3.utils.fromWei(wei, "ether");
+    if (this.isSocialLogin) {
+      // FIXME should I implement this?
+      return 0;
+    } else {
+      const address = await this.getAddress();
+      let wei = await window.web3.eth.getBalance(address);
+      return this.web3.utils.fromWei(wei, "ether");
+    }
   };
+
+  async socialLoginLogout() {
+    if (this.socialLogin?.provider) {
+      this.socialLogin.logout();
+    }
+  }
 }
 
 module.exports = Application;
