@@ -128,7 +128,8 @@ class Application {
         contractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
       });
     } catch (err) {
       throw err;
@@ -140,16 +141,17 @@ class Application {
    * @param {Address} ContractAddress (Opt) If it is deployed
    * @description Create a PredictionMarket Contract
    */
-   getPredictionMarketV2Contract({ contractAddress = null }={}) {
+  getPredictionMarketV2Contract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketV2Contract({
         web3: this.web3,
         contractAddress,
-        acc : this.account,
+        acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
       });
-    } catch(err) {
+    } catch (err) {
       throw err;
     }
   };
@@ -172,7 +174,8 @@ class Application {
         realitioERC20ContractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
       });
     } catch (err) {
       throw err;
@@ -191,7 +194,8 @@ class Application {
         contractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
       });
     } catch (err) {
       throw err;
@@ -210,7 +214,8 @@ class Application {
         contractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
       });
     } catch (err) {
       throw err;
@@ -229,7 +234,8 @@ class Application {
         contractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
       });
     } catch (err) {
       throw err;
@@ -248,7 +254,8 @@ class Application {
         contractAddress: contractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
       });
     } catch (err) {
       throw err;
@@ -267,7 +274,8 @@ class Application {
         contractAddress: contractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
       });
     } catch (err) {
       throw err;
@@ -312,14 +320,9 @@ class Application {
    * @returns {Integer} Balance
    */
   async getETHBalance() {
-    if (this.isSocialLogin) {
-      // FIXME should I implement this?
-      return 0;
-    } else {
-      const address = await this.getAddress();
-      let wei = await window.web3.eth.getBalance(address);
-      return this.web3.utils.fromWei(wei, "ether");
-    }
+    const address = await this.getAddress();
+    let wei = await window.web3.eth.getBalance(address);
+    return this.web3.utils.fromWei(wei, "ether");
   };
 
   async socialLoginLogout() {

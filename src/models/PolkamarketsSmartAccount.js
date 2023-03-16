@@ -21,17 +21,15 @@ class PolkamarketsSmartAccount extends SmartAccount {
 
     function createInstance(provider) {
       const web3Provider = new ethers.providers.Web3Provider(provider);
-
       // FIXME how to pass this
       const options = {
-        debug: false,
+        debug: true,
         activeNetworkId: ChainId.GOERLI,
         supportedNetworksIds: [ChainId.GOERLI],
         networkConfig: [
           {
             chainId: ChainId.GOERLI,
-            // dappAPIKey: 'XXXXX'
-            dappAPIKey: ''
+            dappAPIKey: '',
           }
         ]
       };

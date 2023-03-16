@@ -109,11 +109,12 @@ class PolkamarketsSocialLogin extends SocialLogin {
   async getAddress() {
     return new Promise((resolve, reject) => {
       try {
-        console.log('this.smartAccount.isInit:', this.smartAccount.isInit);
         if (this.smartAccount.isInit) {
           resolve(this.smartAccount.address);
         } else {
-          this.smartAccount.initEventEmitter.on('init', (resp) => resolve(resp));
+          this.smartAccount.initEventEmitter.on('init', (resp) => {
+            resolve(this.smartAccount.address);
+          });
         }
       } catch (error) {
         reject(error);
