@@ -6,13 +6,11 @@ const ChainId = require('@biconomy/core-types').ChainId;
 class PolkamarketsSmartAccount extends SmartAccount {
 
   static initSmartAccount = async (smartAccount) => {
-    smartAccount.initEventEmitter = new SafeEventEmitter();
-
     if (!smartAccount.isInit) {
       await smartAccount.init();
       smartAccount.isInit = true;
 
-      smartAccount.initEventEmitter.emit('init', true);
+      smartAccount.eventEmitter.emit('init', true);
     }
   }
 
@@ -34,7 +32,9 @@ class PolkamarketsSmartAccount extends SmartAccount {
         ]
       };
 
-      return new PolkamarketsSmartAccount(web3Provider, options);
+      const instance = new PolkamarketsSmartAccount(web3Provider, options);
+      instance.eventEmitter = new SafeEventEmitter();
+      return instance;
     }
 
     return {

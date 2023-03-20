@@ -5,25 +5,25 @@ const SafeEventEmitter = require('@metamask/safe-event-emitter').default;
 class PolkamarketsSocialLogin extends SocialLogin {
 
   static initSocialLogin = async (socialLogin, url) => {
-    socialLogin.loginEventEmitter = new SafeEventEmitter();
-
     if (!socialLogin.isInit) {
       url = url || 'http://localhost:3000';
       // get signature that corresponds to your website domains
       const signature1 = await socialLogin.whitelistUrl(url);
       // pass the signatures, you can pass one or many signatures you want to whitelist
       // FIXME pass generic urls
+      const isTestnet = true;
       await socialLogin.init({
         whitelistUrls: {
           [url]: signature1
         },
-        network: 'testnet',
-        chainId: '0x5',
+        network: isTestnet ? 'testnet' : 'mainnet',
       });
 
       if (socialLogin?.provider) {
         socialLogin.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(socialLogin?.provider);
       }
+
+      socialLogin.eventEmitter.emit('init');
     }
   }
 
@@ -31,7 +31,9 @@ class PolkamarketsSocialLogin extends SocialLogin {
     let socialLogin;
 
     function createInstance() {
-      return new PolkamarketsSocialLogin();
+      const instance = new PolkamarketsSocialLogin();
+      instance.eventEmitter = new SafeEventEmitter();
+      return instance;
     }
 
     return {
@@ -47,13 +49,13 @@ class PolkamarketsSocialLogin extends SocialLogin {
 
   hideWallet() {
     super.hideWallet();
-    this.loginEventEmitter.emit('finishLogin', false);
+    this.eventEmitter.emit('finishLogin', false);
   }
 
   async showWallet() {
     return new Promise((resolve, reject) => {
       try {
-        this.loginEventEmitter.on('finishLogin', (resp) => {
+        this.eventEmitter.on('finishLogin', (resp) => {
           if (resp) {
             this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider);
           }
@@ -69,7 +71,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
   async socialLogin(loginProvider) {
     const resp = await super.socialLogin(loginProvider);
 
-    this.loginEventEmitter.emit('finishLogin', !!resp);
+    this.eventEmitter.emit('finishLogin', !!resp);
 
     this.hideWallet();
 
@@ -79,7 +81,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
   async emailLogin(email) {
     const resp = await super.emailLogin(email);
 
-    this.loginEventEmitter.emit('finishLogin', !!resp);
+    this.eventEmitter.emit('finishLogin', !!resp);
 
     this.hideWallet();
 
@@ -89,7 +91,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
   async metamaskLogin() {
     const resp = await super.metamaskLogin();
 
-    this.loginEventEmitter.emit('finishLogin', !!resp);
+    this.eventEmitter.emit('finishLogin', !!resp);
 
     this.hideWallet();
 
@@ -99,7 +101,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
   async walletConnectLogin() {
     const resp = await super.walletConnectLogin();
 
-    this.loginEventEmitter.emit('finishLogin', !!resp);
+    this.eventEmitter.emit('finishLogin', !!resp);
 
     this.hideWallet();
 
@@ -112,8 +114,24 @@ class PolkamarketsSocialLogin extends SocialLogin {
         if (this.smartAccount.isInit) {
           resolve(this.smartAccount.address);
         } else {
-          this.smartAccount.initEventEmitter.on('init', (resp) => {
+          this.smartAccount.eventEmitter.on('init', (resp) => {
             resolve(this.smartAccount.address);
+          });
+        }
+      } catch (error) {
+        reject(error);
+      }
+    })
+  }
+
+  async isLoggedIn() {
+    return new Promise((resolve, reject) => {
+      try {
+        if (this.isInit) {
+          resolve(!!this.provider);
+        } else {
+          this.eventEmitter.on('init', (resp) => {
+            resolve(!!this.provider);
           });
         }
       } catch (error) {

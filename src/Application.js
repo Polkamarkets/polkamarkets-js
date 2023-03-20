@@ -99,7 +99,7 @@ class Application {
    */
   async isLoggedIn() {
     if (this.isSocialLogin) {
-      return !!this.socialLogin?.provider;
+      return await this.socialLogin?.isLoggedIn();
     } else {
       try {
         if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
@@ -292,7 +292,6 @@ class Application {
    * @returns {String} Eth Network
    */
   async getETHNetwork() {
-    // FIXME
     const netId = await this.web3.eth.net.getId();
     const networkName = networksEnum.hasOwnProperty(netId)
       ? networksEnum[netId]
