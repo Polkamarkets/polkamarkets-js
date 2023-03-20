@@ -23,10 +23,10 @@
         "install": "( [ ! -d ./build ] && [ ! -f ./built ] && echo \"\" > ./built && npm install . && npm run build ) || echo \"Already built\""
     },
     "dependencies": {
-        "@openzeppelin/contracts": "^3.2.0",
-        "@openzeppelin/contracts-upgradeable": "^3.2.0",
+        "@openzeppelin/contracts": "^4.8.2",
+        "@openzeppelin/contracts-upgradeable": "^4.8.2",
         "@openzeppelin/truffle-upgrades": "^1.7.0",
-        "@reality.eth/reality-eth-lib": "^2.0.13",
+        "@reality.eth/reality-eth-lib": "^3.2.10",
         "abi-decoder": "^1.2.0",
         "accounting": "^0.4.1",
         "axios": "^0.24.0",

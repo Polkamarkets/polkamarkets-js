@@ -1,10 +1,10 @@
-pragma solidity ^0.6.0;
+pragma solidity ^0.8.10;
 pragma experimental ABIEncoderV2;
 
-import "./RealitioERC20.sol";
+import "@reality.eth/contracts/development/contracts/RealityETH_ERC20-3.0.sol";
 
 // openzeppelin imports
-import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 library CeilDiv {
   // calculates ceil(x/y)
@@ -169,7 +169,7 @@ contract PredictionMarketV2 {
   }
 
   modifier timeTransitions(uint256 marketId) {
-    if (now > markets[marketId].closesAtTimestamp && markets[marketId].state == MarketState.open) {
+    if (block.timestamp > markets[marketId].closesAtTimestamp && markets[marketId].state == MarketState.open) {
       nextState(marketId);
     }
     _;
@@ -212,7 +212,7 @@ contract PredictionMarketV2 {
     address _realitioAddress,
     uint256 _realitioTimeout,
     IWETH _WETH
-  ) public {
+  ) {
     require(_realitioAddress != address(0), "_realitioAddress is address 0");
     require(_realitioTimeout > 0, "timeout must be positive");
 
@@ -237,7 +237,7 @@ contract PredictionMarketV2 {
     Market storage market = markets[marketId];
 
     require(desc.value > 0, "stake needs to be > 0");
-    require(desc.closesAt > now, "market must resolve after the current date");
+    require(desc.closesAt > block.timestamp, "market must resolve after the current date");
     require(desc.arbitrator != address(0), "invalid arbitrator address");
     require(desc.outcomes > 0 && desc.outcomes <= MAX_OUTCOMES, "number of outcomes has to between 1-32");
     require(desc.fee <= MAX_FEE, "fee must be <= 5%");
@@ -254,7 +254,7 @@ contract PredictionMarketV2 {
     market.outcomeCount = desc.outcomes;
 
     // creating question in realitio
-    market.resolution.questionId = RealitioERC20(realitioAddress).askQuestionERC20(
+    market.resolution.questionId = RealityETH_ERC20_v3_0(realitioAddress).askQuestionERC20(
       2,
       desc.question,
       desc.arbitrator,
@@ -317,7 +317,7 @@ contract PredictionMarketV2 {
       })
     );
     // transferring funds
-    IWETH(WETH).deposit.value(msg.value)();
+    IWETH(WETH).deposit{value: msg.value}();
 
     return marketId;
   }
@@ -400,7 +400,7 @@ contract PredictionMarketV2 {
 
     transferOutcomeSharesfromPool(msg.sender, marketId, outcomeId, shares);
 
-    emit MarketActionTx(msg.sender, MarketAction.buy, marketId, outcomeId, shares, value, now);
+    emit MarketActionTx(msg.sender, MarketAction.buy, marketId, outcomeId, shares, value, block.timestamp);
     emitMarketActionEvents(marketId);
   }
 
@@ -423,7 +423,7 @@ contract PredictionMarketV2 {
   ) external payable isWETHMarket(marketId) {
     uint256 value = msg.value;
     // wrapping and depositing funds
-    IWETH(WETH).deposit.value(value)();
+    IWETH(WETH).deposit{value: value}();
     _buy(marketId, outcomeId, minOutcomeSharesToBuy, value);
   }
 
@@ -465,7 +465,7 @@ contract PredictionMarketV2 {
     // Rebalancing market shares
     removeSharesFromMarket(marketId, valuePlusFees);
 
-    emit MarketActionTx(msg.sender, MarketAction.sell, marketId, outcomeId, shares, value, now);
+    emit MarketActionTx(msg.sender, MarketAction.sell, marketId, outcomeId, shares, value, block.timestamp);
     emitMarketActionEvents(marketId);
   }
 
@@ -495,7 +495,7 @@ contract PredictionMarketV2 {
     _sell(marketId, outcomeId, value, maxOutcomeSharesToSell);
 
     IWETH(WETH).withdraw(value);
-    msg.sender.transfer(value);
+    payable(msg.sender).transfer(value);
   }
 
   /// @dev Adds liquidity to a market - external
@@ -585,7 +585,7 @@ contract PredictionMarketV2 {
             i,
             sendBackAmounts[i],
             sendBackAmounts[i].mul(outcomePrice).div(ONE), // price * shares
-            now
+            block.timestamp
           );
         }
       }
@@ -594,8 +594,8 @@ contract PredictionMarketV2 {
     uint256 liquidityPrice = getMarketLiquidityPrice(marketId);
     uint256 liquidityValue = liquidityPrice.mul(liquidityAmount) / ONE;
 
-    emit MarketActionTx(msg.sender, MarketAction.addLiquidity, marketId, 0, liquidityAmount, liquidityValue, now);
-    emit MarketLiquidity(marketId, market.liquidity, liquidityPrice, now);
+    emit MarketActionTx(msg.sender, MarketAction.addLiquidity, marketId, 0, liquidityAmount, liquidityValue, block.timestamp);
+    emit MarketLiquidity(marketId, market.liquidity, liquidityPrice, block.timestamp);
   }
 
   function addLiquidity(uint256 marketId, uint256 value) external {
@@ -611,7 +611,7 @@ contract PredictionMarketV2 {
     uint256[] memory distribution = new uint256[](0);
     _addLiquidity(marketId, value, distribution);
     // wrapping and depositing funds
-    IWETH(WETH).deposit.value(value)();
+    IWETH(WETH).deposit{value: value}();
   }
 
   /// @dev Removes liquidity to a market - external
@@ -676,13 +676,13 @@ contract PredictionMarketV2 {
           i,
           sendAmounts[i],
           sendAmounts[i].mul(outcomePrice).div(ONE), // price * shares
-          now
+          block.timestamp
         );
       }
     }
 
-    emit MarketActionTx(msg.sender, MarketAction.removeLiquidity, marketId, 0, shares, liquidityAmount, now);
-    emit MarketLiquidity(marketId, market.liquidity, getMarketLiquidityPrice(marketId), now);
+    emit MarketActionTx(msg.sender, MarketAction.removeLiquidity, marketId, 0, shares, liquidityAmount, block.timestamp);
+    emit MarketLiquidity(marketId, market.liquidity, getMarketLiquidityPrice(marketId), block.timestamp);
 
     return liquidityAmount;
   }
@@ -698,7 +698,7 @@ contract PredictionMarketV2 {
     uint256 value = _removeLiquidity(marketId, shares);
     // unwrapping and transferring user funds from liquidity removed
     IWETH(WETH).withdraw(value);
-    msg.sender.transfer(value);
+    payable(msg.sender).transfer(value);
   }
 
   /// @dev Fetches winning outcome from Realitio and resolves the market
@@ -711,13 +711,13 @@ contract PredictionMarketV2 {
   {
     Market storage market = markets[marketId];
 
-    RealitioERC20 realitio = RealitioERC20(realitioAddress);
+    RealityETH_ERC20_v3_0 realitio = RealityETH_ERC20_v3_0(realitioAddress);
     // will fail if question is not finalized
     uint256 outcomeId = uint256(realitio.resultFor(market.resolution.questionId));
 
     market.resolution.outcomeId = outcomeId;
 
-    emit MarketResolved(msg.sender, marketId, outcomeId, now);
+    emit MarketResolved(msg.sender, marketId, outcomeId, block.timestamp);
     emitMarketActionEvents(marketId);
 
     return market.resolution.outcomeId;
@@ -747,7 +747,7 @@ contract PredictionMarketV2 {
       market.resolution.outcomeId,
       resolvedOutcome.shares.holders[msg.sender],
       value,
-      now
+      block.timestamp
     );
 
     return value;
@@ -764,7 +764,7 @@ contract PredictionMarketV2 {
     uint256 value = _claimWinnings(marketId);
     // unwrapping and transferring user funds from winnings claimed
     IWETH(WETH).withdraw(value);
-    msg.sender.transfer(value);
+    payable(msg.sender).transfer(value);
   }
 
   /// @dev Allows holders of voided outcome shares to claim balance back.
@@ -796,7 +796,7 @@ contract PredictionMarketV2 {
       outcomeId,
       outcome.shares.holders[msg.sender],
       value,
-      now
+      block.timestamp
     );
 
     return value;
@@ -813,7 +813,7 @@ contract PredictionMarketV2 {
     uint256 value = _claimVoidedOutcomeShares(marketId, outcomeId);
     // unwrapping and transferring user funds from voided outcome shares claimed
     IWETH(WETH).withdraw(value);
-    msg.sender.transfer(value);
+    payable(msg.sender).transfer(value);
   }
 
   /// @dev Allows liquidity providers to claim earnings from liquidity providing.
@@ -843,7 +843,7 @@ contract PredictionMarketV2 {
       0,
       market.liquidityShares[msg.sender],
       value,
-      now
+      block.timestamp
     );
 
     return value;
@@ -860,7 +860,7 @@ contract PredictionMarketV2 {
     uint256 value = _claimLiquidity(marketId);
     // unwrapping and transferring user funds from liquidity claimed
     IWETH(WETH).withdraw(value);
-    msg.sender.transfer(value);
+    payable(msg.sender).transfer(value);
   }
 
   /// @dev Allows liquidity providers to claim their fees share from fees pool
@@ -880,13 +880,13 @@ contract PredictionMarketV2 {
       0,
       market.liquidityShares[msg.sender],
       claimableFees,
-      now
+      block.timestamp
     );
 
     return claimableFees;
   }
 
-  function claimFees(uint256 marketId) public returns (uint256) {
+  function claimFees(uint256 marketId) public {
     uint256 value = _claimFees(marketId);
     // transferring user funds from fees claimed
     Market storage market = markets[marketId];
@@ -897,7 +897,7 @@ contract PredictionMarketV2 {
     uint256 value = _claimFees(marketId);
     // unwrapping and transferring user funds from fees claimed
     IWETH(WETH).withdraw(value);
-    msg.sender.transfer(value);
+    payable(msg.sender).transfer(value);
   }
 
   /// @dev Rebalances the fees pool. Needed in every AddLiquidity / RemoveLiquidity call
@@ -905,7 +905,7 @@ contract PredictionMarketV2 {
     uint256 marketId,
     uint256 liquidityShares,
     MarketAction action
-  ) private returns (uint256) {
+  ) private {
     Market storage market = markets[marketId];
 
     uint256 poolWeight = liquidityShares.mul(market.fees.poolWeight).div(market.liquidity);
@@ -934,7 +934,7 @@ contract PredictionMarketV2 {
       outcomeShares[i] = market.outcomes[i].shares.available;
     }
 
-    emit MarketOutcomeShares(marketId, now, outcomeShares, market.liquidity);
+    emit MarketOutcomeShares(marketId, block.timestamp, outcomeShares, market.liquidity);
   }
 
   /// @dev Adds outcome shares to shares pool
