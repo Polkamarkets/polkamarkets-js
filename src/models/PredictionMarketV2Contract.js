@@ -4,6 +4,7 @@ const moment = require("moment");
 const prediction = require("../interfaces").predictionV2;
 
 const Numbers = require( "../utils/Numbers");
+const Question = require("../utils/Question");
 const IContract = require( './IContract');
 
 const realitioLib = require('@reality.eth/reality-eth-lib/formatters/question');
@@ -461,7 +462,7 @@ class PredictionMarketV2Contract extends IContract {
   }) {
     const valueToWei = Numbers.toSmartContractDecimals(value, 18);
     const title = `${name};${description}`;
-    const question = realitioLib.encodeText('single-select', title, outcomes, category);
+    const question = Question.encodeText('single-select', title, outcomes, category);
     let distribution = [];
 
     if (odds.length > 0) {
@@ -520,7 +521,7 @@ class PredictionMarketV2Contract extends IContract {
   }) {
     const valueToWei = Numbers.toSmartContractDecimals(value, 18);
     const title = `${name};${description}`;
-    const question = realitioLib.encodeText('single-select', title, outcomes, category);
+    const question = Question.encodeText('single-select', title, outcomes, category);
     let distribution = [];
     const token = await this.getWETHAddress();
 
