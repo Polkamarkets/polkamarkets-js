@@ -4,6 +4,7 @@ const moment = require("moment");
 const prediction = require("../interfaces").prediction;
 
 const Numbers = require("../utils/Numbers");
+const Question = require("../utils/Question");
 const IContract = require('./IContract');
 
 const realitioLib = require('@reality.eth/reality-eth-lib/formatters/question');
@@ -424,7 +425,7 @@ class PredictionMarketContract extends IContract {
    */
   async createMarket({ name, image, duration, oracleAddress, outcomes, category, ethAmount }) {
     let ethToWei = Numbers.toSmartContractDecimals(ethAmount, 18);
-    const question = realitioLib.encodeText('single-select', name, outcomes, category);
+    const question = Question.encodeText('single-select', name, outcomes, category);
 
     return await this.__sendTx(
       this.getContract().methods.createMarket(
