@@ -105,7 +105,53 @@ class IContract {
     const receipt = await txResponse.wait();
     console.log('receipt:', receipt);
 
+    if (receipt.logs) {
+      const events = receipt.logs.map(log => {
+        try {
+          const event = contractInterface.parseLog(log);
+          return event;
+        } catch (error) {
+          return null;
+        }
+      });
+      receipt.events = this.convertEtherEventsToWeb3Events(events);
+    }
+
     return receipt;
+  }
+
+  convertEtherEventsToWeb3Events(events) {
+    const transformedEvents = {};
+    for (const event of events) {
+      if (!event) {
+        continue;
+      }
+
+      const { name, args, eventFragment } = event;
+
+      const returnValues = {};
+
+      eventFragment.inputs.forEach((input, index) => {
+        let value = args[index];
+
+        // if value is a BigNumber, convert it to a string
+        if (ethers.BigNumber.isBigNumber(value)) {
+          value = value.toString();
+        }
+
+        returnValues[input.name] = value;
+        returnValues[index.toString()] = value;
+      });
+
+      const transformedEvent = {
+        event: name,
+        returnValues,
+      };
+
+      transformedEvents[name] = transformedEvent;
+    }
+
+    return transformedEvents;
   }
 
   async __sendTx(f, call = false, value, callback = () => { }) {
