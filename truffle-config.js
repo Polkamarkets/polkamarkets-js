@@ -43,6 +43,14 @@ module.exports = {
     mumbai: {
       provider: new HDWalletProvider(mnemonic, "https://rpc-mumbai.maticvigil.com"),
       network_id: 80001,
+    },
+    polygon_zkevm: {
+      provider: new HDWalletProvider(mnemonic, "https://zkevm-rpc.com"),
+      network_id: 1101,
+    },
+    polygon_zkevm_testnet: {
+      provider: new HDWalletProvider(mnemonic, "https://rpc.public.zkevm-test.net"),
+      network_id: 1442,
     }
   },
   // Configure your compilers
