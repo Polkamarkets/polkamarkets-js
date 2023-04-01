@@ -1,6 +1,6 @@
-pragma solidity ^0.6.0;
+pragma solidity ^0.8.10;
 
-import "@openzeppelin/contracts/presets/ERC20PresetMinterPauser.sol";
+import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
 
 contract FantasyERC20 is ERC20PresetMinterPauser {
   event TokensClaimed(address indexed user, uint256 amount, uint256 timestamp);
@@ -21,7 +21,7 @@ contract FantasyERC20 is ERC20PresetMinterPauser {
     string memory symbol,
     uint256 _tokenAmountToClaim,
     address _tokenManager
-  ) public ERC20PresetMinterPauser(name, symbol) {
+  ) ERC20PresetMinterPauser(name, symbol) {
     tokenAmountToClaim = _tokenAmountToClaim;
     tokenManager = _tokenManager;
   }
@@ -46,7 +46,7 @@ contract FantasyERC20 is ERC20PresetMinterPauser {
 
     usersClaimed[msg.sender] = true;
 
-    emit TokensClaimed(msg.sender, tokenAmountToClaim, now);
+    emit TokensClaimed(msg.sender, tokenAmountToClaim, block.timestamp);
   }
 
   /// @dev Allows user to approve and claim the amount of tokens by minting them

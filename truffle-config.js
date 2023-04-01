@@ -43,12 +43,20 @@ module.exports = {
     mumbai: {
       provider: new HDWalletProvider(mnemonic, "https://rpc-mumbai.maticvigil.com"),
       network_id: 80001,
+    },
+    polygon_zkevm: {
+      provider: new HDWalletProvider(mnemonic, "https://zkevm-rpc.com"),
+      network_id: 1101,
+    },
+    polygon_zkevm_testnet: {
+      provider: new HDWalletProvider(mnemonic, "https://rpc.public.zkevm-test.net"),
+      network_id: 1442,
     }
   },
   // Configure your compilers
   compilers: {
     solc: {
-      version: "0.6.2",    // Fetch exact version from solc-bin (default: truffle's version)
+      version: "0.8.10",    // Fetch exact version from solc-bin (default: truffle's version)
       // docker: true,        // Use "0.5.1" you've installed locally with docker (default: false)
       // settings: {          // See the solidity docs for advice about optimization and evmVersion
       //  optimizer: {
