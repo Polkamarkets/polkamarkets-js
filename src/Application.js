@@ -88,11 +88,7 @@ class Application {
    */
   async login() {
     if (this.isSocialLogin) {
-      if (!this.socialLogin?.provider) {
-        await this.socialLogin.showWallet();
-      } else {
-        return true;
-      }
+      return this.socialLogin.login();
     } else {
       try {
         if (typeof window === "undefined") { return false; }
