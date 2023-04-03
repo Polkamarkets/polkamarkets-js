@@ -70,6 +70,28 @@ class PolkamarketsSocialLogin extends SocialLogin {
     })
   }
 
+  async login() {
+    if (this.isInit) {
+      if (this.provider) {
+        return true;
+      }
+      return this.showWallet();
+    } else {
+      return new Promise((resolve, reject) => {
+        try {
+          this.eventEmitter.on('init', async () => {
+            if (this.provider) {
+              resolve(true);
+            }
+            resolve(await this.showWallet());
+          });
+        } catch (error) {
+          reject(error);
+        }
+      })
+    }
+  }
+
   async socialLogin(loginProvider) {
     const resp = await super.socialLogin(loginProvider);
 
