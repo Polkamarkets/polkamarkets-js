@@ -4,7 +4,7 @@ const SafeEventEmitter = require('@metamask/safe-event-emitter').default;
 
 class PolkamarketsSocialLogin extends SocialLogin {
 
-  static initSocialLogin = async (socialLogin, urls, isTestnet) => {
+  static initSocialLogin = async (socialLogin, urls, isTestnet, whiteLabelData = null) => {
     if (!socialLogin.isInit) {
       const whitelistUrls = {};
 
@@ -15,10 +15,17 @@ class PolkamarketsSocialLogin extends SocialLogin {
 
       signatures.forEach((signature, index) => whitelistUrls[urls[index]] = signature);
 
-      await socialLogin.init({
+      const initData = {
         whitelistUrls,
         network: isTestnet ? 'testnet' : 'mainnet',
-      });
+      };
+
+      if (whiteLabelData) {
+        // yes it's really without the i and with the l misplaced
+        initData.whteLableData = whiteLabelData;
+      }
+
+      await socialLogin.init(initData);
 
       if (socialLogin?.provider) {
         socialLogin.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(socialLogin.provider, socialLogin.socialLoginParams.networkConfig);
@@ -42,7 +49,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
         if (!socialLogin) {
           socialLogin = createInstance();
           socialLogin.socialLoginParams = socialLoginParams;
-          this.initSocialLogin(socialLogin, socialLoginParams.urls, socialLoginParams.isTestnet);
+          this.initSocialLogin(socialLogin, socialLoginParams.urls, socialLoginParams.isTestnet, socialLoginParams.whiteLabelData);
         }
         return socialLogin;
       }
@@ -91,6 +98,45 @@ class PolkamarketsSocialLogin extends SocialLogin {
       })
     }
   }
+
+  // function called to login withotu showing the biconomy model
+  async directLogin(provider, email = null) {
+    if (this.isInit) {
+      if (this.provider) {
+        return true;
+      }
+      return this.callLoginProvider(provider, email);
+    } else {
+      return new Promise((resolve, reject) => {
+        try {
+          this.eventEmitter.on('init', async () => {
+            if (this.provider) {
+              resolve(true);
+            }
+            resolve(await this.callLoginProvider(provider, email));
+          });
+        } catch (error) {
+          reject(error);
+        }
+      })
+    }
+  }
+
+  async callLoginProvider(provider, email = null) {
+    switch (provider) {
+      case 'metamask':
+        return this.metamaskLogin();
+      case 'walletconnect':
+        return this.walletConnectLogin();
+      case 'email':
+        return this.emailLogin(email);
+      case 'google':
+        return this.socialLogin('google');
+      case 'facebook':
+        return this.socialLogin('facebook');
+    }
+  }
+
 
   async socialLogin(loginProvider) {
     const resp = await super.socialLogin(loginProvider);
