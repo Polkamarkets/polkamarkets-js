@@ -51,7 +51,7 @@ class Application {
               chainId: ChainId.GOERLI,
               dappAPIKey: '',
             }
-          ]
+          ],
         }
       }
       this.socialLoginParams = socialLoginParams;
@@ -335,6 +335,26 @@ class Application {
     let wei = await window.web3.eth.getBalance(address);
     return this.web3.utils.fromWei(wei, "ether");
   };
+
+  async socialLoginGoogle() {
+    await this.socialLogin.directLogin('google');
+  }
+
+  async socialLoginFacebook() {
+    await this.socialLogin.directLogin('facebook');
+  }
+
+  async socialLoginEmail(email) {
+    await this.socialLogin.directLogin('email', email);
+  }
+
+  async socialLoginMetamask() {
+    await this.socialLogin.directLogin('metamask');
+  }
+
+  async socialLoginWalletConnect() {
+    await this.socialLogin.directLogin('walletconnect');
+  }
 
   async socialLoginLogout() {
     if (this.socialLogin?.provider) {
