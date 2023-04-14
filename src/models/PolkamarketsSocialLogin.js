@@ -130,10 +130,8 @@ class PolkamarketsSocialLogin extends SocialLogin {
         return this.walletConnectLogin();
       case 'email':
         return this.emailLogin(email);
-      case 'google':
-        return this.socialLogin('google');
-      case 'facebook':
-        return this.socialLogin('facebook');
+      default:
+        return this.socialLogin(provider);
     }
   }
 

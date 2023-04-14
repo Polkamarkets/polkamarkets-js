@@ -344,6 +344,18 @@ class Application {
     await this.socialLogin.directLogin('facebook');
   }
 
+  async socialLoginTwitter() {
+    await this.socialLogin.directLogin('twitter');
+  }
+
+  async socialLoginGithub() {
+    await this.socialLogin.directLogin('github');
+  }
+
+  async socialLoginDiscord() {
+    await this.socialLogin.directLogin('discord');
+  }
+
   async socialLoginEmail(email) {
     await this.socialLogin.directLogin('email', email);
   }
