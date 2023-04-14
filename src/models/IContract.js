@@ -94,12 +94,18 @@ class IContract {
     const tx = {
       to: this.params.contractAddress,
       data: methodCallData,
-      // gasLimit: 200000000,
+      // gasLimit: 2000,
     };
 
-    const txResponse = await smartAccount.sendGaslessTransaction({
-      transaction: tx
-    });
+    let txResponse
+    try {
+      txResponse = await smartAccount.sendTransaction({
+        transaction: tx
+      });
+    } catch (error) {
+      console.log('error:', error);
+      throw error;
+    }
 
     // https://docs.ethers.org/v5/api/providers/types/#providers-TransactionResponse
     const receipt = await txResponse.wait();
