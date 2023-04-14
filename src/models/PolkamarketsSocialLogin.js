@@ -18,6 +18,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
       const initData = {
         whitelistUrls,
         network: isTestnet ? 'testnet' : 'mainnet',
+        chainId: '0x13881', // TODO fixme this is hardcoded
       };
 
       if (whiteLabelData) {
@@ -65,7 +66,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
     return new Promise((resolve, reject) => {
       try {
         this.eventEmitter.on('finishLogin', (resp) => {
-          if (resp) {
+          if (resp && this.provider) {
             this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.socialLoginParams.networkConfig);
           }
           resolve(resp)
