@@ -4,7 +4,7 @@ const SafeEventEmitter = require('@metamask/safe-event-emitter').default;
 
 class PolkamarketsSocialLogin extends SocialLogin {
 
-  static initSocialLogin = async (socialLogin, urls, isTestnet, whiteLabelData = null) => {
+  static initSocialLogin = async (socialLogin, urls, isTestnet, whiteLabelData, networkConfig) => {
     if (!socialLogin.isInit) {
       const whitelistUrls = {};
 
@@ -15,10 +15,13 @@ class PolkamarketsSocialLogin extends SocialLogin {
 
       signatures.forEach((signature, index) => whitelistUrls[urls[index]] = signature);
 
+      // convert int to hex
+      const chainId = networkConfig.chainId.toString(16);
+
       const initData = {
         whitelistUrls,
         network: isTestnet ? 'testnet' : 'mainnet',
-        chainId: '0x13881', // TODO fixme this is hardcoded
+        chainId: `0x${chainId}`,
       };
 
       if (whiteLabelData) {
@@ -50,7 +53,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
         if (!socialLogin) {
           socialLogin = createInstance();
           socialLogin.socialLoginParams = socialLoginParams;
-          this.initSocialLogin(socialLogin, socialLoginParams.urls, socialLoginParams.isTestnet, socialLoginParams.whiteLabelData);
+          this.initSocialLogin(socialLogin, socialLoginParams.urls, socialLoginParams.isTestnet, socialLoginParams.whiteLabelData, socialLoginParams.networkConfig);
         }
         return socialLogin;
       }
