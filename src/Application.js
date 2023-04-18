@@ -46,12 +46,10 @@ class Application {
         socialLoginParams = {
           urls: ['http://localhost:3000'],
           isTestnet: false,
-          networkConfig: [
-            {
-              chainId: ChainId.GOERLI,
-              dappAPIKey: '',
-            }
-          ],
+          networkConfig: {
+            chainId: ChainId.GOERLI,
+            dappAPIKey: '',
+          }
         }
       }
       this.socialLoginParams = socialLoginParams;

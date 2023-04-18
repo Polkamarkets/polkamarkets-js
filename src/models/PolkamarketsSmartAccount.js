@@ -19,12 +19,11 @@ class PolkamarketsSmartAccount extends SmartAccount {
     function createInstance(provider, networkConfig) {
       const web3Provider = new ethers.providers.Web3Provider(provider);
 
-      const supportedNetworksIds = networkConfig.map(nc => nc.chainId);
       const options = {
         // debug: true,
-        activeNetworkId: supportedNetworksIds[0],
-        supportedNetworksIds,
-        networkConfig
+        activeNetworkId: networkConfig.chainId,
+        supportedNetworksIds: [networkConfig.chainId],
+        networkConfig: [networkConfig]
       };
 
       const instance = new PolkamarketsSmartAccount(web3Provider, options);
