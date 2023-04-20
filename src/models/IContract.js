@@ -347,6 +347,11 @@ class IContract {
    * @returns {String | undefined} address
    */
   async getMyAccount() {
+    if (this.params.isSocialLogin) {
+      const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
+      return await socialLogin.getAddress();
+    }
+
     if (this.acc) {
       return this.acc.getAddress()
     }
