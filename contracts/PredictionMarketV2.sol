@@ -776,6 +776,7 @@ contract PredictionMarketV2 {
     Market storage market = markets[marketId];
     MarketOutcome storage outcome = market.outcomes[outcomeId];
 
+    require(isMarketVoided(marketId), "market is not voided");
     require(outcome.shares.holders[msg.sender] > 0, "user does not hold outcome shares");
     require(outcome.shares.voidedClaims[msg.sender] == false, "user already claimed outcome shares");
 
