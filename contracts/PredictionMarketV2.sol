@@ -1,11 +1,10 @@
 pragma solidity ^0.8.10;
 pragma experimental ABIEncoderV2;
 
-import "@reality.eth/contracts/development/contracts/RealityETH_ERC20-3.0.sol";
-
 // openzeppelin imports
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 library CeilDiv {
   // calculates ceil(x/y)
@@ -13,6 +12,16 @@ library CeilDiv {
     if (x > 0) return ((x - 1) / y) + 1;
     return x / y;
   }
+}
+
+interface IRealityETH_ERC20 {
+  function askQuestionERC20 (uint256 template_id, string calldata question, address arbitrator, uint32 timeout, uint32 opening_ts, uint256 nonce, uint256 tokens) external returns (bytes32);
+  function claimMultipleAndWithdrawBalance (bytes32[] calldata question_ids, uint256[] calldata lengths, bytes32[] calldata hist_hashes, address[] calldata addrs, uint256[] calldata bonds, bytes32[] calldata answers) external;
+  function claimWinnings (bytes32 question_id, bytes32[] calldata history_hashes, address[] calldata addrs, uint256[] calldata bonds, bytes32[] calldata answers) external;
+  function notifyOfArbitrationRequest (bytes32 question_id, address requester, uint256 max_previous) external;
+  function submitAnswerERC20 (bytes32 question_id, bytes32 answer, uint256 max_previous, uint256 tokens) external;
+  function questions (bytes32) external view returns (bytes32 content_hash, address arbitrator, uint32 opening_ts, uint32 timeout, uint32 finalize_ts, bool is_pending_arbitration, uint256 bounty, bytes32 best_answer, bytes32 history_hash, uint256 bond, uint256 min_bond);
+  function resultFor (bytes32 question_id) external view returns (bytes32);
 }
 
 interface IWETH {
@@ -27,6 +36,7 @@ interface IWETH {
 
 /// @title Market Contract Factory
 contract PredictionMarketV2 is ReentrancyGuard {
+  using SafeERC20 for IERC20;
   using SafeMath for uint256;
   using CeilDiv for uint256;
 
@@ -255,7 +265,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     market.outcomeCount = desc.outcomes;
 
     // creating question in realitio
-    market.resolution.questionId = RealityETH_ERC20_v3_0(realitioAddress).askQuestionERC20(
+    market.resolution.questionId = IRealityETH_ERC20(realitioAddress).askQuestionERC20(
       2,
       desc.question,
       desc.arbitrator,
@@ -294,7 +304,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
       })
     );
     // transferring funds
-    require(desc.token.transferFrom(msg.sender, address(this), desc.value), "erc20 transfer failed");
+    desc.token.safeTransferFrom(msg.sender, address(this), desc.value);
 
     return marketId;
   }
@@ -402,7 +412,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
 
     // transfering treasury fee to treasury address
     if (treasuryFeeAmount > 0) {
-      require(market.token.transfer(market.fees.treasury, treasuryFeeAmount), "erc20 transfer failed");
+      market.token.safeTransfer(market.fees.treasury, treasuryFeeAmount);
     }
   }
 
@@ -414,7 +424,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 value
   ) external nonReentrant {
     Market storage market = markets[marketId];
-    require(market.token.transferFrom(msg.sender, address(this), value), "erc20 transfer failed");
+    market.token.safeTransferFrom(msg.sender, address(this), value);
     _buy(marketId, outcomeId, minOutcomeSharesToBuy, value);
   }
 
@@ -467,7 +477,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
       uint256 treasuryFeeAmount = value.mul(market.fees.treasuryFee) / (ONE.sub(fee));
       // transfering treasury fee to treasury address
       if (treasuryFeeAmount > 0) {
-        require(market.token.transfer(market.fees.treasury, treasuryFeeAmount), "erc20 transfer failed");
+        market.token.safeTransfer(market.fees.treasury, treasuryFeeAmount);
       }
     }
   }
@@ -481,7 +491,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     _sell(marketId, outcomeId, value, maxOutcomeSharesToSell);
     // Transferring funds to user
     Market storage market = markets[marketId];
-    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
+    market.token.safeTransfer(msg.sender, value);
   }
 
   function sellToETH(
@@ -606,7 +616,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     _addLiquidity(marketId, value, distribution);
 
     Market storage market = markets[marketId];
-    require(market.token.transferFrom(msg.sender, address(this), value), "erc20 transfer failed");
+    market.token.safeTransferFrom(msg.sender, address(this), value);
   }
 
   function addLiquidityWithETH(uint256 marketId) external payable isWETHMarket(marketId) {
@@ -694,7 +704,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 value = _removeLiquidity(marketId, shares);
     // transferring user funds from liquidity removed
     Market storage market = markets[marketId];
-    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
+    market.token.safeTransfer(msg.sender, value);
   }
 
   function removeLiquidityToETH(uint256 marketId, uint256 shares) external isWETHMarket(marketId) {
@@ -714,9 +724,8 @@ contract PredictionMarketV2 is ReentrancyGuard {
   {
     Market storage market = markets[marketId];
 
-    RealityETH_ERC20_v3_0 realitio = RealityETH_ERC20_v3_0(realitioAddress);
     // will fail if question is not finalized
-    uint256 outcomeId = uint256(realitio.resultFor(market.resolution.questionId));
+    uint256 outcomeId = uint256(IRealityETH_ERC20(realitioAddress).resultFor(market.resolution.questionId));
 
     market.resolution.outcomeId = outcomeId;
 
@@ -760,7 +769,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 value = _claimWinnings(marketId);
     // transferring user funds from winnings claimed
     Market storage market = markets[marketId];
-    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
+    market.token.safeTransfer(msg.sender, value);
   }
 
   function claimWinningsToETH(uint256 marketId) external isWETHMarket(marketId) {
@@ -810,7 +819,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 value = _claimVoidedOutcomeShares(marketId, outcomeId);
     // transferring user funds from voided outcome shares claimed
     Market storage market = markets[marketId];
-    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
+    market.token.safeTransfer(msg.sender, value);
   }
 
   function claimVoidedOutcomeSharesToETH(uint256 marketId, uint256 outcomeId) external isWETHMarket(marketId) {
@@ -857,7 +866,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 value = _claimLiquidity(marketId);
     // transferring user funds from liquidity claimed
     Market storage market = markets[marketId];
-    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
+    market.token.safeTransfer(msg.sender, value);
   }
 
   function claimLiquidityToETH(uint256 marketId) external isWETHMarket(marketId) {
@@ -894,7 +903,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 value = _claimFees(marketId);
     // transferring user funds from fees claimed
     Market storage market = markets[marketId];
-    require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
+    market.token.safeTransfer(msg.sender, value);
   }
 
   function claimFeesToETH(uint256 marketId) public isWETHMarket(marketId) nonReentrant {
