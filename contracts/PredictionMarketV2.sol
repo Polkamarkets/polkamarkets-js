@@ -1,8 +1,6 @@
 pragma solidity ^0.8.10;
 pragma experimental ABIEncoderV2;
 
-import "@reality.eth/contracts/development/contracts/RealityETH_ERC20-3.0.sol";
-
 // openzeppelin imports
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -13,6 +11,16 @@ library CeilDiv {
     if (x > 0) return ((x - 1) / y) + 1;
     return x / y;
   }
+}
+
+interface IRealityETH_ERC20 {
+  function askQuestionERC20 (uint256 template_id, string calldata question, address arbitrator, uint32 timeout, uint32 opening_ts, uint256 nonce, uint256 tokens) external returns (bytes32);
+  function claimMultipleAndWithdrawBalance (bytes32[] calldata question_ids, uint256[] calldata lengths, bytes32[] calldata hist_hashes, address[] calldata addrs, uint256[] calldata bonds, bytes32[] calldata answers) external;
+  function claimWinnings (bytes32 question_id, bytes32[] calldata history_hashes, address[] calldata addrs, uint256[] calldata bonds, bytes32[] calldata answers) external;
+  function notifyOfArbitrationRequest (bytes32 question_id, address requester, uint256 max_previous) external;
+  function submitAnswerERC20 (bytes32 question_id, bytes32 answer, uint256 max_previous, uint256 tokens) external;
+  function questions (bytes32) external view returns (bytes32 content_hash, address arbitrator, uint32 opening_ts, uint32 timeout, uint32 finalize_ts, bool is_pending_arbitration, uint256 bounty, bytes32 best_answer, bytes32 history_hash, uint256 bond, uint256 min_bond);
+  function resultFor (bytes32 question_id) external view returns (bytes32);
 }
 
 interface IWETH {
@@ -255,7 +263,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     market.outcomeCount = desc.outcomes;
 
     // creating question in realitio
-    market.resolution.questionId = RealityETH_ERC20_v3_0(realitioAddress).askQuestionERC20(
+    market.resolution.questionId = IRealityETH_ERC20(realitioAddress).askQuestionERC20(
       2,
       desc.question,
       desc.arbitrator,
@@ -714,9 +722,8 @@ contract PredictionMarketV2 is ReentrancyGuard {
   {
     Market storage market = markets[marketId];
 
-    RealityETH_ERC20_v3_0 realitio = RealityETH_ERC20_v3_0(realitioAddress);
     // will fail if question is not finalized
-    uint256 outcomeId = uint256(realitio.resultFor(market.resolution.questionId));
+    uint256 outcomeId = uint256(IRealityETH_ERC20(realitioAddress).resultFor(market.resolution.questionId));
 
     market.resolution.outcomeId = outcomeId;
 
