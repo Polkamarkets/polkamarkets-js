@@ -386,10 +386,6 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 valueMinusFees = value.sub(feeAmount);
 
     uint256 treasuryFeeAmount = value.mul(market.fees.treasuryFee) / ONE;
-    // transfering treasury fee to treasury address
-    if (treasuryFeeAmount > 0) {
-      require(market.token.transfer(market.fees.treasury, treasuryFeeAmount), "erc20 transfer failed");
-    }
     valueMinusFees = valueMinusFees.sub(treasuryFeeAmount);
 
     MarketOutcome storage outcome = market.outcomes[outcomeId];
@@ -403,6 +399,11 @@ contract PredictionMarketV2 is ReentrancyGuard {
 
     emit MarketActionTx(msg.sender, MarketAction.buy, marketId, outcomeId, shares, value, block.timestamp);
     emitMarketActionEvents(marketId);
+
+    // transfering treasury fee to treasury address
+    if (treasuryFeeAmount > 0) {
+      require(market.token.transfer(market.fees.treasury, treasuryFeeAmount), "erc20 transfer failed");
+    }
   }
 
   /// @dev Buy shares of a market outcome
@@ -452,13 +453,6 @@ contract PredictionMarketV2 is ReentrancyGuard {
       uint256 feeAmount = value.mul(market.fees.fee) / (ONE.sub(fee));
       market.fees.poolWeight = market.fees.poolWeight.add(feeAmount);
     }
-    {
-      uint256 treasuryFeeAmount = value.mul(market.fees.treasuryFee) / (ONE.sub(fee));
-      // transfering treasury fee to treasury address
-      if (treasuryFeeAmount > 0) {
-        require(market.token.transfer(market.fees.treasury, treasuryFeeAmount), "erc20 transfer failed");
-      }
-    }
     uint256 valuePlusFees = value.add(value.mul(fee) / (ONE.sub(fee)));
 
     require(market.balance >= valuePlusFees, "market does not have enough balance");
@@ -468,6 +462,14 @@ contract PredictionMarketV2 is ReentrancyGuard {
 
     emit MarketActionTx(msg.sender, MarketAction.sell, marketId, outcomeId, shares, value, block.timestamp);
     emitMarketActionEvents(marketId);
+
+    {
+      uint256 treasuryFeeAmount = value.mul(market.fees.treasuryFee) / (ONE.sub(fee));
+      // transfering treasury fee to treasury address
+      if (treasuryFeeAmount > 0) {
+        require(market.token.transfer(market.fees.treasury, treasuryFeeAmount), "erc20 transfer failed");
+      }
+    }
   }
 
   function sell(
