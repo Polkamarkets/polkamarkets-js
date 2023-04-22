@@ -5,6 +5,7 @@ import "@reality.eth/contracts/development/contracts/RealityETH_ERC20-3.0.sol";
 
 // openzeppelin imports
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 library CeilDiv {
   // calculates ceil(x/y)
@@ -25,7 +26,7 @@ interface IWETH {
 }
 
 /// @title Market Contract Factory
-contract PredictionMarketV2 {
+contract PredictionMarketV2 is ReentrancyGuard {
   using SafeMath for uint256;
   using CeilDiv for uint256;
 
@@ -385,10 +386,6 @@ contract PredictionMarketV2 {
     uint256 valueMinusFees = value.sub(feeAmount);
 
     uint256 treasuryFeeAmount = value.mul(market.fees.treasuryFee) / ONE;
-    // transfering treasury fee to treasury address
-    if (treasuryFeeAmount > 0) {
-      require(market.token.transfer(market.fees.treasury, treasuryFeeAmount), "erc20 transfer failed");
-    }
     valueMinusFees = valueMinusFees.sub(treasuryFeeAmount);
 
     MarketOutcome storage outcome = market.outcomes[outcomeId];
@@ -402,6 +399,11 @@ contract PredictionMarketV2 {
 
     emit MarketActionTx(msg.sender, MarketAction.buy, marketId, outcomeId, shares, value, block.timestamp);
     emitMarketActionEvents(marketId);
+
+    // transfering treasury fee to treasury address
+    if (treasuryFeeAmount > 0) {
+      require(market.token.transfer(market.fees.treasury, treasuryFeeAmount), "erc20 transfer failed");
+    }
   }
 
   /// @dev Buy shares of a market outcome
@@ -410,7 +412,7 @@ contract PredictionMarketV2 {
     uint256 outcomeId,
     uint256 minOutcomeSharesToBuy,
     uint256 value
-  ) external {
+  ) external nonReentrant {
     Market storage market = markets[marketId];
     require(market.token.transferFrom(msg.sender, address(this), value), "erc20 transfer failed");
     _buy(marketId, outcomeId, minOutcomeSharesToBuy, value);
@@ -420,7 +422,7 @@ contract PredictionMarketV2 {
     uint256 marketId,
     uint256 outcomeId,
     uint256 minOutcomeSharesToBuy
-  ) external payable isWETHMarket(marketId) {
+  ) external payable isWETHMarket(marketId) nonReentrant {
     uint256 value = msg.value;
     // wrapping and depositing funds
     IWETH(WETH).deposit{value: value}();
@@ -451,13 +453,6 @@ contract PredictionMarketV2 {
       uint256 feeAmount = value.mul(market.fees.fee) / (ONE.sub(fee));
       market.fees.poolWeight = market.fees.poolWeight.add(feeAmount);
     }
-    {
-      uint256 treasuryFeeAmount = value.mul(market.fees.treasuryFee) / (ONE.sub(fee));
-      // transfering treasury fee to treasury address
-      if (treasuryFeeAmount > 0) {
-        require(market.token.transfer(market.fees.treasury, treasuryFeeAmount), "erc20 transfer failed");
-      }
-    }
     uint256 valuePlusFees = value.add(value.mul(fee) / (ONE.sub(fee)));
 
     require(market.balance >= valuePlusFees, "market does not have enough balance");
@@ -467,6 +462,14 @@ contract PredictionMarketV2 {
 
     emit MarketActionTx(msg.sender, MarketAction.sell, marketId, outcomeId, shares, value, block.timestamp);
     emitMarketActionEvents(marketId);
+
+    {
+      uint256 treasuryFeeAmount = value.mul(market.fees.treasuryFee) / (ONE.sub(fee));
+      // transfering treasury fee to treasury address
+      if (treasuryFeeAmount > 0) {
+        require(market.token.transfer(market.fees.treasury, treasuryFeeAmount), "erc20 transfer failed");
+      }
+    }
   }
 
   function sell(
@@ -474,7 +477,7 @@ contract PredictionMarketV2 {
     uint256 outcomeId,
     uint256 value,
     uint256 maxOutcomeSharesToSell
-  ) external {
+  ) external nonReentrant {
     _sell(marketId, outcomeId, value, maxOutcomeSharesToSell);
     // Transferring funds to user
     Market storage market = markets[marketId];
@@ -486,7 +489,7 @@ contract PredictionMarketV2 {
     uint256 outcomeId,
     uint256 value,
     uint256 maxOutcomeSharesToSell
-  ) external isWETHMarket(marketId) {
+  ) external isWETHMarket(marketId) nonReentrant {
     require(address(WETH) != address(0), "WETH address is address 0");
 
     Market storage market = markets[marketId];
@@ -887,14 +890,14 @@ contract PredictionMarketV2 {
     return claimableFees;
   }
 
-  function claimFees(uint256 marketId) public {
+  function claimFees(uint256 marketId) public nonReentrant {
     uint256 value = _claimFees(marketId);
     // transferring user funds from fees claimed
     Market storage market = markets[marketId];
     require(market.token.transfer(msg.sender, value), "erc20 transfer failed");
   }
 
-  function claimFeesToETH(uint256 marketId) public isWETHMarket(marketId) {
+  function claimFeesToETH(uint256 marketId) public isWETHMarket(marketId) nonReentrant {
     uint256 value = _claimFees(marketId);
     // unwrapping and transferring user funds from fees claimed
     IWETH(WETH).withdraw(value);
