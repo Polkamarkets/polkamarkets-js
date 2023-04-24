@@ -210,6 +210,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
   }
 
   modifier isWETHMarket(uint256 marketId) {
+    require(address(WETH) != address(0), "WETH address is address 0");
     require(address(markets[marketId].token) == address(WETH), "Market token is not WETH");
     _;
   }
@@ -500,8 +501,6 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 value,
     uint256 maxOutcomeSharesToSell
   ) external isWETHMarket(marketId) nonReentrant {
-    require(address(WETH) != address(0), "WETH address is address 0");
-
     Market storage market = markets[marketId];
     require(address(market.token) == address(WETH), "market token is not WETH");
 
