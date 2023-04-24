@@ -508,7 +508,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     _sell(marketId, outcomeId, value, maxOutcomeSharesToSell);
 
     IWETH(WETH).withdraw(value);
-    payable(msg.sender).transfer(value);
+    payable(msg.sender).call{value: value}("");
   }
 
   /// @dev Adds liquidity to a market - external
@@ -711,7 +711,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 value = _removeLiquidity(marketId, shares);
     // unwrapping and transferring user funds from liquidity removed
     IWETH(WETH).withdraw(value);
-    payable(msg.sender).transfer(value);
+    payable(msg.sender).call{value: value}("");
   }
 
   /// @dev Fetches winning outcome from Realitio and resolves the market
@@ -776,7 +776,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 value = _claimWinnings(marketId);
     // unwrapping and transferring user funds from winnings claimed
     IWETH(WETH).withdraw(value);
-    payable(msg.sender).transfer(value);
+    payable(msg.sender).call{value: value}("");
   }
 
   /// @dev Allows holders of voided outcome shares to claim balance back.
@@ -826,7 +826,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 value = _claimVoidedOutcomeShares(marketId, outcomeId);
     // unwrapping and transferring user funds from voided outcome shares claimed
     IWETH(WETH).withdraw(value);
-    payable(msg.sender).transfer(value);
+    payable(msg.sender).call{value: value}("");
   }
 
   /// @dev Allows liquidity providers to claim earnings from liquidity providing.
@@ -873,7 +873,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 value = _claimLiquidity(marketId);
     // unwrapping and transferring user funds from liquidity claimed
     IWETH(WETH).withdraw(value);
-    payable(msg.sender).transfer(value);
+    payable(msg.sender).call{value: value}("");
   }
 
   /// @dev Allows liquidity providers to claim their fees share from fees pool
@@ -910,7 +910,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 value = _claimFees(marketId);
     // unwrapping and transferring user funds from fees claimed
     IWETH(WETH).withdraw(value);
-    payable(msg.sender).transfer(value);
+    payable(msg.sender).call{value: value}("");
   }
 
   /// @dev Rebalances the fees pool. Needed in every AddLiquidity / RemoveLiquidity call
