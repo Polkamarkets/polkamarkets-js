@@ -1,5 +1,4 @@
-pragma solidity ^0.8.10;
-pragma experimental ABIEncoderV2;
+pragma solidity ^0.8.18;
 
 // openzeppelin imports
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
