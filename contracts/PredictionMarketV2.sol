@@ -161,13 +161,13 @@ contract PredictionMarketV2 is ReentrancyGuard {
   uint256 public marketIndex;
 
   // realitio configs
-  address public realitioAddress;
-  uint256 public realitioTimeout;
+  address public immutable realitioAddress;
+  uint256 public immutable realitioTimeout;
   // market creation
-  IERC20 public requiredBalanceToken; // token used for rewards / market creation
-  uint256 public requiredBalance; // required balance for market creation
+  IERC20 public immutable requiredBalanceToken; // token used for rewards / market creation
+  uint256 public immutable requiredBalance; // required balance for market creation
   // weth configs
-  IWETH public WETH;
+  IWETH public immutable WETH;
 
   // ------ Modifiers ------
 
