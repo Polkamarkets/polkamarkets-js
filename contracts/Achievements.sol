@@ -1,4 +1,4 @@
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.18;
 pragma experimental ABIEncoderV2;
 
 import "./PredictionMarketV2.sol";
