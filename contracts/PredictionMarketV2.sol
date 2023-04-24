@@ -73,7 +73,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
 
   // ------ Events End ------
 
-  uint256 public constant MAX_UINT_256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
+  uint256 public constant MAX_UINT_256 = type(uint256).max;
 
   uint256 public constant ONE = 10**18;
 
