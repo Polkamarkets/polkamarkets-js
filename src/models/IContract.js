@@ -161,7 +161,7 @@ class IContract {
   }
 
   async __sendTx(f, call = false, value, callback = () => { }) {
-    if (this.params.isSocialLogin) {
+    if (this.params.isSocialLogin && !call) {
       return await this.sendGaslessTransactions(f);
     } else {
       var res;
