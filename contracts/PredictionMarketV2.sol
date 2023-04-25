@@ -201,7 +201,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
   modifier mustHoldRequiredBalance() {
     require(
       requiredBalance == 0 || requiredBalanceToken.balanceOf(msg.sender) >= requiredBalance,
-      "msg.sender must hold minimum erc20 balance"
+      "minimum erc20 balance not held"
     );
     _;
   }
@@ -246,9 +246,9 @@ contract PredictionMarketV2 is ReentrancyGuard {
     Market storage market = markets[marketId];
 
     require(desc.value > 0, "stake needs to be > 0");
-    require(desc.closesAt > block.timestamp, "market must resolve after the current date");
+    require(desc.closesAt > block.timestamp, "resolution before current date");
     require(desc.arbitrator != address(0), "invalid arbitrator address");
-    require(desc.outcomes > 0 && desc.outcomes <= MAX_OUTCOMES, "number of outcomes has to between 1-32");
+    require(desc.outcomes > 0 && desc.outcomes <= MAX_OUTCOMES, "outcome count not between 1-32");
     require(desc.fee <= MAX_FEE, "fee must be <= 5%");
     require(desc.treasuryFee <= MAX_FEE, "treasury fee must be <= 5%");
 
@@ -309,7 +309,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
 
   function createMarketWithETH(CreateMarketDescription calldata desc) external payable returns (uint256) {
     require(address(desc.token) == address(WETH), "Market token is not WETH");
-    require(msg.value == desc.value, "msg.value must be equal to desc.value");
+    require(msg.value == desc.value, "value does not match arguments");
     uint256 marketId = _createMarket(
       CreateMarketDescription({
         value: desc.value,
@@ -401,7 +401,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     // Funding market shares with received funds
     addSharesToMarket(marketId, valueMinusFees);
 
-    require(outcome.shares.available >= shares, "outcome shares pool balance is too low");
+    require(outcome.shares.available >= shares, "shares pool balance is too low");
 
     transferOutcomeSharesfromPool(msg.sender, marketId, outcomeId, shares);
 
@@ -451,7 +451,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
 
     require(shares <= maxOutcomeSharesToSell, "maximum sell amount exceeded");
     require(shares > 0, "shares amount is 0");
-    require(outcome.shares.holders[msg.sender] >= shares, "user does not have enough balance");
+    require(outcome.shares.holders[msg.sender] >= shares, "insufficient shares balance");
 
     transferOutcomeSharesToPool(msg.sender, marketId, outcomeId, shares);
 
@@ -463,7 +463,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     }
     uint256 valuePlusFees = value + value * fee / (ONE - fee);
 
-    require(market.balance >= valuePlusFees, "market does not have enough balance");
+    require(market.balance >= valuePlusFees, "insufficient market balance");
 
     // Rebalancing market shares
     removeSharesFromMarket(marketId, valuePlusFees);
@@ -525,7 +525,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 poolWeight = 0;
 
     if (market.liquidity > 0) {
-      require(distribution.length == 0, "market already has liquidity, can't distribute liquidity");
+      require(distribution.length == 0, "market already funded");
 
       // part of the liquidity is exchanged for outcome shares if market is not balanced
       for (uint256 i = 0; i < outcomesShares.length; ++i) {
@@ -545,7 +545,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     } else {
       // funding market with no liquidity
       if (distribution.length > 0) {
-        require(distribution.length == outcomesShares.length, "weight distribution length does not match");
+        require(distribution.length == outcomesShares.length, "distribution length not matching");
 
         uint256 maxHint = 0;
         for (uint256 i = 0; i < distribution.length; ++i) {
@@ -631,7 +631,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
   {
     Market storage market = markets[marketId];
 
-    require(market.liquidityShares[msg.sender] >= shares, "user does not have enough balance");
+    require(market.liquidityShares[msg.sender] >= shares, "insufficient shares balance");
     // claiming any pending fees
     claimFees(marketId);
 
@@ -734,14 +734,14 @@ contract PredictionMarketV2 is ReentrancyGuard {
     Market storage market = markets[marketId];
     MarketOutcome storage resolvedOutcome = market.outcomes[market.resolution.outcomeId];
 
-    require(resolvedOutcome.shares.holders[msg.sender] > 0, "user does not hold resolved outcome shares");
-    require(resolvedOutcome.shares.claims[msg.sender] == false, "user already claimed resolved outcome winnings");
+    require(resolvedOutcome.shares.holders[msg.sender] > 0, "user doesn't hold outcome shares");
+    require(resolvedOutcome.shares.claims[msg.sender] == false, "user already claimed winnings");
 
     // 1 share => price = 1
     uint256 value = resolvedOutcome.shares.holders[msg.sender];
 
     // assuring market has enough funds
-    require(market.balance >= value, "Market does not have enough balance");
+    require(market.balance >= value, "insufficient market balance");
 
     market.balance = market.balance - value;
     resolvedOutcome.shares.claims[msg.sender] = true;
@@ -784,15 +784,15 @@ contract PredictionMarketV2 is ReentrancyGuard {
     MarketOutcome storage outcome = market.outcomes[outcomeId];
 
     require(isMarketVoided(marketId), "market is not voided");
-    require(outcome.shares.holders[msg.sender] > 0, "user does not hold outcome shares");
-    require(outcome.shares.voidedClaims[msg.sender] == false, "user already claimed outcome shares");
+    require(outcome.shares.holders[msg.sender] > 0, "user doesn't hold outcome shares");
+    require(outcome.shares.voidedClaims[msg.sender] == false, "user already claimed shares");
 
     // voided market - shares are valued at last market price
     uint256 price = getMarketOutcomePrice(marketId, outcomeId);
     uint256 value = price * outcome.shares.holders[msg.sender] / ONE;
 
     // assuring market has enough funds
-    require(market.balance >= value, "Market does not have enough balance");
+    require(market.balance >= value, "insufficient market balance");
 
     market.balance = market.balance - value;
     outcome.shares.voidedClaims[msg.sender] = true;
@@ -832,15 +832,15 @@ contract PredictionMarketV2 is ReentrancyGuard {
     // claiming any pending fees
     claimFees(marketId);
 
-    require(market.liquidityShares[msg.sender] > 0, "user does not hold liquidity shares");
-    require(market.liquidityClaims[msg.sender] == false, "user already claimed liquidity winnings");
+    require(market.liquidityShares[msg.sender] > 0, "user doesn't hold shares");
+    require(market.liquidityClaims[msg.sender] == false, "user already claimed shares");
 
     // value = total resolved outcome pool shares * pool share (%)
     uint256 liquidityPrice = getMarketLiquidityPrice(marketId);
     uint256 value = liquidityPrice * market.liquidityShares[msg.sender] / ONE;
 
     // assuring market has enough funds
-    require(market.balance >= value, "Market does not have enough balance");
+    require(market.balance >= value, "insufficient market balance");
 
     market.balance = market.balance - value;
     market.liquidityClaims[msg.sender] = true;
