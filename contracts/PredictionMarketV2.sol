@@ -13,13 +13,64 @@ library CeilDiv {
 }
 
 interface IRealityETH_ERC20 {
-  function askQuestionERC20 (uint256 template_id, string calldata question, address arbitrator, uint32 timeout, uint32 opening_ts, uint256 nonce, uint256 tokens) external returns (bytes32);
-  function claimMultipleAndWithdrawBalance (bytes32[] calldata question_ids, uint256[] calldata lengths, bytes32[] calldata hist_hashes, address[] calldata addrs, uint256[] calldata bonds, bytes32[] calldata answers) external;
-  function claimWinnings (bytes32 question_id, bytes32[] calldata history_hashes, address[] calldata addrs, uint256[] calldata bonds, bytes32[] calldata answers) external;
-  function notifyOfArbitrationRequest (bytes32 question_id, address requester, uint256 max_previous) external;
-  function submitAnswerERC20 (bytes32 question_id, bytes32 answer, uint256 max_previous, uint256 tokens) external;
-  function questions (bytes32) external view returns (bytes32 content_hash, address arbitrator, uint32 opening_ts, uint32 timeout, uint32 finalize_ts, bool is_pending_arbitration, uint256 bounty, bytes32 best_answer, bytes32 history_hash, uint256 bond, uint256 min_bond);
-  function resultFor (bytes32 question_id) external view returns (bytes32);
+  function askQuestionERC20(
+    uint256 template_id,
+    string calldata question,
+    address arbitrator,
+    uint32 timeout,
+    uint32 opening_ts,
+    uint256 nonce,
+    uint256 tokens
+  ) external returns (bytes32);
+
+  function claimMultipleAndWithdrawBalance(
+    bytes32[] calldata question_ids,
+    uint256[] calldata lengths,
+    bytes32[] calldata hist_hashes,
+    address[] calldata addrs,
+    uint256[] calldata bonds,
+    bytes32[] calldata answers
+  ) external;
+
+  function claimWinnings(
+    bytes32 question_id,
+    bytes32[] calldata history_hashes,
+    address[] calldata addrs,
+    uint256[] calldata bonds,
+    bytes32[] calldata answers
+  ) external;
+
+  function notifyOfArbitrationRequest(
+    bytes32 question_id,
+    address requester,
+    uint256 max_previous
+  ) external;
+
+  function submitAnswerERC20(
+    bytes32 question_id,
+    bytes32 answer,
+    uint256 max_previous,
+    uint256 tokens
+  ) external;
+
+  function questions(bytes32)
+    external
+    view
+    returns (
+      bytes32 content_hash,
+      address arbitrator,
+      uint32 opening_ts,
+      uint32 timeout,
+      uint32 finalize_ts,
+      bool is_pending_arbitration,
+      uint256 bounty,
+      bytes32 best_answer,
+      bytes32 history_hash,
+      uint256 bond,
+      uint256 min_bond
+    );
+
+  function resultFor(bytes32 question_id) external view returns (bytes32);
 }
 
 interface IWETH {
@@ -339,7 +390,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
   ) public view returns (uint256) {
     uint256[] memory outcomesShares = getMarketOutcomesShares(marketId);
     uint256 fee = getMarketFee(marketId);
-    uint256 amountMinusFees = amount - (amount * fee / ONE);
+    uint256 amountMinusFees = amount - ((amount * fee) / ONE);
     uint256 buyTokenPoolBalance = outcomesShares[outcomeId];
     uint256 endingOutcomeBalance = buyTokenPoolBalance * ONE;
     for (uint256 i = 0; i < outcomesShares.length; ++i) {
@@ -361,7 +412,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
   ) public view returns (uint256 outcomeTokenSellAmount) {
     uint256[] memory outcomesShares = getMarketOutcomesShares(marketId);
     uint256 fee = getMarketFee(marketId);
-    uint256 amountPlusFees = amount * ONE / (ONE - fee);
+    uint256 amountPlusFees = (amount * ONE) / (ONE - fee);
     uint256 sellTokenPoolBalance = outcomesShares[outcomeId];
     uint256 endingOutcomeBalance = sellTokenPoolBalance * ONE;
     for (uint256 i = 0; i < outcomesShares.length; ++i) {
@@ -389,11 +440,11 @@ contract PredictionMarketV2 is ReentrancyGuard {
     require(shares > 0, "shares amount is 0");
 
     // subtracting fee from transaction value
-    uint256 feeAmount = value * market.fees.fee / ONE;
+    uint256 feeAmount = (value * market.fees.fee) / ONE;
     market.fees.poolWeight = market.fees.poolWeight + feeAmount;
     uint256 valueMinusFees = value - feeAmount;
 
-    uint256 treasuryFeeAmount = value * market.fees.treasuryFee / ONE;
+    uint256 treasuryFeeAmount = (value * market.fees.treasuryFee) / ONE;
     valueMinusFees = valueMinusFees - treasuryFeeAmount;
 
     MarketOutcome storage outcome = market.outcomes[outcomeId];
@@ -458,10 +509,10 @@ contract PredictionMarketV2 is ReentrancyGuard {
     // adding fees to transaction value
     uint256 fee = getMarketFee(marketId);
     {
-      uint256 feeAmount = value * market.fees.fee / (ONE - fee);
+      uint256 feeAmount = (value * market.fees.fee) / (ONE - fee);
       market.fees.poolWeight = market.fees.poolWeight + feeAmount;
     }
-    uint256 valuePlusFees = value + value * fee / (ONE - fee);
+    uint256 valuePlusFees = value + (value * fee) / (ONE - fee);
 
     require(market.balance >= valuePlusFees, "insufficient market balance");
 
@@ -472,7 +523,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     emitMarketActionEvents(marketId);
 
     {
-      uint256 treasuryFeeAmount = value * market.fees.treasuryFee / (ONE - fee);
+      uint256 treasuryFeeAmount = (value * market.fees.treasuryFee) / (ONE - fee);
       // transfering treasury fee to treasury address
       if (treasuryFeeAmount > 0) {
         market.token.safeTransfer(market.fees.treasury, treasuryFeeAmount);
@@ -534,11 +585,11 @@ contract PredictionMarketV2 is ReentrancyGuard {
       }
 
       for (uint256 i = 0; i < outcomesShares.length; ++i) {
-        uint256 remaining = value * outcomesShares[i] / poolWeight;
+        uint256 remaining = (value * outcomesShares[i]) / poolWeight;
         sendBackAmounts[i] = value - remaining;
       }
 
-      liquidityAmount = value * market.liquidity / poolWeight;
+      liquidityAmount = (value * market.liquidity) / poolWeight;
 
       // re-balancing fees pool
       rebalanceFeesPool(marketId, liquidityAmount, MarketAction.addLiquidity);
@@ -554,7 +605,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
         }
 
         for (uint256 i = 0; i < distribution.length; ++i) {
-          uint256 remaining = value * distribution[i] / maxHint;
+          uint256 remaining = (value * distribution[i]) / maxHint;
           require(remaining > 0, "must hint a valid distribution");
           sendBackAmounts[i] = value - remaining;
         }
@@ -584,7 +635,8 @@ contract PredictionMarketV2 is ReentrancyGuard {
       for (uint256 i = 0; i < sendBackAmounts.length; ++i) {
         if (sendBackAmounts[i] > 0) {
           // outcome price = outcome shares / reference outcome shares * reference outcome price
-          uint256 outcomePrice = referencePrice * market.outcomes[0].shares.available / market.outcomes[i].shares.available;
+          uint256 outcomePrice = (referencePrice * market.outcomes[0].shares.available) /
+            market.outcomes[i].shares.available;
 
           emit MarketActionTx(
             msg.sender,
@@ -592,7 +644,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
             marketId,
             i,
             sendBackAmounts[i],
-            sendBackAmounts[i] * outcomePrice / ONE, // price * shares
+            (sendBackAmounts[i] * outcomePrice) / ONE, // price * shares
             block.timestamp
           );
         }
@@ -600,9 +652,17 @@ contract PredictionMarketV2 is ReentrancyGuard {
     }
 
     uint256 liquidityPrice = getMarketLiquidityPrice(marketId);
-    uint256 liquidityValue = liquidityPrice * liquidityAmount / ONE;
+    uint256 liquidityValue = (liquidityPrice * liquidityAmount) / ONE;
 
-    emit MarketActionTx(msg.sender, MarketAction.addLiquidity, marketId, 0, liquidityAmount, liquidityValue, block.timestamp);
+    emit MarketActionTx(
+      msg.sender,
+      MarketAction.addLiquidity,
+      marketId,
+      0,
+      liquidityAmount,
+      liquidityValue,
+      block.timestamp
+    );
     emit MarketLiquidity(marketId, market.liquidity, liquidityPrice, block.timestamp);
   }
 
@@ -648,10 +708,10 @@ contract PredictionMarketV2 is ReentrancyGuard {
       if (poolWeight > outcomeShares) poolWeight = outcomeShares;
     }
 
-    uint256 liquidityAmount = shares * poolWeight / market.liquidity;
+    uint256 liquidityAmount = (shares * poolWeight) / market.liquidity;
 
     for (uint256 i = 0; i < outcomesShares.length; ++i) {
-      sendAmounts[i] = outcomesShares[i] * shares / market.liquidity;
+      sendAmounts[i] = (outcomesShares[i] * shares) / market.liquidity;
       sendAmounts[i] = sendAmounts[i] - liquidityAmount;
     }
 
@@ -673,7 +733,8 @@ contract PredictionMarketV2 is ReentrancyGuard {
     for (uint256 i = 0; i < outcomesShares.length; ++i) {
       if (sendAmounts[i] > 0) {
         // outcome price = outcome shares / reference outcome shares * reference outcome price
-        uint256 outcomePrice = referencePrice * market.outcomes[0].shares.available / market.outcomes[i].shares.available;
+        uint256 outcomePrice = (referencePrice * market.outcomes[0].shares.available) /
+          market.outcomes[i].shares.available;
 
         emit MarketActionTx(
           msg.sender,
@@ -681,13 +742,21 @@ contract PredictionMarketV2 is ReentrancyGuard {
           marketId,
           i,
           sendAmounts[i],
-          sendAmounts[i] * outcomePrice / ONE, // price * shares
+          (sendAmounts[i] * outcomePrice) / ONE, // price * shares
           block.timestamp
         );
       }
     }
 
-    emit MarketActionTx(msg.sender, MarketAction.removeLiquidity, marketId, 0, shares, liquidityAmount, block.timestamp);
+    emit MarketActionTx(
+      msg.sender,
+      MarketAction.removeLiquidity,
+      marketId,
+      0,
+      shares,
+      liquidityAmount,
+      block.timestamp
+    );
     emit MarketLiquidity(marketId, market.liquidity, getMarketLiquidityPrice(marketId), block.timestamp);
 
     return liquidityAmount;
@@ -789,7 +858,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
 
     // voided market - shares are valued at last market price
     uint256 price = getMarketOutcomePrice(marketId, outcomeId);
-    uint256 value = price * outcome.shares.holders[msg.sender] / ONE;
+    uint256 value = (price * outcome.shares.holders[msg.sender]) / ONE;
 
     // assuring market has enough funds
     require(market.balance >= value, "insufficient market balance");
@@ -837,7 +906,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
 
     // value = total resolved outcome pool shares * pool share (%)
     uint256 liquidityPrice = getMarketLiquidityPrice(marketId);
-    uint256 value = liquidityPrice * market.liquidityShares[msg.sender] / ONE;
+    uint256 value = (liquidityPrice * market.liquidityShares[msg.sender]) / ONE;
 
     // assuring market has enough funds
     require(market.balance >= value, "insufficient market balance");
@@ -919,7 +988,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
   ) private {
     Market storage market = markets[marketId];
 
-    uint256 poolWeight = liquidityShares * market.fees.poolWeight / market.liquidity;
+    uint256 poolWeight = (liquidityShares * market.fees.poolWeight) / market.liquidity;
 
     if (action == MarketAction.addLiquidity) {
       market.fees.poolWeight = market.fees.poolWeight + poolWeight;
@@ -1061,13 +1130,13 @@ contract PredictionMarketV2 is ReentrancyGuard {
   function getUserLiquidityPoolShare(uint256 marketId, address user) external view returns (uint256) {
     Market storage market = markets[marketId];
 
-    return market.liquidityShares[user] * ONE / market.liquidity;
+    return (market.liquidityShares[user] * ONE) / market.liquidity;
   }
 
   function getUserClaimableFees(uint256 marketId, address user) public view returns (uint256) {
     Market storage market = markets[marketId];
 
-    uint256 rawAmount = market.fees.poolWeight * market.liquidityShares[user] / market.liquidity;
+    uint256 rawAmount = (market.fees.poolWeight * market.liquidityShares[user]) / market.liquidity;
 
     // No fees left to claim
     if (market.fees.claimed[user] > rawAmount) return 0;
@@ -1161,7 +1230,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
     if (market.state == MarketState.resolved && !isMarketVoided(marketId)) {
       // resolved market, outcome prices are either 0 or 1
       // final liquidity price = outcome shares / liquidity shares
-      return market.outcomes[market.resolution.outcomeId].shares.available * ONE / market.liquidity;
+      return (market.outcomes[market.resolution.outcomeId].shares.available * ONE) / market.liquidity;
     }
 
     // liquidity price = # outcomes / (liquidity * sum (1 / every outcome shares)
@@ -1170,10 +1239,10 @@ contract PredictionMarketV2 is ReentrancyGuard {
     for (uint256 i = 0; i < market.outcomeCount; ++i) {
       MarketOutcome storage outcome = market.outcomes[i];
 
-      marketSharesSum = marketSharesSum + ONE * ONE / outcome.shares.available;
+      marketSharesSum = marketSharesSum + (ONE * ONE) / outcome.shares.available;
     }
 
-    return market.outcomeCount * ONE * ONE * ONE / market.liquidity / marketSharesSum;
+    return (market.outcomeCount * ONE * ONE * ONE) / market.liquidity / marketSharesSum;
   }
 
   function getMarketResolvedOutcome(uint256 marketId) public view returns (int256) {
@@ -1231,10 +1300,10 @@ contract PredictionMarketV2 is ReentrancyGuard {
     for (uint256 i = 0; i < market.outcomeCount; ++i) {
       if (i == outcomeId) continue;
 
-      div = div + market.outcomes[outcomeId].shares.available * ONE / market.outcomes[i].shares.available;
+      div = div + (market.outcomes[outcomeId].shares.available * ONE) / market.outcomes[i].shares.available;
     }
 
-    return ONE * ONE / div;
+    return (ONE * ONE) / div;
   }
 
   function getMarketOutcomeData(uint256 marketId, uint256 outcomeId)
