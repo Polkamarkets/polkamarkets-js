@@ -94,6 +94,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
           this.eventEmitter.on('init', async () => {
             if (this.provider) {
               resolve(true);
+              return
             }
             resolve(await this.showWallet());
           });
