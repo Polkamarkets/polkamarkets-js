@@ -146,6 +146,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
     const resp = await super.socialLogin(loginProvider);
 
     this.eventEmitter.emit('finishLogin', !!resp);
+    this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.socialLoginParams.networkConfig);
 
     this.hideWallet();
 
@@ -156,6 +157,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
     const resp = await super.emailLogin(email);
 
     this.eventEmitter.emit('finishLogin', !!resp);
+    this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.socialLoginParams.networkConfig);
 
     this.hideWallet();
 
@@ -166,6 +168,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
     const resp = await super.metamaskLogin();
 
     this.eventEmitter.emit('finishLogin', !!resp);
+    this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.socialLoginParams.networkConfig);
 
     this.hideWallet();
 
@@ -176,6 +179,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
     const resp = await super.walletConnectLogin();
 
     this.eventEmitter.emit('finishLogin', !!resp);
+    this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.socialLoginParams.networkConfig);
 
     this.hideWallet();
 
