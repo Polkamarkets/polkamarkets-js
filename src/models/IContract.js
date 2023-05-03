@@ -101,7 +101,7 @@ class IContract {
     let txResponse
     try {
       if (isMetamask) {
-        txResponse = await signer.sendTransaction({ ...tx, gasLimit: 210000);
+        txResponse = await signer.sendTransaction({ ...tx, gasLimit: 210000 });
       } else {
         txResponse = await smartAccount.sendTransaction({
           transaction: tx
