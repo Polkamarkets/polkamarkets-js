@@ -1,6 +1,7 @@
 const { default: SocialLogin } = require("@biconomy/web3-auth");
 const PolkamarketsSmartAccount = require("./PolkamarketsSmartAccount");
 const SafeEventEmitter = require('@metamask/safe-event-emitter').default;
+const ethers = require('ethers').ethers;
 
 class PolkamarketsSocialLogin extends SocialLogin {
 
@@ -180,9 +181,28 @@ class PolkamarketsSocialLogin extends SocialLogin {
     return resp;
   }
 
+  async providerIsMetamask() {
+    if (this.provider) {
+      const web3Provider = new ethers.providers.Web3Provider(this.provider)
+      if (web3Provider.connection.url === 'metamask') {
+        const signer = web3Provider.getSigner()
+        const address = await signer.getAddress();
+        return { isMetamask: true, address, signer };
+      }
+    }
+
+    return { isMetamask: false, address: null, signer: null };
+  }
+
   async getAddress() {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
+        const { isMetamask, address } = await this.providerIsMetamask();
+        if (isMetamask) {
+          resolve(address);
+          return;
+        }
+
         if (this.smartAccount.isInit) {
           resolve(this.smartAccount.address);
         } else {
@@ -197,7 +217,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
   }
 
   async isLoggedIn() {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
         if (this.isInit) {
           resolve(!!this.provider);
