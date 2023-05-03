@@ -86,6 +86,8 @@ class IContract {
     const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
     const smartAccount = PolkamarketsSmartAccount.singleton.getInstance(socialLogin?.provider);
 
+    const { isMetamask, signer } = await socialLogin.providerIsMetamask();
+
     const methodName = f._method.name;
 
     const contractInterface = new ethers.utils.Interface(this.params.abi.abi);
@@ -94,14 +96,17 @@ class IContract {
     const tx = {
       to: this.params.contractAddress,
       data: methodCallData,
-      // gasLimit: 2000,
     };
 
     let txResponse
     try {
-      txResponse = await smartAccount.sendTransaction({
-        transaction: tx
-      });
+      if (isMetamask) {
+        txResponse = await signer.sendTransaction({ ...tx, gasLimit: 210000);
+      } else {
+        txResponse = await smartAccount.sendTransaction({
+          transaction: tx
+        });
+      }
     } catch (error) {
       console.log('error:', error);
       throw error;
