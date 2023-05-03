@@ -38,6 +38,9 @@ class PolkamarketsSmartAccount extends SmartAccount {
           this.initSmartAccount(smartAccount);
         }
         return smartAccount;
+      },
+      clearInstance: () => {
+        smartAccount = null;
       }
     };
   })();

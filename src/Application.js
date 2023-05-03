@@ -1,5 +1,6 @@
 const Web3 = require("web3");
 const PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
+const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
 
 const ERC20Contract = require("./models/index").ERC20Contract;
 const PredictionMarketContract = require("./models/index").PredictionMarketContract;
@@ -369,6 +370,7 @@ class Application {
   async socialLoginLogout() {
     if (this.socialLogin?.provider) {
       this.socialLogin.logout();
+      PolkamarketsSmartAccount.singleton.clearInstance();
     }
   }
 }
