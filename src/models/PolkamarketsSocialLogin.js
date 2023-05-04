@@ -43,8 +43,8 @@ class PolkamarketsSocialLogin extends SocialLogin {
   static singleton = (() => {
     let socialLogin;
 
-    function createInstance() {
-      const instance = new PolkamarketsSocialLogin();
+    function createInstance(web3AuthClientId) {
+      const instance = new PolkamarketsSocialLogin(web3AuthClientId);
       instance.eventEmitter = new SafeEventEmitter();
       return instance;
     }
@@ -52,7 +52,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
     return {
       getInstance: (socialLoginParams) => {
         if (!socialLogin) {
-          socialLogin = createInstance();
+          socialLogin = createInstance(socialLoginParams.web3AuthClientId);
           socialLogin.socialLoginParams = socialLoginParams;
           this.initSocialLogin(socialLogin, socialLoginParams.urls, socialLoginParams.isTestnet, socialLoginParams.whiteLabelData, socialLoginParams.networkConfig);
         }
@@ -60,6 +60,14 @@ class PolkamarketsSocialLogin extends SocialLogin {
       }
     };
   })();
+
+  constructor(web3AuthClientId = null) {
+    super();
+
+    if (web3AuthClientId) {
+      this.clientId = web3AuthClientId;
+    }
+  }
 
   hideWallet() {
     super.hideWallet();
@@ -141,49 +149,44 @@ class PolkamarketsSocialLogin extends SocialLogin {
     }
   }
 
+  async afterSocialLogin(resp) {
+    let success = true;
+    if (resp instanceof Error) {
+      success = false;
+    }
+
+    this.eventEmitter.emit('finishLogin', success);
+
+    if (success) {
+      this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.socialLoginParams.networkConfig);
+      this.hideWallet();
+    }
+
+    return success;
+  }
 
   async socialLogin(loginProvider) {
     const resp = await super.socialLogin(loginProvider);
 
-    this.eventEmitter.emit('finishLogin', !!resp);
-    this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.socialLoginParams.networkConfig);
-
-    this.hideWallet();
-
-    return resp;
+    return this.afterSocialLogin(resp);
   }
 
   async emailLogin(email) {
     const resp = await super.emailLogin(email);
 
-    this.eventEmitter.emit('finishLogin', !!resp);
-    this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.socialLoginParams.networkConfig);
-
-    this.hideWallet();
-
-    return resp;
+    return this.afterSocialLogin(resp);
   }
 
   async metamaskLogin() {
     const resp = await super.metamaskLogin();
 
-    this.eventEmitter.emit('finishLogin', !!resp);
-    this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.socialLoginParams.networkConfig);
-
-    this.hideWallet();
-
-    return resp;
+    return this.afterSocialLogin(resp);
   }
 
   async walletConnectLogin() {
     const resp = await super.walletConnectLogin();
 
-    this.eventEmitter.emit('finishLogin', !!resp);
-    this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.socialLoginParams.networkConfig);
-
-    this.hideWallet();
-
-    return resp;
+    return this.afterSocialLogin(resp);
   }
 
   async providerIsMetamask() {
