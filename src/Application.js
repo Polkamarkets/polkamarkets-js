@@ -336,35 +336,35 @@ class Application {
   };
 
   async socialLoginGoogle() {
-    await this.socialLogin.directLogin('google');
+    return await this.socialLogin.directLogin('google');
   }
 
   async socialLoginFacebook() {
-    await this.socialLogin.directLogin('facebook');
+    return await this.socialLogin.directLogin('facebook');
   }
 
   async socialLoginTwitter() {
-    await this.socialLogin.directLogin('twitter');
+    return await this.socialLogin.directLogin('twitter');
   }
 
   async socialLoginGithub() {
-    await this.socialLogin.directLogin('github');
+    return await this.socialLogin.directLogin('github');
   }
 
   async socialLoginDiscord() {
-    await this.socialLogin.directLogin('discord');
+    return await this.socialLogin.directLogin('discord');
   }
 
   async socialLoginEmail(email) {
-    await this.socialLogin.directLogin('email', email);
+    return await this.socialLogin.directLogin('email', email);
   }
 
   async socialLoginMetamask() {
-    await this.socialLogin.directLogin('metamask');
+    return await this.socialLogin.directLogin('metamask');
   }
 
   async socialLoginWalletConnect() {
-    await this.socialLogin.directLogin('walletconnect');
+    return await this.socialLogin.directLogin('walletconnect');
   }
 
   async socialLoginLogout() {
