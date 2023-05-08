@@ -43,8 +43,8 @@ class PolkamarketsSocialLogin extends SocialLogin {
   static singleton = (() => {
     let socialLogin;
 
-    function createInstance(web3AuthClientId) {
-      const instance = new PolkamarketsSocialLogin(web3AuthClientId);
+    function createInstance(web3AuthClientId, useCustomModal) {
+      const instance = new PolkamarketsSocialLogin(web3AuthClientId, useCustomModal);
       instance.eventEmitter = new SafeEventEmitter();
       return instance;
     }
@@ -52,7 +52,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
     return {
       getInstance: (socialLoginParams) => {
         if (!socialLogin) {
-          socialLogin = createInstance(socialLoginParams.web3AuthClientId);
+          socialLogin = createInstance(socialLoginParams.web3AuthClientId, socialLoginParams.useCustomModal);
           socialLogin.socialLoginParams = socialLoginParams;
           this.initSocialLogin(socialLogin, socialLoginParams.urls, socialLoginParams.isTestnet, socialLoginParams.whiteLabelData, socialLoginParams.networkConfig);
         }
@@ -61,9 +61,10 @@ class PolkamarketsSocialLogin extends SocialLogin {
     };
   })();
 
-  constructor(web3AuthClientId = null) {
+  constructor(web3AuthClientId = null, useCustomModal = false) {
     super();
 
+    this.useCustomModal = useCustomModal;
     if (web3AuthClientId) {
       this.clientId = web3AuthClientId;
     }
@@ -95,6 +96,9 @@ class PolkamarketsSocialLogin extends SocialLogin {
       if (this.provider) {
         return true;
       }
+      if (this.useCustomModal) {
+        return false;
+      }
       return this.showWallet();
     } else {
       return new Promise((resolve, reject) => {
@@ -103,6 +107,10 @@ class PolkamarketsSocialLogin extends SocialLogin {
             if (this.provider) {
               resolve(true);
               return
+            }
+            if (this.useCustomModal) {
+              resolve(false)
+              return;
             }
             resolve(await this.showWallet());
           });
