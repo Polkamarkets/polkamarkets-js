@@ -1,6 +1,9 @@
 const Contract = require("../utils/Contract");
 const _ = require("lodash");
 const axios = require('axios');
+const PolkamarketsSmartAccount = require("./PolkamarketsSmartAccount");
+const PolkamarketsSocialLogin = require("./PolkamarketsSocialLogin");
+const ethers = require('ethers').ethers;
 
 /**
  * Contract Object Interface
@@ -18,7 +21,8 @@ class IContract {
     abi,
     acc,
     web3EventsProvider,
-    gasPrice
+    gasPrice,
+    isSocialLogin = false,
   }) {
     try {
       if (!abi) {
@@ -40,7 +44,8 @@ class IContract {
         contractAddress,
         web3EventsProvider,
         gasPrice,
-        contract: new Contract(web3, abi, contractAddress)
+        contract: new Contract(web3, abi, contractAddress),
+        isSocialLogin,
       };
     } catch (err) {
       throw err;
@@ -72,12 +77,96 @@ class IContract {
         }
       })
       .on("error", (err) => {
-        reject(err);
+        throw err;
+        // reject(err);
       });
   };
 
-  async __sendTx(f, call = false, value, callback = () => { }) {
+  async sendGaslessTransactions(f) {
+    const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
+    const smartAccount = PolkamarketsSmartAccount.singleton.getInstance(socialLogin?.provider);
+
+    const { isMetamask, signer } = await socialLogin.providerIsMetamask();
+
+    const methodName = f._method.name;
+
+    const contractInterface = new ethers.utils.Interface(this.params.abi.abi);
+    const methodCallData = contractInterface.encodeFunctionData(methodName, f.arguments);
+
+    const tx = {
+      to: this.params.contractAddress,
+      data: methodCallData,
+    };
+
+    let txResponse
     try {
+      if (isMetamask) {
+        txResponse = await signer.sendTransaction({ ...tx, gasLimit: 210000 });
+      } else {
+        txResponse = await smartAccount.sendTransaction({
+          transaction: tx
+        });
+      }
+    } catch (error) {
+      throw error;
+    }
+
+    // https://docs.ethers.org/v5/api/providers/types/#providers-TransactionResponse
+    const receipt = await txResponse.wait();
+
+    if (receipt.logs) {
+      const events = receipt.logs.map(log => {
+        try {
+          const event = contractInterface.parseLog(log);
+          return event;
+        } catch (error) {
+          return null;
+        }
+      });
+      receipt.events = this.convertEtherEventsToWeb3Events(events);
+    }
+
+    return receipt;
+  }
+
+  convertEtherEventsToWeb3Events(events) {
+    const transformedEvents = {};
+    for (const event of events) {
+      if (!event) {
+        continue;
+      }
+
+      const { name, args, eventFragment } = event;
+
+      const returnValues = {};
+
+      eventFragment.inputs.forEach((input, index) => {
+        let value = args[index];
+
+        // if value is a BigNumber, convert it to a string
+        if (ethers.BigNumber.isBigNumber(value)) {
+          value = value.toString();
+        }
+
+        returnValues[input.name] = value;
+        returnValues[index.toString()] = value;
+      });
+
+      const transformedEvent = {
+        event: name,
+        returnValues,
+      };
+
+      transformedEvents[name] = transformedEvent;
+    }
+
+    return transformedEvents;
+  }
+
+  async __sendTx(f, call = false, value, callback = () => { }) {
+    if (this.params.isSocialLogin && !call) {
+      return await this.sendGaslessTransactions(f);
+    } else {
       var res;
       if (!this.acc && !call) {
         const accounts = await this.params.web3.eth.getAccounts();
@@ -95,8 +184,6 @@ class IContract {
         res = await f.call().catch(err => { throw err; });
       }
       return res;
-    } catch (err) {
-      throw err;
     }
   };
 
@@ -263,6 +350,11 @@ class IContract {
    * @returns {String | undefined} address
    */
   async getMyAccount() {
+    if (this.params.isSocialLogin) {
+      const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
+      return await socialLogin.getAddress();
+    }
+
     if (this.acc) {
       return this.acc.getAddress()
     }

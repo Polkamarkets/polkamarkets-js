@@ -88,7 +88,7 @@ class PredictionMarketV2Contract extends IContract {
    */
   async getMarketData({marketId}) {
     const marketData = await this.params.contract.getContract().methods.getMarketData(marketId).call();
-    const outcomeIds = await this.__sendTx(this.getContract().methods.getMarketOutcomeIds(marketId), true);
+    const outcomeIds = await this.params.contract.getContract().methods.getMarketOutcomeIds(marketId).call();
 
     return {
       name: '', // TODO: remove; deprecated
