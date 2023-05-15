@@ -13,8 +13,6 @@ const WETH9Contract = require("./models/index").WETH9Contract;
 const ChainId = require('@biconomy/core-types').ChainId;
 
 const Account = require('./utils/Account');
-require('@biconomy/web3-auth/dist/src/style.css'); // needed for the modal styles
-
 
 const networksEnum = Object.freeze({
   1: "Main",
