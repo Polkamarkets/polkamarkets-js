@@ -90146,8 +90146,9 @@
       "transactionHash": "0x43f69fb5a02e497d168bcdc24fbc5955e61e1709f2b670c8caf9e4674ff9385b"
     }
   },
-  "schemaVersion": "3.4.4",
-  "updatedAt": "2023-03-16T13:49:18.147Z",
+  "schemaVersion": "3.3.4",
+  "updatedAt": "2023-05-15T13:27:56.214Z",
+  "networkType": "ethereum",
   "devdoc": {
     "methods": {
       "addLiquidity(uint256)": {
