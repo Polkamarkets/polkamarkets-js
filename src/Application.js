@@ -1,5 +1,11 @@
 const Web3 = require("web3");
-const PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
+
+let PolkamarketsSocialLogin = null;
+
+if (typeof window !== "undefined") {
+  PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
+}
+
 const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
 
 const ERC20Contract = require("./models/index").ERC20Contract;
@@ -39,7 +45,7 @@ class Application {
     // fixed gas price for txs (optional)
     this.gasPrice = gasPrice;
 
-    this.isSocialLogin = isSocialLogin;
+    this.isSocialLogin = !!PolkamarketsSocialLogin && isSocialLogin;
 
     if (this.isSocialLogin) {
       this.socialLoginParams = socialLoginParams;
