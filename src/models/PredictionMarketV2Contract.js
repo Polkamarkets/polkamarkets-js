@@ -724,7 +724,7 @@ class PredictionMarketV2Contract extends IContract {
     const prod = odds.reduce((a, b) => a * b, 1);
 
     for (let i = 0; i < odds.length; i++) {
-      distribution.push(Math.round(prod / odds[i] * 1000000));
+      distribution.push((Math.round(prod / odds[i] * 1000000)).toString());
     }
 
     return distribution;
