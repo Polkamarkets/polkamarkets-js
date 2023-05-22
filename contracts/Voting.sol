@@ -1,8 +1,8 @@
-pragma solidity ^0.6.0;
+pragma solidity ^0.8.18;
 pragma experimental ABIEncoderV2;
 
 // openzeppelin imports
-import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /// @title Upvoting / Downvoting Contract
@@ -42,7 +42,7 @@ contract Voting {
   // ------ Modifiers End ------
 
   /// @dev protocol is immutable and has no ownership
-  constructor(IERC20 _token, uint256 _requiredBalance) public {
+  constructor(IERC20 _token, uint256 _requiredBalance) {
     token = _token;
     requiredBalance = _requiredBalance;
   }
@@ -92,9 +92,9 @@ contract Voting {
     listToRemoveVote[msg.sender] = false;
 
     // emit events
-    emit ItemVoteAction(msg.sender, action, itemId, now);
+    emit ItemVoteAction(msg.sender, action, itemId, block.timestamp);
 
-    emit ItemVotesUpdated(itemId, item.upvotes, item.downvotes, now);
+    emit ItemVotesUpdated(itemId, item.upvotes, item.downvotes, block.timestamp);
   }
 
   /// @dev allows user to remove an upvote from an item
@@ -131,9 +131,9 @@ contract Voting {
     listToRemoveVote[msg.sender] = false;
 
     // emit events
-    emit ItemVoteAction(msg.sender, action, itemId, now);
+    emit ItemVoteAction(msg.sender, action, itemId, block.timestamp);
 
-    emit ItemVotesUpdated(itemId, item.upvotes, item.downvotes, now);
+    emit ItemVotesUpdated(itemId, item.upvotes, item.downvotes, block.timestamp);
   }
 
   /// @dev Returns the number of upvotes/downvotes of an item

@@ -42,17 +42,6 @@ class Application {
     this.isSocialLogin = isSocialLogin;
 
     if (this.isSocialLogin) {
-      if (!socialLoginParams) {
-        // create defaults
-        socialLoginParams = {
-          urls: ['http://localhost:3000'],
-          isTestnet: false,
-          networkConfig: {
-            chainId: ChainId.GOERLI,
-            dappAPIKey: '',
-          }
-        }
-      }
       this.socialLoginParams = socialLoginParams;
       this.socialLogin = PolkamarketsSocialLogin.singleton.getInstance(this.socialLoginParams);
     }

@@ -108,13 +108,11 @@ class IContract {
         });
       }
     } catch (error) {
-      console.log('error:', error);
       throw error;
     }
 
     // https://docs.ethers.org/v5/api/providers/types/#providers-TransactionResponse
     const receipt = await txResponse.wait();
-    console.log('receipt:', receipt);
 
     if (receipt.logs) {
       const events = receipt.logs.map(log => {
