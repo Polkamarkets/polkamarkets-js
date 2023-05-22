@@ -6,6 +6,8 @@ const prediction = require("../interfaces").predictionV2;
 const Numbers = require( "../utils/Numbers");
 const IContract = require( './IContract');
 
+const ERC20Contract = require('./ERC20Contract');
+
 const realitioLib = require('@reality.eth/reality-eth-lib/formatters/question');
 
 const actions = {
@@ -432,6 +434,26 @@ class PredictionMarketV2Contract extends IContract {
       liquidity: Numbers.fromDecimalsNumber(marketShares[0], 18),
       outcomes: Object.fromEntries(marketShares[1].map((item, index) => [index, Numbers.fromDecimalsNumber(item, 18)] ))
     };
+  }
+
+  /**
+   * @function getMarketDecimals
+   * @description Get Market Decimals
+   * @param {Integer} marketId
+   * @return {Integer} decimals
+   */
+  async getMarketDecimals({marketId}) {
+    try {
+      const marketAltData = await this.params.contract.getContract().methods.getMarketAltData(marketId).call();
+      const contractAddress = marketAltData[3];
+
+      const erc20Contract = new ERC20Contract({ ...this.params, contractAddress });
+
+      return await erc20Contract.getDecimalsAsync();
+    } catch (err) {
+      // defaulting to 18 decimals
+      return 18;
+    }
   }
 
   /* POST User Functions */
