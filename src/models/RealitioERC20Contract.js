@@ -4,6 +4,8 @@ const realitio = require("../interfaces").realitio;
 const Numbers = require("../utils/Numbers");
 const IContract = require('./IContract');
 
+const ERC20Contract = require('./ERC20Contract');
+
 /**
  * RealitioERC20 Contract Object
  * @constructor RealitioERC20Contract
@@ -19,6 +21,23 @@ class RealitioERC20Contract extends IContract {
   }
 
   /**
+   * @function getTokenDecimals
+   * @description Get Token Decimals
+   * @return {Integer} decimals
+   */
+  async getTokenDecimals() {
+    try {
+      const contractAddress = await this.params.contract.getContract().methods.token().call();
+      const erc20Contract = new ERC20Contract({ ...this.params, contractAddress });
+
+      return await erc20Contract.getDecimalsAsync();
+    } catch (err) {
+      // defaulting to 18 decimals
+      return 18;
+    }
+  }
+
+  /**
    * @function getQuestion
    * @description getQuestion
    * @param {bytes32} questionId
@@ -28,10 +47,11 @@ class RealitioERC20Contract extends IContract {
     const question = await this.getContract().methods.questions(questionId).call();
     const isFinalized = await this.getContract().methods.isFinalized(questionId).call();
     const isClaimed = isFinalized && question.history_hash === Numbers.nullHash();
+    const decimals = await this.getTokenDecimals();
 
     return {
       id: questionId,
-      bond: Numbers.fromDecimalsNumber(question.bond, 18),
+      bond: Numbers.fromDecimalsNumber(question.bond, decimals),
       bestAnswer: question.best_answer,
       finalizeTs: question.finalize_ts,
       isFinalized,
@@ -70,12 +90,14 @@ class RealitioERC20Contract extends IContract {
 
     const answers = await this.getEvents('LogNewAnswer', { question_id: questionId, user });
 
+    const decimals = await this.getTokenDecimals();
+
     answers.forEach((answer) => {
       const answerId = answer.returnValues.answer;
 
       if (!bonds[answerId]) bonds[answerId] = 0;
 
-      bonds[answerId] += Numbers.fromDecimalsNumber(answer.returnValues.bond, 18);
+      bonds[answerId] += Numbers.fromDecimalsNumber(answer.returnValues.bond, decimals);
     });
 
     return bonds;
@@ -89,7 +111,8 @@ class RealitioERC20Contract extends IContract {
    * @param {Integer} amount
    */
   async submitAnswerERC20({ questionId, answerId, amount }) {
-    let amountDecimals = Numbers.toSmartContractDecimals(amount, 18);
+    const decimals = await this.getTokenDecimals();
+    let amountDecimals = Numbers.toSmartContractDecimals(amount, decimals);
 
     return await this.__sendTx(
       this.getContract().methods.submitAnswerERC20(
@@ -114,6 +137,7 @@ class RealitioERC20Contract extends IContract {
     const events = await this.getEvents('LogNewAnswer', { user: account });
     const claimEvents = await this.getEvents('LogClaim', { user: account });
     const withdrawEvents = await this.getEvents('LogWithdraw', { user: account });
+    const decimals = await this.getTokenDecimals();
 
     const lastWithdrawBlockNumber = withdrawEvents[withdrawEvents.length - 1]
       ? withdrawEvents[withdrawEvents.length - 1].blockNumber
@@ -131,7 +155,7 @@ class RealitioERC20Contract extends IContract {
         bonds[questionId].answers[event.returnValues.answer] = 0;
       }
 
-      const bond = Numbers.fromDecimalsNumber(event.returnValues.bond, 18)
+      const bond = Numbers.fromDecimalsNumber(event.returnValues.bond, decimals)
 
       bonds[questionId].total += bond;
       bonds[questionId].answers[event.returnValues.answer] += bond;
@@ -140,7 +164,7 @@ class RealitioERC20Contract extends IContract {
     claimEvents.forEach((event) => {
       const questionId = event.returnValues.question_id;
 
-      const amount = Numbers.fromDecimalsNumber(event.returnValues.amount, 18)
+      const amount = Numbers.fromDecimalsNumber(event.returnValues.amount, decimals);
 
       bonds[questionId].claimed += amount;
 
@@ -162,13 +186,14 @@ class RealitioERC20Contract extends IContract {
     if (!account) return [];
 
     const events = await this.getEvents('LogNewAnswer', { user: account });
+    const decimals = await this.getTokenDecimals();
 
     return events.map(event => {
       return {
         action: 'Bond',
         questionId: event.returnValues.question_id,
         answerId: event.returnValues.answer,
-        value: Numbers.fromDecimalsNumber(event.returnValues.bond, 18),
+        value: Numbers.fromDecimalsNumber(event.returnValues.bond, decimals),
         timestamp: Numbers.fromBigNumberToInteger(event.returnValues.ts, 18),
         transactionHash: event.transactionHash
       }
