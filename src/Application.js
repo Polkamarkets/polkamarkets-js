@@ -10,10 +10,8 @@ const RealitioERC20Contract = require("./models/index").RealitioERC20Contract;
 const VotingContract = require("./models/index").VotingContract;
 const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
 const WETH9Contract = require("./models/index").WETH9Contract;
-const ChainId = require('@biconomy/core-types').ChainId;
 
 const Account = require('./utils/Account');
-require('@biconomy/web3-auth/dist/src/style.css'); // needed for the modal styles
 
 
 const networksEnum = Object.freeze({
