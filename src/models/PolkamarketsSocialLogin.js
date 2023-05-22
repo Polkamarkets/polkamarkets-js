@@ -1,4 +1,9 @@
-const { default: SocialLogin } = require("@biconomy/web3-auth");
+let SocialLogin = null;
+
+if (typeof window !== 'undefined') {
+  SocialLogin = require('@biconomy/web3-auth');
+}
+
 const PolkamarketsSmartAccount = require("./PolkamarketsSmartAccount");
 const SafeEventEmitter = require('@metamask/safe-event-emitter').default;
 const ethers = require('ethers').ethers;
