@@ -2,6 +2,12 @@ const { default: SocialLogin } = require("@biconomy/web3-auth");
 const PolkamarketsSmartAccount = require("./PolkamarketsSmartAccount");
 const SafeEventEmitter = require('@metamask/safe-event-emitter').default;
 const ethers = require('ethers').ethers;
+const { OpenloginAdapter } = require('@web3auth/openlogin-adapter');
+const Web3AuthCore = require('@web3auth/core').Web3AuthCore;
+const { WALLET_ADAPTERS, CHAIN_NAMESPACES } = require('@web3auth/base');
+const { MetamaskAdapter } = require('@web3auth/metamask-adapter');
+const { WalletConnectV1Adapter } = require('@web3auth/wallet-connect-v1-adapter');
+const { QRCodeModal } = require('@walletconnect/qrcode-modal');
 
 class PolkamarketsSocialLogin extends SocialLogin {
 
@@ -43,8 +49,8 @@ class PolkamarketsSocialLogin extends SocialLogin {
   static singleton = (() => {
     let socialLogin;
 
-    function createInstance(web3AuthClientId, useCustomModal) {
-      const instance = new PolkamarketsSocialLogin(web3AuthClientId, useCustomModal);
+    function createInstance(web3AuthConfig, useCustomModal) {
+      const instance = new PolkamarketsSocialLogin(web3AuthConfig, useCustomModal);
       instance.eventEmitter = new SafeEventEmitter();
       return instance;
     }
@@ -52,7 +58,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
     return {
       getInstance: (socialLoginParams) => {
         if (!socialLogin) {
-          socialLogin = createInstance(socialLoginParams.web3AuthClientId, socialLoginParams.useCustomModal);
+          socialLogin = createInstance(socialLoginParams.web3AuthConfig, socialLoginParams.useCustomModal);
           socialLogin.socialLoginParams = socialLoginParams;
           this.initSocialLogin(socialLogin, socialLoginParams.urls, socialLoginParams.isTestnet, socialLoginParams.whiteLabelData, socialLoginParams.networkConfig);
         }
@@ -61,12 +67,87 @@ class PolkamarketsSocialLogin extends SocialLogin {
     };
   })();
 
-  constructor(web3AuthClientId = null, useCustomModal = false) {
+  constructor(web3AuthConfig = null, useCustomModal = false) {
     super();
 
     this.useCustomModal = useCustomModal;
-    if (web3AuthClientId) {
-      this.clientId = web3AuthClientId;
+    this.web3AuthConfig = web3AuthConfig;
+
+    if (this.web3AuthConfig && this.web3AuthConfig.clientId) {
+      this.clientId = this.web3AuthConfig.clientId;
+    }
+  }
+
+  async init(socialLoginDTO) {
+    const finalDTO = {
+      chainId: '0x1',
+      whitelistUrls: {},
+      network: 'mainnet',
+      whteLableData: this.whiteLabel
+    }
+    if (socialLoginDTO) {
+      if (socialLoginDTO.chainId) finalDTO.chainId = socialLoginDTO.chainId
+      if (socialLoginDTO.network) finalDTO.network = socialLoginDTO.network
+      if (socialLoginDTO.whitelistUrls) finalDTO.whitelistUrls = socialLoginDTO.whitelistUrls
+      if (socialLoginDTO.whteLableData) this.whiteLabel = socialLoginDTO.whteLableData
+    }
+    try {
+      const web3AuthCore = new Web3AuthCore({
+        clientId: this.clientId,
+        chainConfig: {
+          chainNamespace: CHAIN_NAMESPACES.EIP155,
+          chainId: finalDTO.chainId
+        }
+      })
+
+      const loginConfig = {};
+
+      if (this.web3AuthConfig && this.web3AuthConfig.drip) {
+        loginConfig.discordcustom = {
+          name: 'Discord',
+          verifier: this.web3AuthConfig.drip.customVerifier,
+          typeOfLogin: 'discord',
+          clientId: this.web3AuthConfig.drip.clientId,
+        };
+      }
+
+      const openloginAdapter = new OpenloginAdapter({
+        adapterSettings: {
+          clientId: this.clientId,
+          network: finalDTO.network,
+          uxMode: 'popup',
+          loginConfig,
+          whiteLabel: {
+            name: this.whiteLabel.name,
+            logoLight: this.whiteLabel.logo,
+            logoDark: this.whiteLabel.logo,
+            defaultLanguage: 'en',
+            dark: true
+          },
+          originData: finalDTO.whitelistUrls
+        }
+      })
+      const metamaskAdapter = new MetamaskAdapter({
+        clientId: this.clientId
+      })
+      const wcAdapter = new WalletConnectV1Adapter({
+        adapterSettings: {
+          qrcodeModal: QRCodeModal
+        }
+      })
+
+      web3AuthCore.configureAdapter(openloginAdapter)
+      web3AuthCore.configureAdapter(metamaskAdapter)
+      web3AuthCore.configureAdapter(wcAdapter)
+      await web3AuthCore.init()
+      this.web3auth = web3AuthCore
+      if (web3AuthCore && web3AuthCore.provider) {
+        this.provider = web3AuthCore.provider
+      }
+
+      this.isInit = true
+    } catch (error) {
+      console.error(error)
     }
   }
 
@@ -173,8 +254,50 @@ class PolkamarketsSocialLogin extends SocialLogin {
     return success;
   }
 
+  getConnectToOptions(loginProvider) {
+    let connectToOptions = {
+      loginProvider,
+    }
+
+    if (loginProvider === 'discord' && this.web3AuthConfig && this.web3AuthConfig.drip) {
+      connectToOptions = {
+        loginProvider: 'discordcustom',
+        extraLoginOptions: {
+          scope: 'identify email guilds',
+        }
+      };
+    }
+
+    return connectToOptions;
+  }
+
+  async biconomySocialLogin(loginProvider) {
+    if (!this.web3auth) {
+      console.info('web3auth not initialized yet')
+      return
+    }
+    try {
+
+      const web3authProvider = await this.web3auth.connectTo(
+        WALLET_ADAPTERS.OPENLOGIN,
+        this.getConnectToOptions(loginProvider)
+      );
+
+      if (!web3authProvider) {
+        console.error('web3authProvider is null')
+        return null
+      }
+
+      this.provider = web3authProvider
+      return web3authProvider
+    } catch (error) {
+      console.error(error)
+      return error
+    }
+  }
+
   async socialLogin(loginProvider) {
-    const resp = await super.socialLogin(loginProvider);
+    const resp = await this.biconomySocialLogin(loginProvider);
 
     return this.afterSocialLogin(resp);
   }

@@ -373,6 +373,12 @@ class Application {
       PolkamarketsSmartAccount.singleton.clearInstance();
     }
   }
+
+  async getSocialLoginUserInfo() {
+    if (this.socialLogin?.provider) {
+      return await this.socialLogin.getUserInfo();
+    }
+  }
 }
 
 module.exports = Application;
