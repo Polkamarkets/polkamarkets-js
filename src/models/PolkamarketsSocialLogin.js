@@ -1,7 +1,7 @@
 let SocialLogin = null;
 
 if (typeof window !== 'undefined') {
-  SocialLogin = require('@biconomy/web3-auth');
+  SocialLogin = require('@biconomy/web3-auth').default;
 }
 
 const PolkamarketsSmartAccount = require("./PolkamarketsSmartAccount");
