@@ -4,7 +4,7 @@ const IContract = require('./IContract');
 
 class ERC20Contract extends IContract {
   constructor(params) {
-    super({ abi: ierc20, ...params });
+    super({...params, abi: ierc20});
     this.contractName = 'erc20';
   }
 
@@ -47,6 +47,10 @@ class ERC20Contract extends IContract {
     return await this.getContract().methods.decimals().call();
   }
 
+  async balanceOf({ address }) {
+    return Numbers.fromDecimalsNumber(await this.getContract().methods.balanceOf(address).call(), this.getDecimals());
+  }
+
   async isApproved({ address, amount, spenderAddress }) {
     try {
       let approvedAmount = Numbers.fromDecimals(
@@ -76,6 +80,23 @@ class ERC20Contract extends IContract {
     } catch (err) {
       throw err;
     }
+  }
+
+  async name() {
+    return await this.getContract().methods.name().call();
+  }
+
+  async symbol() {
+    return await this.getContract().methods.symbol().call();
+  }
+
+  async getTokenInfo() {
+    return {
+      name: await this.name(),
+      address: this.getAddress(),
+      ticker: await this.symbol(),
+      decimals: await this.getDecimalsAsync(),
+    };
   }
 }
 

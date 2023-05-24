@@ -1,11 +1,22 @@
 const Web3 = require("web3");
 
+let PolkamarketsSocialLogin = null;
+
+if (typeof window !== "undefined") {
+  PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
+}
+
+const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
+
 const ERC20Contract = require("./models/index").ERC20Contract;
 const PredictionMarketContract = require("./models/index").PredictionMarketContract;
+const PredictionMarketV2Contract = require("./models/index").PredictionMarketV2Contract;
 const AchievementsContract = require("./models/index").AchievementsContract;
 const RealitioERC20Contract = require("./models/index").RealitioERC20Contract;
 const VotingContract = require("./models/index").VotingContract;
 const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
+const WETH9Contract = require("./models/index").WETH9Contract;
+const ChainId = require('@biconomy/core-types').ChainId;
 
 const Account = require('./utils/Account');
 
@@ -22,7 +33,9 @@ class Application {
     web3Provider,
     web3PrivateKey,
     web3EventsProvider,
-    gasPrice
+    gasPrice,
+    isSocialLogin = false,
+    socialLoginParams,
   }) {
     this.web3Provider = web3Provider;
     // evm logs http source (optional)
@@ -30,8 +43,15 @@ class Application {
     // fixed gas price for txs (optional)
     this.gasPrice = gasPrice;
 
+    this.isSocialLogin = !!PolkamarketsSocialLogin && isSocialLogin;
+
+    if (this.isSocialLogin) {
+      this.socialLoginParams = socialLoginParams;
+      this.socialLogin = PolkamarketsSocialLogin.singleton.getInstance(this.socialLoginParams);
+    }
+
     // IMPORTANT: this parameter should only be used for testing purposes
-    if (web3PrivateKey) {
+    if (web3PrivateKey && !this.isSocialLogin) {
       this.start();
       this.login();
       this.account = new Account(this.web3, this.web3.eth.accounts.privateKeyToAccount(web3PrivateKey));
@@ -59,17 +79,21 @@ class Application {
    * @description Login with Metamask or a web3 provider
    */
   async login() {
-    try {
-      if (typeof window === "undefined") { return false; }
-      if (window.ethereum) {
-        window.web3 = new Web3(window.ethereum);
-        this.web3 = window.web3;
-        await window.ethereum.enable();
-        return true;
+    if (this.isSocialLogin) {
+      return this.socialLogin.login();
+    } else {
+      try {
+        if (typeof window === "undefined") { return false; }
+        if (window.ethereum) {
+          window.web3 = new Web3(window.ethereum);
+          this.web3 = window.web3;
+          await window.ethereum.enable();
+          return true;
+        }
+        return false;
+      } catch (err) {
+        throw err;
       }
-      return false;
-    } catch (err) {
-      throw err;
     }
   };
 
@@ -78,13 +102,17 @@ class Application {
    * @description Returns wether metamask account is connected to service or not
    */
   async isLoggedIn() {
-    try {
-      if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
-      const accounts = await ethereum.request({ method: 'eth_accounts' });
+    if (this.isSocialLogin) {
+      return await this.socialLogin?.isLoggedIn();
+    } else {
+      try {
+        if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
+        const accounts = await ethereum.request({ method: 'eth_accounts' });
 
-      return accounts.length > 0;
-    } catch (err) {
-      return false;
+        return accounts.length > 0;
+      } catch (err) {
+        return false;
+      }
     }
   };
 
@@ -104,7 +132,8 @@ class Application {
         contractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
       });
     } catch (err) {
       throw err;
@@ -112,7 +141,27 @@ class Application {
   };
 
   /**
-   * @name getPredictionMarketContract
+   * @name getPredictionMarketV2Contract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PredictionMarket Contract
+   */
+  getPredictionMarketV2Contract({ contractAddress = null } = {}) {
+    try {
+      return new PredictionMarketV2Contract({
+        web3: this.web3,
+        contractAddress,
+        acc: this.account,
+        web3EventsProvider: this.web3EventsProvider,
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name getAchievementsContract
    * @param {Address} ContractAddress (Opt) If it is deployed
    * @description Create a PredictionMarket Contract
    */
@@ -129,7 +178,8 @@ class Application {
         realitioERC20ContractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
       });
     } catch (err) {
       throw err;
@@ -148,7 +198,8 @@ class Application {
         contractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
       });
     } catch (err) {
       throw err;
@@ -167,7 +218,8 @@ class Application {
         contractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
       });
     } catch (err) {
       throw err;
@@ -186,7 +238,8 @@ class Application {
         contractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
       });
     } catch (err) {
       throw err;
@@ -205,7 +258,28 @@ class Application {
         contractAddress: contractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name getWETH9Contract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a WETH9 Contract
+   */
+  getWETH9Contract({ contractAddress = null }) {
+    try {
+      return new WETH9Contract({
+        web3: this.web3,
+        contractAddress: contractAddress,
+        acc: this.account,
+        web3EventsProvider: this.web3EventsProvider,
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
       });
     } catch (err) {
       throw err;
@@ -235,8 +309,12 @@ class Application {
    * @returns {Address} Address
    */
   async getAddress() {
-    const accounts = await this.web3.eth.getAccounts();
-    return accounts[0];
+    if (this.isSocialLogin) {
+      return await this.socialLogin.getAddress();
+    } else {
+      const accounts = await this.web3.eth.getAccounts();
+      return accounts[0];
+    }
   };
 
   /**
@@ -249,6 +327,45 @@ class Application {
     let wei = await window.web3.eth.getBalance(address);
     return this.web3.utils.fromWei(wei, "ether");
   };
+
+  async socialLoginGoogle() {
+    return await this.socialLogin.directLogin('google');
+  }
+
+  async socialLoginFacebook() {
+    return await this.socialLogin.directLogin('facebook');
+  }
+
+  async socialLoginTwitter() {
+    return await this.socialLogin.directLogin('twitter');
+  }
+
+  async socialLoginGithub() {
+    return await this.socialLogin.directLogin('github');
+  }
+
+  async socialLoginDiscord() {
+    return await this.socialLogin.directLogin('discord');
+  }
+
+  async socialLoginEmail(email) {
+    return await this.socialLogin.directLogin('email', email);
+  }
+
+  async socialLoginMetamask() {
+    return await this.socialLogin.directLogin('metamask');
+  }
+
+  async socialLoginWalletConnect() {
+    return await this.socialLogin.directLogin('walletconnect');
+  }
+
+  async socialLoginLogout() {
+    if (this.socialLogin?.provider) {
+      this.socialLogin.logout();
+      PolkamarketsSmartAccount.singleton.clearInstance();
+    }
+  }
 }
 
 module.exports = Application;
