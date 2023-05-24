@@ -38,8 +38,13 @@ module.exports = {
       gasPrice: 0
     },
     polygon: {
-      provider: new HDWalletProvider(mnemonic, "https://polygon-rpc.com"),
-      network_id: 137,
+      provider: new HDWalletProvider(mnemonic, "https://rpc-mainnet.maticvigil.com"),
+      network_id: "137",
+      gasPrice: 200000000000,
+      skipDryRun: true,
+      networkCheckTimeout: 10000,
+      timeoutBlocks: 200,
+      gas: 25000000,
     },
     mumbai: {
       provider: new HDWalletProvider(mnemonic, "https://rpc-mumbai.maticvigil.com"),
