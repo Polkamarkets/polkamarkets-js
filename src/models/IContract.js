@@ -68,7 +68,9 @@ class IContract {
     return f.send({
       from: acc,
       value: value,
-      gasPrice: this.params.gasPrice
+      gasPrice: this.params.gasPrice,
+      maxPriorityFeePerGas: null,
+      maxFeePerGas: null
     })
       .on("confirmation", (confirmationNumber, receipt) => {
         callback(confirmationNumber)
