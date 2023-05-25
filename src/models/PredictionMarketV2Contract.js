@@ -6,6 +6,8 @@ const prediction = require("../interfaces").predictionV2;
 const Numbers = require( "../utils/Numbers");
 const IContract = require( './IContract');
 
+const ERC20Contract = require('./ERC20Contract');
+
 const realitioLib = require('@reality.eth/reality-eth-lib/formatters/question');
 
 const actions = {
@@ -46,7 +48,15 @@ class PredictionMarketV2Contract extends IContract {
       .requiredBalance()
       .call();
 
-    return Numbers.fromDecimalsNumber(requiredBalance, 18)
+    const requiredBalanceToken = await this.params.contract
+      .getContract()
+      .methods
+      .requiredBalanceToken()
+      .call();
+
+    const decimals = await this.getTokenDecimals({ contractAddress: requiredBalanceToken });
+
+    return Numbers.fromDecimalsNumber(requiredBalance, decimals)
   }
 
     /**
@@ -89,13 +99,14 @@ class PredictionMarketV2Contract extends IContract {
   async getMarketData({marketId}) {
     const marketData = await this.params.contract.getContract().methods.getMarketData(marketId).call();
     const outcomeIds = await this.params.contract.getContract().methods.getMarketOutcomeIds(marketId).call();
+    const decimals = await this.getMarketDecimals({marketId});
 
     return {
       name: '', // TODO: remove; deprecated
       closeDateTime: moment.unix(marketData[1]).format("YYYY-MM-DD HH:mm"),
       state: parseInt(marketData[0]),
       oracleAddress: '0x0000000000000000000000000000000000000000',
-      liquidity: Numbers.fromDecimalsNumber(marketData[2], 18),
+      liquidity: Numbers.fromDecimalsNumber(marketData[2], decimals),
       outcomeIds: outcomeIds.map((outcomeId) => Numbers.fromBigNumberToInteger(outcomeId, 18))
     };
   }
@@ -111,11 +122,12 @@ class PredictionMarketV2Contract extends IContract {
    */
   async getOutcomeData({marketId, outcomeId}) {
     const outcomeData = await this.params.contract.getContract().methods.getMarketOutcomeData(marketId, outcomeId).call();
+    const decimals = await this.getMarketDecimals({marketId});
 
     return {
       name: '', // TODO: remove; deprecated
       price: Numbers.fromDecimalsNumber(outcomeData[0], 18),
-      shares: Numbers.fromDecimalsNumber(outcomeData[1], 18),
+      shares: Numbers.fromDecimalsNumber(outcomeData[1], decimals),
     };
   }
 
@@ -285,6 +297,7 @@ class PredictionMarketV2Contract extends IContract {
           }
         };
       } else {
+        const decimals = await this.getMarketDecimals({marketId});
         const marketShares = await this.getContract().methods.getUserMarketShares(marketId, user).call();
         let claimStatus;
         try {
@@ -314,7 +327,7 @@ class PredictionMarketV2Contract extends IContract {
           return [
             index,
             {
-              shares: Numbers.fromDecimalsNumber(item, 18),
+              shares: Numbers.fromDecimalsNumber(item, decimals),
               price: this.getAverageOutcomeBuyPrice({events, marketId, outcomeId: index})
             }
           ];
@@ -322,7 +335,7 @@ class PredictionMarketV2Contract extends IContract {
 
         portfolio = {
           liquidity: {
-            shares: Numbers.fromDecimalsNumber(marketShares[0], 18),
+            shares: Numbers.fromDecimalsNumber(marketShares[0], decimals),
             price: this.getAverageAddLiquidityPrice({events, marketId}),
           },
           outcomes: outcomeShares,
@@ -331,7 +344,7 @@ class PredictionMarketV2Contract extends IContract {
             winningsClaimed: claimStatus[1],
             liquidityToClaim: claimStatus[2],
             liquidityClaimed: claimStatus[3],
-            liquidityFees: Numbers.fromDecimalsNumber(claimStatus[4], 18)
+            liquidityFees: Numbers.fromDecimalsNumber(claimStatus[4], decimals)
           }
         };
       }
@@ -354,11 +367,12 @@ class PredictionMarketV2Contract extends IContract {
     const account = await this.getMyAccount();
     if (!account) return [];
 
+    const decimals = await this.getMarketDecimals({marketId});
     const marketShares = await this.getContract().methods.getUserMarketShares(marketId, account).call();
-    const outcomeShares = Object.fromEntries(marketShares[1].map((item, index) => [index, Numbers.fromDecimalsNumber(item, 18)] ));
+    const outcomeShares = Object.fromEntries(marketShares[1].map((item, index) => [index, Numbers.fromDecimalsNumber(item, decimals)] ));
 
     return  {
-      liquidityShares: Numbers.fromDecimalsNumber(marketShares[0], 18),
+      liquidityShares: Numbers.fromDecimalsNumber(marketShares[0], decimals),
       outcomeShares
     };
   }
@@ -373,14 +387,20 @@ class PredictionMarketV2Contract extends IContract {
   async getActions({ user }) {
     const events = await this.getEvents('MarketActionTx', { user });
 
+    // fetching decimals for each market (unique)
+    const marketIds = events.map(event => event.returnValues.marketId).filter((x, i, a) => a.indexOf(x) == i);
+    const marketDecimals = await Promise.all(marketIds.map(marketId => this.getMarketDecimals({marketId})));
+
     // filtering by address
     return events.map(event => {
+      const decimals = marketDecimals[marketIds.indexOf(event.returnValues.marketId)];
+
       return {
         action: actions[Numbers.fromBigNumberToInteger(event.returnValues.action, 18)],
         marketId: Numbers.fromBigNumberToInteger(event.returnValues.marketId, 18),
         outcomeId: Numbers.fromBigNumberToInteger(event.returnValues.outcomeId, 18),
-        shares: Numbers.fromDecimalsNumber(event.returnValues.shares, 18),
-        value: Numbers.fromDecimalsNumber(event.returnValues.value, 18),
+        shares: Numbers.fromDecimalsNumber(event.returnValues.shares, decimals),
+        value: Numbers.fromDecimalsNumber(event.returnValues.value, decimals),
         timestamp: Numbers.fromBigNumberToInteger(event.returnValues.timestamp, 18),
         transactionHash: event.transactionHash,
       }
@@ -426,12 +446,43 @@ class PredictionMarketV2Contract extends IContract {
    * @return {Object} shares
    */
   async getMarketShares({marketId}) {
+    const decimals = await this.getMarketDecimals({marketId});
     const marketShares = await this.getContract().methods.getMarketShares(marketId).call();
 
     return {
-      liquidity: Numbers.fromDecimalsNumber(marketShares[0], 18),
-      outcomes: Object.fromEntries(marketShares[1].map((item, index) => [index, Numbers.fromDecimalsNumber(item, 18)] ))
+      liquidity: Numbers.fromDecimalsNumber(marketShares[0], decimals),
+      outcomes: Object.fromEntries(marketShares[1].map((item, index) => [index, Numbers.fromDecimalsNumber(item, decimals)] ))
     };
+  }
+
+  /**
+   * @function getTokenDecimals
+   * @description Get Token Decimals
+   * @param {address} contractAddress
+   * @return {Integer} decimals
+   */
+  async getTokenDecimals({contractAddress}) {
+    try {
+      const erc20Contract = new ERC20Contract({ ...this.params, contractAddress });
+
+      return await erc20Contract.getDecimalsAsync();
+    } catch (err) {
+      // defaulting to 18 decimals
+      return 18;
+    }
+  }
+
+  /**
+   * @function getMarketDecimals
+   * @description Get Market Decimals
+   * @param {Integer} marketId
+   * @return {Integer} decimals
+   */
+  async getMarketDecimals({marketId}) {
+    const marketAltData = await this.params.contract.getContract().methods.getMarketAltData(marketId).call();
+    const contractAddress = marketAltData[3];
+
+    return await this.getTokenDecimals({ contractAddress });
   }
 
   /* POST User Functions */
@@ -459,7 +510,8 @@ class PredictionMarketV2Contract extends IContract {
     treasuryFee = 0,
     treasury = '0x0000000000000000000000000000000000000000',
   }) {
-    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    const decimals = await this.getTokenDecimals({ contractAddress: token });
+    const valueToWei = Numbers.toSmartContractDecimals(value, decimals);
     const title = `${name};${description}`;
     const question = realitioLib.encodeText('single-select', title, outcomes, category);
     let distribution = [];
@@ -518,11 +570,12 @@ class PredictionMarketV2Contract extends IContract {
     treasuryFee = 0,
     treasury = '0x0000000000000000000000000000000000000000',
   }) {
-    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    const token = await this.getWETHAddress();
+    const decimals = await this.getTokenDecimals({ contractAddress: token });
+    const valueToWei = Numbers.toSmartContractDecimals(value, decimals);
     const title = `${name};${description}`;
     const question = realitioLib.encodeText('single-select', title, outcomes, category);
     let distribution = [];
-    const token = await this.getWETHAddress();
 
     if (odds.length > 0) {
       if (odds.length !== outcomes.length) {
@@ -566,7 +619,8 @@ class PredictionMarketV2Contract extends IContract {
    * @param {Integer} value
    */
   async addLiquidity({marketId, value, wrapped = false}) {
-    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    const decimals = await this.getMarketDecimals({marketId});
+    const valueToWei = Numbers.toSmartContractDecimals(value, decimals);
 
     if (wrapped) {
       return await this.__sendTx(
@@ -588,7 +642,8 @@ class PredictionMarketV2Contract extends IContract {
    * @param {Integer} shares
    */
   async removeLiquidity({marketId, shares, wrapped = false}) {
-    shares = Numbers.toSmartContractDecimals(shares, 18);
+    const decimals = await this.getMarketDecimals({marketId});
+    shares = Numbers.toSmartContractDecimals(shares, decimals);
 
     if (wrapped) {
       return await this.__sendTx(
@@ -610,8 +665,9 @@ class PredictionMarketV2Contract extends IContract {
    * @param {Integer} value
    */
   async buy ({ marketId, outcomeId, value, minOutcomeSharesToBuy, wrapped = false}) {
-    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
-    minOutcomeSharesToBuy = Numbers.toSmartContractDecimals(minOutcomeSharesToBuy, 18);
+    const decimals = await this.getMarketDecimals({marketId});
+    const valueToWei = Numbers.toSmartContractDecimals(value, decimals);
+    minOutcomeSharesToBuy = Numbers.toSmartContractDecimals(minOutcomeSharesToBuy, decimals);
 
     if (wrapped) {
       return await this.__sendTx(
@@ -634,8 +690,9 @@ class PredictionMarketV2Contract extends IContract {
    * @param {Integer} shares
    */
   async sell({marketId, outcomeId, value, maxOutcomeSharesToSell, wrapped = false}) {
-    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
-    maxOutcomeSharesToSell = Numbers.toSmartContractDecimals(maxOutcomeSharesToSell, 18);
+    const decimals = await this.getMarketDecimals({marketId});
+    const valueToWei = Numbers.toSmartContractDecimals(value, decimals);
+    maxOutcomeSharesToSell = Numbers.toSmartContractDecimals(maxOutcomeSharesToSell, decimals);
 
     if (wrapped) {
       return await this.__sendTx(
@@ -692,7 +749,8 @@ class PredictionMarketV2Contract extends IContract {
   };
 
   async calcBuyAmount({ marketId, outcomeId, value }) {
-    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    const decimals = await this.getMarketDecimals({marketId});
+    const valueToWei = Numbers.toSmartContractDecimals(value, decimals);
 
     const amount = await this.getContract()
       .methods.calcBuyAmount(
@@ -702,11 +760,12 @@ class PredictionMarketV2Contract extends IContract {
       )
       .call();
 
-    return Numbers.fromDecimalsNumber(amount, 18);
+    return Numbers.fromDecimalsNumber(amount, decimals);
   }
 
   async calcSellAmount({ marketId, outcomeId, value }) {
-    const valueToWei = Numbers.toSmartContractDecimals(value, 18);
+    const decimals = await this.getMarketDecimals({marketId});
+    const valueToWei = Numbers.toSmartContractDecimals(value, decimals);
 
     const amount = await this.getContract()
       .methods.calcSellAmount(
@@ -716,7 +775,7 @@ class PredictionMarketV2Contract extends IContract {
       )
       .call();
 
-    return Numbers.fromDecimalsNumber(amount, 18);
+    return Numbers.fromDecimalsNumber(amount, decimals);
   }
 
   calcDistribution({ odds }) {
