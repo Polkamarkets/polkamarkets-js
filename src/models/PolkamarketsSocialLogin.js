@@ -107,12 +107,12 @@ class PolkamarketsSocialLogin extends SocialLogin {
 
       const loginConfig = {};
 
-      if (this.web3AuthConfig && this.web3AuthConfig.drip) {
+      if (this.web3AuthConfig && this.web3AuthConfig.discord) {
         loginConfig.discordcustom = {
           name: 'Discord',
-          verifier: this.web3AuthConfig.drip.customVerifier,
+          verifier: this.web3AuthConfig.discord.customVerifier,
           typeOfLogin: 'discord',
-          clientId: this.web3AuthConfig.drip.clientId,
+          clientId: this.web3AuthConfig.discord.clientId,
         };
       }
 
@@ -264,7 +264,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
       loginProvider,
     }
 
-    if (loginProvider === 'discord' && this.web3AuthConfig && this.web3AuthConfig.drip) {
+    if (loginProvider === 'discord' && this.web3AuthConfig && this.web3AuthConfig.discord) {
       connectToOptions = {
         loginProvider: 'discordcustom',
         extraLoginOptions: {
