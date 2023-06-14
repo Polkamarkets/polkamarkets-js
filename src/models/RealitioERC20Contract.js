@@ -1,6 +1,8 @@
 const _ = require("lodash");
 
 const realitio = require("../interfaces").realitio;
+const ierc20 = require("../interfaces").ierc20;
+
 const Numbers = require("../utils/Numbers");
 const IContract = require('./IContract');
 
@@ -28,7 +30,7 @@ class RealitioERC20Contract extends IContract {
   async getTokenDecimals() {
     try {
       const contractAddress = await this.params.contract.getContract().methods.token().call();
-      const erc20Contract = new ERC20Contract({ ...this.params, contractAddress });
+      const erc20Contract = new ERC20Contract({ ...this.params, contractAddress, abi: ierc20 });
 
       return await erc20Contract.getDecimalsAsync();
     } catch (err) {

@@ -2,6 +2,7 @@ const _ =  require("lodash");
 const moment = require("moment");
 
 const prediction = require("../interfaces").predictionV2;
+const ierc20 = require("../interfaces").ierc20;
 
 const Numbers = require( "../utils/Numbers");
 const IContract = require( './IContract');
@@ -463,7 +464,7 @@ class PredictionMarketV2Contract extends IContract {
    */
   async getTokenDecimals({contractAddress}) {
     try {
-      const erc20Contract = new ERC20Contract({ ...this.params, contractAddress });
+      const erc20Contract = new ERC20Contract({ ...this.params, contractAddress, abi: ierc20 });
 
       return await erc20Contract.getDecimalsAsync();
     } catch (err) {

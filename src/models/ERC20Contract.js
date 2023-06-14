@@ -3,8 +3,8 @@ const Numbers = require("../utils/Numbers");
 const IContract = require('./IContract');
 
 class ERC20Contract extends IContract {
-  constructor(params) {
-    super({...params, abi: ierc20});
+  constructor(params, abi) {
+    super({...params, abi: params.abi || ierc20});
     this.contractName = 'erc20';
   }
 
