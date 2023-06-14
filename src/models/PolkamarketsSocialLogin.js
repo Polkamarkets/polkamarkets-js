@@ -262,6 +262,9 @@ class PolkamarketsSocialLogin extends SocialLogin {
   getConnectToOptions(loginProvider) {
     let connectToOptions = {
       loginProvider,
+      extraLoginOptions: {
+        scope: 'email'
+      }
     }
 
     if (loginProvider === 'discord' && this.web3AuthConfig && this.web3AuthConfig.discord) {
