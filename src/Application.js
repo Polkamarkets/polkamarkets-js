@@ -2,7 +2,7 @@ const Web3 = require("web3");
 
 let PolkamarketsSocialLogin = null;
 
-if (typeof window !== "undefined") {
+if (typeof window !== "undefined" && typeof window.document.body !== 'undefined') {
   PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
 }
 

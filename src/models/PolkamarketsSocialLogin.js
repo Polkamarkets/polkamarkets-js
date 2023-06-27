@@ -1,6 +1,6 @@
 let SocialLogin = null;
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof window.document.body !== 'undefined') {
   SocialLogin = require('@biconomy/web3-auth').default;
 }
 
