@@ -1,8 +1,9 @@
 const Web3 = require("web3");
+require('dotenv').config();
 
 let PolkamarketsSocialLogin = null;
 
-if (typeof window !== "undefined" && typeof window.document.body !== 'undefined') {
+if (typeof window !== "undefined" && process.env.POLKAMARKETS_SOCIAL_LOGIN) {
   PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
 }
 

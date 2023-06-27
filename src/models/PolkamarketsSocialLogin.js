@@ -1,6 +1,7 @@
 let SocialLogin = null;
+require('dotenv').config();
 
-if (typeof window !== 'undefined' && typeof window.document.body !== 'undefined') {
+if (typeof window !== 'undefined' && process.env.POLKAMARKETS_SOCIAL_LOGIN) {
   SocialLogin = require('@biconomy/web3-auth').default;
 }
 
