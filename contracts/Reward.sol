@@ -18,13 +18,13 @@ contract Reward {
     unlock
   }
 
-  struct Tiers {
+  struct Tier {
     uint256 minAmount;
     uint256 multiplier;
   }
 
   struct ItemLocks {
-    mapping(address => uint256) usersLocked;
+    mapping(address => uint256) userLocks;
     uint256 totalLocked;
   }
 
@@ -42,30 +42,73 @@ contract Reward {
 
 
   /// @dev protocol is immutable and has no ownership
-  constructor(IERC20 _token, Tiers[] _tiers) {
+  constructor(IERC20 _token, Tier[] _tiers) {
     token = _token;
     tiers = _tiers;
   }
 
-  /// lock tokens in the contract
-  /// transfer?
-  /// save total amount locked for each market
-  /// save info of address/market id/amount locked
-  /// emit event
-  /// @dev allows user to lock an item
+  /// @dev allows user to lock tokens in an item
   function lockItem(uint256 itemId, uint256 amount) external {
-    // TODO - implement
+    require(
+      amount > 0 && token.balanceOf(msg.sender) >= amount,
+      "not enough erc20 balance held"
+    );
+
+
+    token.transferFrom(msg.sender, address(this), amount);
+
+    items[itemId].userLocks[msg.sender] = items[itemId].userLocks[msg.sender].add(amount);
+    items[itemId].totalLocked = items[itemId].totalLocked.add(amount);
+
+    users[msg.sender].amountLocked[itemId] = users[msg.sender].amountLocked[itemId].add(amount);
+    users[msg.sender].totalLocked = users[msg.sender].totalLocked.add(amount);
+
+    emit ItemAction(msg.sender, LockAction.lock, itemId, amount, block.timestamp);
+    emit ItemUpdated(itemId, items[itemId].totalLocked, block.timestamp);
   }
 
-  // unlock goes the other way around
-  /// @dev allows user to unlock an item
+  /// @dev allows user to unlock tokens from an item
   function unlockItem(uint256 itemId) external {
-    // TODO - implement
+    uint256 storage amountLocked = items[itemId].userLocks[msg.sender];
+
+    require(
+      amountLocked > 0,
+      "no erc20 balance locked"
+    );
+
+    _unlockItem(itemId, amountLocked);
   }
 
-/// @dev allows user to unlock multiple items
+  /// @dev allows user to unlock multiple items
   function unlockMultipleItems(uint256[] itemIds) external {
-    // TODO - implement
+    for (uint256 i = 0; i < itemIds.length; i++) {
+      uint256 storage amountLocked = items[itemIds[i]].userLocks[msg.sender];
+
+      require(
+        amountLocked > 0,
+        "no erc20 balance locked"
+      );
+
+      _unlockItem(itemIds[i], amountLocked);
+    }
+  }
+
+  function _unlockItem(uint256 itemId, uint256 amount) internal {
+    token.transferFrom(address(this), msg.sender, amount);
+
+    items[itemId].userLocks[msg.sender] = items[itemId].userLocks[msg.sender].sub(amount);
+    items[itemId].totalLocked = items[itemId].totalLocked.sub(amount);
+
+    users[msg.sender].amountLocked[itemId] = users[msg.sender].amountLocked[itemId].sub(amount);
+    users[msg.sender].totalLocked = users[msg.sender].totalLocked.sub(amount);
+
+    emit ItemAction(msg.sender, LockAction.unlock, itemId, amount, block.timestamp);
+    emit ItemUpdated(itemId, items[itemId].totalLocked, block.timestamp);
+  }
+
+  /// @dev Returns the total amount locked by a user
+  function getUserLockedAmount(address user) external view returns (uint256) {
+    return users[user].totalLocked;
   }
 
   /// @dev Returns the total amont locked for an item
@@ -79,6 +122,11 @@ contract Reward {
   function amountUserLockedItem(address user, uint256 itemId) external view returns (uint256) {
     ItemLocks storage item = items[itemId];
 
-    return (item.usersLocked[user]);
+    return item.userLocks[user];
+  }
+
+  /// @dev Returns the ERC20 token address
+  function getTokenAddress() external view returns (address) {
+    return address(token);
   }
 }
