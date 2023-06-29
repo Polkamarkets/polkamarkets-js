@@ -1,9 +1,4 @@
-let SocialLogin = null;
-require('dotenv').config();
-
-if (typeof window !== 'undefined' && process.env.POLKAMARKETS_SOCIAL_LOGIN) {
-  SocialLogin = require('@biconomy/web3-auth').default;
-}
+const SocialLogin = require('@biconomy/web3-auth').default;
 
 const PolkamarketsSmartAccount = require("./PolkamarketsSmartAccount");
 const SafeEventEmitter = require('@metamask/safe-event-emitter').default;

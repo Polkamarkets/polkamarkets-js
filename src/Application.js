@@ -1,12 +1,6 @@
 const Web3 = require("web3");
 require('dotenv').config();
 
-let PolkamarketsSocialLogin = null;
-
-if (typeof window !== "undefined" && process.env.POLKAMARKETS_SOCIAL_LOGIN) {
-  PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
-}
-
 const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
 
 const ERC20Contract = require("./models/index").ERC20Contract;
@@ -43,10 +37,10 @@ class Application {
     this.web3EventsProvider = web3EventsProvider;
     // fixed gas price for txs (optional)
     this.gasPrice = gasPrice;
-
-    this.isSocialLogin = !!PolkamarketsSocialLogin && isSocialLogin;
+    this.isSocialLogin = isSocialLogin;
 
     if (this.isSocialLogin) {
+      const PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
       this.socialLoginParams = socialLoginParams;
       this.socialLogin = PolkamarketsSocialLogin.singleton.getInstance(this.socialLoginParams);
     }
