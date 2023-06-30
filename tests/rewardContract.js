@@ -5,6 +5,8 @@ import { expect } from 'chai';
 import { mochaAsync } from './utils';
 import { Application } from '..';
 
+const USER_ADDRESS = process.env.ERC20_USER;
+
 context('Reward Contract', async () => {
   require('dotenv').config();
 
@@ -34,28 +36,8 @@ context('Reward Contract', async () => {
       await rewardContract.deploy({
         params: [
           ERC20ContractAddress,
-          [
-            {
-              minAmount: 0,
-              multiplier: 1,
-            },
-            {
-              minAmount: 1000,
-              multiplier: 1.3,
-            },
-            {
-              minAmount: 5000,
-              multiplier: 1.5,
-            },
-            {
-              minAmount: 10000,
-              multiplier: 1.7,
-            },
-            {
-              minAmount: 20000,
-              multiplier: 2.1,
-            },
-          ]
+          [0, 1000, 5000, 10000, 20000],
+          [10, 13, 15, 17, 21],
         ]
       });
       const rewardContractAddress = rewardContract.getAddress();
@@ -66,15 +48,98 @@ context('Reward Contract', async () => {
 
   context('Lock Items', async () => {
     it('should lock an Item', mochaAsync(async () => {
-      // TODO: implement
+      let itemId = 0;
+
+      // chek if there are no lock amount
+      let amountLocked = await rewardContract.getItemLockedAmount({ itemId });
+      expect(amountLocked).to.equal(0);
+
+      amountLocked = await rewardContract.getAmontUserLockedItem({ itemId, user: USER_ADDRESS });
+      expect(amountLocked).to.equal(0);
+
+      const beforeTokenAmount = await ERC20Contract.getTokenAmount(USER_ADDRESS);
+      expect(beforeTokenAmount).to.greaterThan(0);
+
+      const res = await rewardContract.lockItem({
+        itemId,
+        amount: 10,
+      });
+
+      expect(res.status).to.equal(true);
+
+      amountLocked = await rewardContract.getItemLockedAmount({ itemId });
+      expect(amountLocked).to.equal(10);
+
+      amountLocked = await rewardContract.getAmontUserLockedItem({ itemId, user: USER_ADDRESS });
+      expect(amountLocked).to.equal(10);
+
+      const afterTokenAmount = await ERC20Contract.getTokenAmount(USER_ADDRESS);
+      expect(afterTokenAmount).to.greaterThan(beforeTokenAmount - 10);
+
     }));
 
     it('should unlock an Item', mochaAsync(async () => {
-      // TODO: implement
+      let itemId = 0;
+
+      // chek if there are no lock amount
+      let amountLocked = await rewardContract.getItemLockedAmount({ itemId });
+      expect(amountLocked).to.equal(10);
+
+      amountLocked = await rewardContract.getAmontUserLockedItem({ itemId, user: USER_ADDRESS });
+      expect(amountLocked).to.equal(10);
+
+      const beforeTokenAmount = await ERC20Contract.getTokenAmount(USER_ADDRESS);
+      expect(beforeTokenAmount).to.greaterThan(0);
+
+      const res = await rewardContract.unlockItem({
+        itemId,
+        amount: 5,
+      });
+
+      expect(res.status).to.equal(true);
+
+      amountLocked = await rewardContract.getItemLockedAmount({ itemId });
+      expect(amountLocked).to.equal(5);
+
+      amountLocked = await rewardContract.getAmontUserLockedItem({ itemId, user: USER_ADDRESS });
+      expect(amountLocked).to.equal(5);
+
+      const afterTokenAmount = await ERC20Contract.getTokenAmount(USER_ADDRESS);
+      expect(afterTokenAmount).to.greaterThan(beforeTokenAmount + 5);
     }));
 
     it('should unlock multiple items', mochaAsync(async () => {
-      // TODO: implement
+      const itemId = 0;
+      const itemId2 = 1;
+
+      // lock itemId2
+      let amountLocked = await rewardContract.getItemLockedAmount({ itemId: itemId2 });
+      expect(amountLocked).to.equal(0);
+
+      let res = await rewardContract.lockItem({
+        itemId: itemId2,
+        amount: 30,
+      });
+
+      amountLocked = await rewardContract.getItemLockedAmount({ itemId: itemId2 });
+      expect(amountLocked).to.equal(30);
+
+      // check amount locked for itemId
+      amountLocked = await rewardContract.getItemLockedAmount({ itemId });
+      expect(amountLocked).to.equal(5);
+
+      // unlock both items
+      res = await rewardContract.unlockMultipleItems({
+        itemIds: [itemId, itemId2],
+      });
+
+      expect(res.status).to.equal(true);
+
+      amountLocked = await rewardContract.getItemLockedAmount({ itemId });
+      expect(amountLocked).to.equal(0);
+
+      amountLocked = await rewardContract.getItemLockedAmount({ itemId: itemId2 });
+      expect(amountLocked).to.equal(0);
     }));
   });
 });

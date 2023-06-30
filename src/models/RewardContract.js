@@ -63,24 +63,6 @@ class RewardContract extends IContract {
   }
 
   /**
-   * @function getUserLockedAmount
-   * @description Get User Total amount locked
-   * @param {Address} user
-   * @returns {Integer} total amount locked
-   */
-  async getUserLockedAmount({ user }) {
-    const amountLocked = await this.params.contract
-      .getContract()
-      .methods
-      .getUserLockedAmount(user)
-      .call();
-
-    const decimals = await this.getTokenDecimals();
-
-    return Numbers.fromDecimalsNumber(amountLocked, decimals);
-  }
-
-  /**
    * @function getAmontUserLockedItem
    * @description Get the Total amount a user has locked for an item
    * @param {Address} user
@@ -91,7 +73,7 @@ class RewardContract extends IContract {
     const amountLocked = await this.params.contract
       .getContract()
       .methods
-      .getAmontUserLockedItem(user, itemId)
+      .amountUserLockedItem(user, itemId)
       .call();
 
     const decimals = await this.getTokenDecimals();
@@ -142,9 +124,12 @@ class RewardContract extends IContract {
    * @description Unlock the amount of an item
    * @param {Integer} itemId
    */
-  async unlockItem({ itemId }) {
+  async unlockItem({ itemId, amount }) {
+    const decimals = await this.getTokenDecimals();
+    const amountDecimals = Numbers.toSmartContractDecimals(amount, decimals);
+
     return await this.__sendTx(
-      this.getContract().methods.unlockItem(itemId)
+      this.getContract().methods.unlockItem(itemId, amountDecimals)
     );
   };
 

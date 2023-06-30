@@ -3,4 +3,5 @@ context('Unit Tests', async () => {
   require('./predictionMarketV2Contract');
   require('./fantasyERC20Contract');
   require('./votingContract');
+  require('./rewardContract');
 });
