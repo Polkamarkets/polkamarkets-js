@@ -7,8 +7,6 @@ const { OpenloginAdapter } = require('@web3auth/openlogin-adapter');
 const Web3AuthCore = require('@web3auth/core').Web3AuthCore;
 const { WALLET_ADAPTERS, CHAIN_NAMESPACES } = require('@web3auth/base');
 const { MetamaskAdapter } = require('@web3auth/metamask-adapter');
-const { WalletConnectV1Adapter } = require('@web3auth/wallet-connect-v1-adapter');
-const { QRCodeModal } = require('@walletconnect/qrcode-modal');
 
 class PolkamarketsSocialLogin extends SocialLogin {
 
@@ -131,15 +129,10 @@ class PolkamarketsSocialLogin extends SocialLogin {
       const metamaskAdapter = new MetamaskAdapter({
         clientId: this.clientId
       })
-      const wcAdapter = new WalletConnectV1Adapter({
-        adapterSettings: {
-          qrcodeModal: QRCodeModal
-        }
-      })
 
       web3AuthCore.configureAdapter(openloginAdapter)
       web3AuthCore.configureAdapter(metamaskAdapter)
-      web3AuthCore.configureAdapter(wcAdapter)
+
       await web3AuthCore.init()
       this.web3auth = web3AuthCore
       if (web3AuthCore && web3AuthCore.provider) {
@@ -230,8 +223,6 @@ class PolkamarketsSocialLogin extends SocialLogin {
     switch (provider) {
       case 'metamask':
         return this.metamaskLogin();
-      case 'walletconnect':
-        return this.walletConnectLogin();
       case 'email':
         return this.emailLogin(email);
       default:
@@ -318,11 +309,6 @@ class PolkamarketsSocialLogin extends SocialLogin {
     return this.afterSocialLogin(resp);
   }
 
-  async walletConnectLogin() {
-    const resp = await super.walletConnectLogin();
-
-    return this.afterSocialLogin(resp);
-  }
 
   async providerIsMetamask() {
     if (this.provider) {

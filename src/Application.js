@@ -351,10 +351,6 @@ class Application {
     return await this.socialLogin.directLogin('metamask');
   }
 
-  async socialLoginWalletConnect() {
-    return await this.socialLogin.directLogin('walletconnect');
-  }
-
   async socialLoginLogout() {
     if (this.socialLogin?.provider) {
       this.socialLogin.logout();
