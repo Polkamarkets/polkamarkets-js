@@ -67,23 +67,23 @@ contract Reward {
 
     require(
       amountLocked > 0 && amountLocked >= amount,
-      "no erc20 balance locked"
+      "invalid erc20 balance locked"
     );
 
     _unlockItem(itemId, amount);
   }
 
   /// @dev allows user to unlock multiple items
-  function unlockMultipleItems(uint256[] calldata itemIds) external {
+  function unlockMultipleItems(uint256[] calldata itemIds, uint256[] calldata amounts) external {
     for (uint256 i = 0; i < itemIds.length; i++) {
       uint256 amountLocked = items[itemIds[i]].userLocks[msg.sender];
 
       require(
-        amountLocked > 0,
-        "no erc20 balance locked"
+        amountLocked > 0 && amountLocked >= amounts[i] && amounts[i] > 0,
+        "invalid erc20 balance locked"
       );
 
-      _unlockItem(itemIds[i], amountLocked);
+      _unlockItem(itemIds[i], amounts[i]);
     }
   }
 

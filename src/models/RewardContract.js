@@ -139,9 +139,12 @@ class RewardContract extends IContract {
    * @description Unlock the amount of multiple items at the same time
    * @param {Integer} itemId
    */
-  async unlockMultipleItems({ itemIds }) {
+  async unlockMultipleItems({ itemIds, amounts }) {
+    const decimals = await this.getTokenDecimals();
+    const amountsDecimals = amounts.map(amount => Numbers.toSmartContractDecimals(amount, decimals));
+
     return await this.__sendTx(
-      this.getContract().methods.unlockMultipleItems(itemIds)
+      this.getContract().methods.unlockMultipleItems(itemIds, amountsDecimals)
     );
   };
 

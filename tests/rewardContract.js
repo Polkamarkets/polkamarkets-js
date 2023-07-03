@@ -131,6 +131,7 @@ context('Reward Contract', async () => {
       // unlock both items
       res = await rewardContract.unlockMultipleItems({
         itemIds: [itemId, itemId2],
+        amounts: [5, 30],
       });
 
       expect(res.status).to.equal(true);
