@@ -1,9 +1,5 @@
 const moment = require('moment');
 const accounting = require('accounting');
-const dayjs = require('dayjs');
-const BN = require('bn.js');
-const web3 = require("web3");
-let Web3 = new web3();
 
 Number.prototype.noExponents = function () {
   var data = String(this).split(/[eE]/)
@@ -34,14 +30,6 @@ class numbers {
     return mom.format('ddd, hA')
   }
 
-  fromSmartContractTimeToMinutes(time) {
-    return dayjs.unix(time).toDate();
-  }
-
-  fromMinutesToSmartContracTime(time) {
-    return time
-  }
-
   fromHex(hex){
     return hex.toString();
   }
@@ -59,18 +47,6 @@ class numbers {
     mom.set('hour', date.hour)
     mom.set('year', date.year)
     return mom.unix()
-  }
-
-  toMoney(number) {
-    return accounting.formatMoney(number, { symbol: 'EUR', format: '%v' })
-  }
-
-  toFormatBet(number) {
-    return parseFloat(parseFloat(number).toFixed(6))
-  }
-
-  formatNumber(number) {
-    return accounting.formatNumber(number)
   }
 
   toSmartContractDecimals(value, decimals) {
