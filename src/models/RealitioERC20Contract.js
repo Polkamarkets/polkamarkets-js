@@ -57,7 +57,9 @@ class RealitioERC20Contract extends IContract {
       bestAnswer: question.best_answer,
       finalizeTs: question.finalize_ts,
       isFinalized,
-      isClaimed
+      isClaimed,
+      isPendingArbitration: question.is_pending_arbitration,
+      arbitrator: question.arbitrator,
     };
   }
 
