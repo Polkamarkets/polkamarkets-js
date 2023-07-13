@@ -353,6 +353,7 @@ class IContract {
    */
   async getMyAccount() {
     if (this.params.isSocialLogin) {
+      const PolkamarketsSocialLogin = require("./PolkamarketsSocialLogin");
       const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
       return await socialLogin.getAddress();
     }
