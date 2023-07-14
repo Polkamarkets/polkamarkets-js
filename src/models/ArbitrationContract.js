@@ -53,8 +53,9 @@ class ArbitrationContract extends IContract {
    * @param {bytes32} questionId
    * @param {Integer} maxPrevious
    */
-  async requestArbitration({ questionId, maxPrevious }) {
+  async requestArbitration({ questionId, bond }) {
     const fee = await this.params.contract.getContract().methods.getDisputeFee(questionId).call();
+    const maxPrevious = Numbers.toSmartContractDecimals(bond, 18);
 
     return await this.__sendTx(
       this.getContract().methods.requestArbitration(questionId, maxPrevious),
