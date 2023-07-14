@@ -16,7 +16,7 @@ const RealitioERC20Contract = require("./models/index").RealitioERC20Contract;
 const VotingContract = require("./models/index").VotingContract;
 const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
 const WETH9Contract = require("./models/index").WETH9Contract;
-const ChainId = require('@biconomy/core-types').ChainId;
+const ArbitrationContract = require("./models/index").ArbitrationContract;
 
 const Account = require('./utils/Account');
 
@@ -274,6 +274,26 @@ class Application {
   getWETH9Contract({ contractAddress = null }) {
     try {
       return new WETH9Contract({
+        web3: this.web3,
+        contractAddress: contractAddress,
+        acc: this.account,
+        web3EventsProvider: this.web3EventsProvider,
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name getArbitrationContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a Arbitration Contract
+   */
+  getArbitrationContract({ contractAddress = null }) {
+    try {
+      return new ArbitrationContract({
         web3: this.web3,
         contractAddress: contractAddress,
         acc: this.account,
