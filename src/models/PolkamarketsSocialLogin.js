@@ -249,6 +249,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
   getConnectToOptions(loginProvider) {
     let connectToOptions = {
       loginProvider,
+      mfaLevel: 'none',
       extraLoginOptions: {
         scope: 'email'
       }
@@ -257,6 +258,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
     if (loginProvider === 'discord' && this.web3AuthConfig && this.web3AuthConfig.discord) {
       connectToOptions = {
         loginProvider: 'discordcustom',
+        mfaLevel: 'none',
         extraLoginOptions: {
           scope: 'identify email guilds',
         }
