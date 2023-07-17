@@ -1,6 +1,7 @@
 let index = {
   achievements: require("../../build/contracts/Achievements.json"),
   arbitration: require("../../build/contracts/RealitioForeignArbitrationProxyWithAppeals.json"),
+  arbitrationProxy: require("../../build/contracts/RealitioHomeArbitrationProxy.json"),
   fantasyerc20: require("../../build/contracts/FantasyERC20.json"),
   ierc20: require("../../build/contracts/ERC20PresetMinterPauser.json"),
   prediction: require("../../build/contracts/PredictionMarket.json"),

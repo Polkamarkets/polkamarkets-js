@@ -17,6 +17,7 @@ const VotingContract = require("./models/index").VotingContract;
 const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
 const WETH9Contract = require("./models/index").WETH9Contract;
 const ArbitrationContract = require("./models/index").ArbitrationContract;
+const ArbitrationProxyContract = require("./models/index").ArbitrationProxyContract;
 
 const Account = require('./utils/Account');
 
@@ -294,6 +295,26 @@ class Application {
   getArbitrationContract({ contractAddress = null }) {
     try {
       return new ArbitrationContract({
+        web3: this.web3,
+        contractAddress: contractAddress,
+        acc: this.account,
+        web3EventsProvider: this.web3EventsProvider,
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name getArbitrationProxyContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a Arbitration Proxy Contract
+   */
+  getArbitrationProxyContract({ contractAddress = null }) {
+    try {
+      return new ArbitrationProxyContract({
         web3: this.web3,
         contractAddress: contractAddress,
         acc: this.account,
