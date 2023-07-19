@@ -28,6 +28,26 @@ class ArbitrationContract extends IContract {
     return Numbers.fromDecimalsNumber(fee, 18);
   }
 
+  async getArbitrationDisputeId({ questionId }) {
+    const allEvents = await this.getEvents('ArbitrationCreated');
+    const questionEvents = allEvents.filter(event => event.returnValues._questionID === questionId);
+
+    if (questionEvents.length === 0) return null;
+
+    return Number(questionEvents[0].returnValues._disputeID);
+  }
+
+  async getArbitrationRequests({ questionId }) {
+    const allEvents = await this.getEvents('ArbitrationRequested');
+    const questionEvents = allEvents.filter(event => event.returnValues._questionID === questionId);
+
+    return questionEvents.map(event => ({
+      questionId: event.returnValues._questionID,
+      requester: event.returnValues._requester,
+      maxPrevious: Numbers.fromDecimalsNumber(event.returnValues._maxPrevious, 18)
+    }));
+  }
+
   /**
    * @function requestArbitration
    * @description apply for arbitration
