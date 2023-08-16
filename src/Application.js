@@ -42,7 +42,7 @@ class Application {
     if (this.isSocialLogin) {
       const PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
       this.socialLoginParams = socialLoginParams;
-      this.socialLogin = PolkamarketsSocialLogin.singleton.getInstance(this.socialLoginParams);
+      this.socialLogin = PolkamarketsSocialLogin.singleton.getInstance(this.socialLoginParams, this.web3Provider);
     }
 
     // IMPORTANT: this parameter should only be used for testing purposes

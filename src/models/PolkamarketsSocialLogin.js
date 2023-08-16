@@ -1,38 +1,29 @@
-const SocialLogin = require('@biconomy/web3-auth').default;
 
 const PolkamarketsSmartAccount = require("./PolkamarketsSmartAccount");
 const SafeEventEmitter = require('@metamask/safe-event-emitter').default;
 const ethers = require('ethers').ethers;
+
+const { EthereumPrivateKeyProvider } = require('@web3auth/ethereum-provider');
 const { OpenloginAdapter } = require('@web3auth/openlogin-adapter');
-const Web3AuthCore = require('@web3auth/core').Web3AuthCore;
+const Web3AuthNoModal = require('@web3auth/no-modal').Web3AuthNoModal;
 const { WALLET_ADAPTERS, CHAIN_NAMESPACES } = require('@web3auth/base');
 const { MetamaskAdapter } = require('@web3auth/metamask-adapter');
 
-class PolkamarketsSocialLogin extends SocialLogin {
+class PolkamarketsSocialLogin {
 
   static initSocialLogin = async (socialLogin, urls, isTestnet, whiteLabelData, networkConfig) => {
     if (!socialLogin.isInit) {
-      const whitelistUrls = {};
-
-      const signaturePromises = [];
-      urls.forEach(url => signaturePromises.push(socialLogin.whitelistUrl(url)));
-
-      const signatures = await Promise.all(signaturePromises);
-
-      signatures.forEach((signature, index) => whitelistUrls[urls[index]] = signature);
 
       // convert int to hex
       const chainId = networkConfig.chainId.toString(16);
 
       const initData = {
-        whitelistUrls,
-        network: isTestnet ? 'testnet' : 'mainnet',
+        network: isTestnet ? 'testnet' : 'cyan',
         chainId: `0x${chainId}`,
       };
 
       if (whiteLabelData) {
-        // yes it's really without the i and with the l misplaced
-        initData.whteLableData = whiteLabelData;
+        initData.whiteLabelData = whiteLabelData;
       }
 
       await socialLogin.init(initData);
@@ -48,16 +39,16 @@ class PolkamarketsSocialLogin extends SocialLogin {
   static singleton = (() => {
     let socialLogin;
 
-    function createInstance(web3AuthConfig, useCustomModal) {
-      const instance = new PolkamarketsSocialLogin(web3AuthConfig, useCustomModal);
+    function createInstance(web3AuthConfig, web3Provider, useCustomModal) {
+      const instance = new PolkamarketsSocialLogin(web3AuthConfig, web3Provider, useCustomModal);
       instance.eventEmitter = new SafeEventEmitter();
       return instance;
     }
 
     return {
-      getInstance: (socialLoginParams) => {
+      getInstance: (socialLoginParams, web3Provider) => {
         if (!socialLogin) {
-          socialLogin = createInstance(socialLoginParams.web3AuthConfig, socialLoginParams.useCustomModal);
+          socialLogin = createInstance(socialLoginParams.web3AuthConfig, web3Provider, socialLoginParams.useCustomModal);
           socialLogin.socialLoginParams = socialLoginParams;
           this.initSocialLogin(socialLogin, socialLoginParams.urls, socialLoginParams.isTestnet, socialLoginParams.whiteLabelData, socialLoginParams.networkConfig);
         }
@@ -66,8 +57,16 @@ class PolkamarketsSocialLogin extends SocialLogin {
     };
   })();
 
-  constructor(web3AuthConfig = null, useCustomModal = false) {
-    super();
+  constructor(web3AuthConfig = null, web3Provider = null, useCustomModal = false) {
+    this.isInit = false
+    this.web3auth = null
+    this.web3Provider = web3Provider;
+    this.provider = null
+
+    this.whiteLabel = {
+      name: 'Biconomy SDK',
+      logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/9543.png'
+    }
 
     this.useCustomModal = useCustomModal;
     this.web3AuthConfig = web3AuthConfig;
@@ -80,23 +79,24 @@ class PolkamarketsSocialLogin extends SocialLogin {
   async init(socialLoginDTO) {
     const finalDTO = {
       chainId: '0x1',
-      whitelistUrls: {},
       network: 'mainnet',
-      whteLableData: this.whiteLabel
+      whiteLabelData: this.whiteLabel
     }
     if (socialLoginDTO) {
       if (socialLoginDTO.chainId) finalDTO.chainId = socialLoginDTO.chainId
       if (socialLoginDTO.network) finalDTO.network = socialLoginDTO.network
-      if (socialLoginDTO.whitelistUrls) finalDTO.whitelistUrls = socialLoginDTO.whitelistUrls
-      if (socialLoginDTO.whteLableData) this.whiteLabel = socialLoginDTO.whteLableData
+      if (socialLoginDTO.whiteLabelData) this.whiteLabel = socialLoginDTO.whiteLabelData
     }
+
     try {
-      const web3AuthCore = new Web3AuthCore({
+      const chainConfig = {
+        chainNamespace: CHAIN_NAMESPACES.EIP155,
+        chainId: finalDTO.chainId
+      };
+
+      const web3AuthCore = new Web3AuthNoModal({
         clientId: this.clientId,
-        chainConfig: {
-          chainNamespace: CHAIN_NAMESPACES.EIP155,
-          chainId: finalDTO.chainId
-        }
+        chainConfig
       })
 
       const loginConfig = {};
@@ -110,6 +110,9 @@ class PolkamarketsSocialLogin extends SocialLogin {
         };
       }
 
+      const privateKeyProvider = new EthereumPrivateKeyProvider({
+        config: { chainConfig: { ...chainConfig, rpcTarget: this.web3Provider }},
+      });
       const openloginAdapter = new OpenloginAdapter({
         adapterSettings: {
           clientId: this.clientId,
@@ -123,20 +126,25 @@ class PolkamarketsSocialLogin extends SocialLogin {
             defaultLanguage: 'en',
             dark: true
           },
-          originData: finalDTO.whitelistUrls
-        }
+        },
+        privateKeyProvider
       })
-      const metamaskAdapter = new MetamaskAdapter({
-        clientId: this.clientId
-      })
+      // const metamaskAdapter = new MetamaskAdapter({
+      //   clientId: this.clientId
+      // })
 
       web3AuthCore.configureAdapter(openloginAdapter)
-      web3AuthCore.configureAdapter(metamaskAdapter)
+      // web3AuthCore.configureAdapter(metamaskAdapter)
 
       await web3AuthCore.init()
       this.web3auth = web3AuthCore
       if (web3AuthCore && web3AuthCore.provider) {
-        this.provider = web3AuthCore.provider
+        try {
+          await this.web3auth.getUserInfo()
+          this.provider = web3AuthCore.provider;
+        } catch (error) {
+          // ignore, provider is invalid
+        }
       }
 
       this.isInit = true
@@ -146,7 +154,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
   }
 
   hideWallet() {
-    super.hideWallet();
+    // super.hideWallet();
     this.eventEmitter.emit('finishLogin', false);
   }
 
@@ -159,7 +167,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
           }
           resolve(resp)
         });
-        super.showWallet();
+        // super.showWallet();
       } catch (error) {
         reject(error);
       }
@@ -300,17 +308,18 @@ class PolkamarketsSocialLogin extends SocialLogin {
   }
 
   async emailLogin(email) {
-    const resp = await super.emailLogin(email);
+    // NOT WORKING FOR NOW
+    // const resp = await super.emailLogin(email);
 
     return this.afterSocialLogin(resp);
   }
 
   async metamaskLogin() {
-    const resp = await super.metamaskLogin();
+    // NOT WORKING FOR NOW
+    // const resp = await super.metamaskLogin();
 
     return this.afterSocialLogin(resp);
   }
-
 
   async providerIsMetamask() {
     if (this.provider) {
@@ -363,6 +372,24 @@ class PolkamarketsSocialLogin extends SocialLogin {
     })
   }
 
+  async getUserInfo() {
+    if (this.web3auth) {
+      const userInfo = await this.web3auth.getUserInfo()
+      this.userInfo = userInfo
+      return userInfo
+    }
+    return null
+  }
+
+  async logout() {
+    if (!this.web3auth) {
+      console.log('web3auth not initialized yet')
+      return
+    }
+    await this.web3auth.logout()
+    this.web3auth.clearCache()
+    this.provider = null
+  }
 }
 
 module.exports = PolkamarketsSocialLogin;
