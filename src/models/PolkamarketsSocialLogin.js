@@ -117,7 +117,7 @@ class PolkamarketsSocialLogin {
         adapterSettings: {
           clientId: this.clientId,
           network: finalDTO.network,
-          uxMode: 'popup',
+          uxMode: 'redirect',
           loginConfig,
           whiteLabel: {
             name: this.whiteLabel.name,
