@@ -1,10 +1,5 @@
 const Web3 = require("web3");
-
-let PolkamarketsSocialLogin = null;
-
-if (typeof window !== "undefined") {
-  PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
-}
+require('dotenv').config();
 
 const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
 
@@ -16,9 +11,9 @@ const RealitioERC20Contract = require("./models/index").RealitioERC20Contract;
 const VotingContract = require("./models/index").VotingContract;
 const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
 const WETH9Contract = require("./models/index").WETH9Contract;
-const ChainId = require('@biconomy/core-types').ChainId;
 
 const Account = require('./utils/Account');
+
 
 const networksEnum = Object.freeze({
   1: "Main",
@@ -42,12 +37,12 @@ class Application {
     this.web3EventsProvider = web3EventsProvider;
     // fixed gas price for txs (optional)
     this.gasPrice = gasPrice;
-
-    this.isSocialLogin = !!PolkamarketsSocialLogin && isSocialLogin;
+    this.isSocialLogin = isSocialLogin;
 
     if (this.isSocialLogin) {
+      const PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
       this.socialLoginParams = socialLoginParams;
-      this.socialLogin = PolkamarketsSocialLogin.singleton.getInstance(this.socialLoginParams);
+      this.socialLogin = PolkamarketsSocialLogin.singleton.getInstance(this.socialLoginParams, this.web3Provider);
     }
 
     // IMPORTANT: this parameter should only be used for testing purposes
@@ -356,14 +351,16 @@ class Application {
     return await this.socialLogin.directLogin('metamask');
   }
 
-  async socialLoginWalletConnect() {
-    return await this.socialLogin.directLogin('walletconnect');
-  }
-
   async socialLoginLogout() {
     if (this.socialLogin?.provider) {
       this.socialLogin.logout();
       PolkamarketsSmartAccount.singleton.clearInstance();
+    }
+  }
+
+  async getSocialLoginUserInfo() {
+    if (this.socialLogin?.provider) {
+      return await this.socialLogin.getUserInfo();
     }
   }
 }
