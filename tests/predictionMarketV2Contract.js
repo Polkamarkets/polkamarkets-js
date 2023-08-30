@@ -136,12 +136,13 @@ context('Prediction Market Contract V2', async () => {
     it('should get Market data', mochaAsync(async () => {
       const res = await predictionMarketContract.getMarketData({marketId});
       expect(res).to.eql({
-        name: '',
         closeDateTime: '2024-05-01 00:00',
         state: 0,
         oracleAddress: '0x0000000000000000000000000000000000000000',
         liquidity: 0.01,
         outcomeIds: [0, 1],
+        resolvedOutcomeId: -1,
+        voided: false
       });
     }));
 

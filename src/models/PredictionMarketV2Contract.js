@@ -101,14 +101,17 @@ class PredictionMarketV2Contract extends IContract {
     const marketData = await this.params.contract.getContract().methods.getMarketData(marketId).call();
     const outcomeIds = await this.params.contract.getContract().methods.getMarketOutcomeIds(marketId).call();
     const decimals = await this.getMarketDecimals({marketId});
+    const state = parseInt(marketData[0]);
+    const resolvedOutcomeId = parseInt(marketData[5]);
 
     return {
-      name: '', // TODO: remove; deprecated
       closeDateTime: moment.unix(marketData[1]).format("YYYY-MM-DD HH:mm"),
-      state: parseInt(marketData[0]),
+      state,
       oracleAddress: '0x0000000000000000000000000000000000000000',
       liquidity: Numbers.fromDecimalsNumber(marketData[2], decimals),
-      outcomeIds: outcomeIds.map((outcomeId) => Numbers.fromBigNumberToInteger(outcomeId, 18))
+      outcomeIds: outcomeIds.map((outcomeId) => Numbers.fromBigNumberToInteger(outcomeId, 18)),
+      resolvedOutcomeId,
+      voided: state === 2 && !outcomeIds.includes(resolvedOutcomeId)
     };
   }
 
