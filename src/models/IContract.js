@@ -390,6 +390,15 @@ class IContract {
     const { data } = await axios.get(uri);
     return data;
   }
+
+  /**
+   * @function getBlock
+   * @description Gets block details
+   * @returns {Object} block
+   */
+  async getBlock(blockNumber) {
+    return await this.params.web3.eth.getBlock(blockNumber);
+  }
 }
 
 module.exports = IContract;
