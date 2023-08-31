@@ -70,8 +70,7 @@ class ERC20Contract extends IContract {
         this.getDecimals()
       );
       let res = await this.__sendTx(
-        this.getContract()
-          .methods.approve(address, amountWithDecimals),
+        this.getContract().methods.approve(address, amountWithDecimals),
         null,
         null,
         callback
@@ -80,6 +79,39 @@ class ERC20Contract extends IContract {
     } catch (err) {
       throw err;
     }
+  }
+
+  async burn({ amount }) {
+    try {
+      let amountWithDecimals = Numbers.toSmartContractDecimals(
+        amount,
+        this.getDecimals()
+      );
+      let res = await this.__sendTx(
+        this.getContract().methods.burn(amountWithDecimals),
+        false,
+      );
+      return res;
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  async burnEvents({ address }) {
+    const events = await this.getEvents(
+      'Transfer',
+      { from: address, to: '0x0000000000000000000000000000000000000000' }
+    )
+
+    // attaching block timestamp to event
+    return await Promise.all(events.map(async (event) => {
+      const block = await this.getBlock(event.blockNumber);
+
+      return {
+        ...event,
+        timestamp: block.timestamp
+      };
+    }));
   }
 
   async name() {
