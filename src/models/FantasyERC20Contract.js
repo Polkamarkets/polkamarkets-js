@@ -80,14 +80,13 @@ class FantasyERC20Contract extends ERC20Contract {
     const address = await this.getMyAccount();
     if (!address) return false;
 
-    const tokenAmountToClaim = await this.params.contract.getContract().methods.tokenAmountToClaim().call();
-    const balance = await this.getContract().methods.balanceOf(address).call();
+    const tokenAmountToClaim = await this.tokenAmountToClaim();
+    const balance = await this.getTokenAmount(address);
 
     const amountToBurn = balance - tokenAmountToClaim > 0 ? balance - tokenAmountToClaim : 0;
 
     return await this.burn({ amount: amountToBurn });
   };
-
 }
 
 module.exports = FantasyERC20Contract;
