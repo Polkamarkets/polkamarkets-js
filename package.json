@@ -29,6 +29,7 @@
         "@openzeppelin/contracts": "^4.8.2",
         "@openzeppelin/contracts-upgradeable": "^4.8.2",
         "@openzeppelin/truffle-upgrades": "^1.7.0",
+        "@polymarket/distributor-sdk": "^1.0.5",
         "@reality.eth/reality-eth-lib": "^3.2.10",
         "abi-decoder": "^1.2.0",
         "accounting": "^0.4.1",

@@ -6,6 +6,7 @@ let index = {
   realitio: require("../../build/contracts/RealitioERC20.json"),
   voting: require("../../build/contracts/Voting.json"),
   reward: require("../../build/contracts/Reward.json"),
+  merkledistributor: require("../../build/contracts/MerkleDistributor.json"),
   fantasyerc20: require("../../build/contracts/FantasyERC20.json"),
   weth: require("../../build/contracts/WETH9.json"),
 };

@@ -15,6 +15,7 @@ const AchievementsContract = require("./models/index").AchievementsContract;
 const RealitioERC20Contract = require("./models/index").RealitioERC20Contract;
 const VotingContract = require("./models/index").VotingContract;
 const RewardContract = require("./models/index").RewardContract;
+const MerkleDistributorContract = require("./models/index").MerkleDistributorContract;
 const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
 const WETH9Contract = require("./models/index").WETH9Contract;
 
@@ -214,6 +215,26 @@ class Application {
   getRewardContract({ contractAddress = null } = {}) {
     try {
       return new RewardContract({
+        web3: this.web3,
+        contractAddress,
+        acc: this.account,
+        web3EventsProvider: this.web3EventsProvider,
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name getMerkleDistributorContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a MerkleDistributor Contract
+   */
+  getMerkleDistributorContract({ contractAddress = null } = {}) {
+    try {
+      return new MerkleDistributorContract({
         web3: this.web3,
         contractAddress,
         acc: this.account,
