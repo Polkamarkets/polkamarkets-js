@@ -115,4 +115,9 @@ contract Reward {
   function getTokenAddress() external view returns (address) {
     return address(token);
   }
+
+  /// @dev Returns the number of tiers
+  function getNumberOfTiers() external view returns (uint256) {
+    return tiers.length;
+  }
 }

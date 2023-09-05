@@ -82,6 +82,21 @@ class RewardContract extends IContract {
   }
 
   /**
+   * @function getNumberOfTiers
+   * @description Get the number of tiers configured
+   * @returns {Integer} number of tiers
+   */
+  async getNumberOfTiers() {
+    const numberOfTiers = await this.params.contract
+      .getContract()
+      .methods
+      .getNumberOfTiers()
+      .call();
+
+    return parseInt(numberOfTiers);
+  }
+
+  /**
    * @function getUserActions
    * @description Get user locking actions
    * @param {Address} user

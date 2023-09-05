@@ -1,3 +1,4 @@
+require('dotenv').config();
 
 
 import { expect } from 'chai';
@@ -5,10 +6,10 @@ import { expect } from 'chai';
 import { mochaAsync } from './utils';
 import { Application } from '..';
 
-const USER_ADDRESS = process.env.ERC20_USER;
+const USER_ADDRESS = process.env.TEST_USER1_ADDRESS;
+const USER_PRIVATE_KEY = process.env.TEST_USER1_PRIVATE_KEY;
 
 context('Reward Contract', async () => {
-  require('dotenv').config();
 
   let app;
   let rewardContract;
@@ -43,6 +44,26 @@ context('Reward Contract', async () => {
       const rewardContractAddress = rewardContract.getAddress();
 
       expect(rewardContractAddress).to.not.equal(null);
+
+      // minting for rewards interaction
+      await ERC20Contract.getContract().methods.mint(USER_ADDRESS, '100000000000000000000000000').send({ from: USER_ADDRESS });
+
+      // approve reward contract to spend ERC20 tokens
+      const user1App = new Application({
+        web3Provider: process.env.WEB3_PROVIDER,
+        web3PrivateKey: USER_PRIVATE_KEY,
+      });
+
+      const user1erc20 = user1App.getERC20Contract({ contractAddress: ERC20ContractAddress})
+      await user1erc20.__assert();
+
+      await user1erc20.approve({address: rewardContractAddress, amount: '100000000000000000000000000'});
+    }));
+
+    it('should return number of tiers', mochaAsync(async () => {
+      const numberOfTiers = await rewardContract.getNumberOfTiers();
+
+      expect(numberOfTiers).to.equal(5);
     }));
   });
 
@@ -57,7 +78,8 @@ context('Reward Contract', async () => {
       amountLocked = await rewardContract.getAmontUserLockedItem({ itemId, user: USER_ADDRESS });
       expect(amountLocked).to.equal(0);
 
-      const beforeTokenAmount = await ERC20Contract.getTokenAmount(USER_ADDRESS);
+      const beforeTokenAmount = parseInt(await ERC20Contract.getTokenAmount(USER_ADDRESS));
+
       expect(beforeTokenAmount).to.greaterThan(0);
 
       const res = await rewardContract.lockItem({
@@ -73,8 +95,8 @@ context('Reward Contract', async () => {
       amountLocked = await rewardContract.getAmontUserLockedItem({ itemId, user: USER_ADDRESS });
       expect(amountLocked).to.equal(10);
 
-      const afterTokenAmount = await ERC20Contract.getTokenAmount(USER_ADDRESS);
-      expect(afterTokenAmount).to.greaterThan(beforeTokenAmount - 10);
+      const afterTokenAmount = parseInt(await ERC20Contract.getTokenAmount(USER_ADDRESS));
+      expect(afterTokenAmount).to.equal(beforeTokenAmount - 10);
 
     }));
 
@@ -88,7 +110,7 @@ context('Reward Contract', async () => {
       amountLocked = await rewardContract.getAmontUserLockedItem({ itemId, user: USER_ADDRESS });
       expect(amountLocked).to.equal(10);
 
-      const beforeTokenAmount = await ERC20Contract.getTokenAmount(USER_ADDRESS);
+      const beforeTokenAmount = parseInt(await ERC20Contract.getTokenAmount(USER_ADDRESS));
       expect(beforeTokenAmount).to.greaterThan(0);
 
       const res = await rewardContract.unlockItem({
@@ -104,8 +126,8 @@ context('Reward Contract', async () => {
       amountLocked = await rewardContract.getAmontUserLockedItem({ itemId, user: USER_ADDRESS });
       expect(amountLocked).to.equal(5);
 
-      const afterTokenAmount = await ERC20Contract.getTokenAmount(USER_ADDRESS);
-      expect(afterTokenAmount).to.greaterThan(beforeTokenAmount + 5);
+      const afterTokenAmount = parseInt(await ERC20Contract.getTokenAmount(USER_ADDRESS));
+      expect(afterTokenAmount).to.equal(beforeTokenAmount + 5);
     }));
 
     it('should unlock multiple items', mochaAsync(async () => {
