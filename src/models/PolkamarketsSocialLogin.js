@@ -326,6 +326,27 @@ class PolkamarketsSocialLogin {
     }
   }
 
+  async biconomyMetamaskLogin() {
+    if (!this.web3auth) {
+      console.log('web3auth not initialized yet')
+      return
+    }
+    try {
+      const web3authProvider = await this.web3auth.connectTo(WALLET_ADAPTERS.METAMASK)
+      if (!web3authProvider) {
+        console.log('web3authProvider is null')
+        return null
+      }
+
+      this.provider = web3authProvider
+      return web3authProvider
+    } catch (error) {
+      console.error(error)
+      return error
+    }
+  }
+
+
   async socialLogin(loginProvider) {
     const resp = await this.biconomySocialLogin(loginProvider);
 
@@ -339,8 +360,7 @@ class PolkamarketsSocialLogin {
   }
 
   async metamaskLogin() {
-    // NOT WORKING FOR NOW
-    // const resp = await super.metamaskLogin();
+    const resp = await this.biconomyMetamaskLogin();
 
     return this.afterSocialLogin(resp);
   }
