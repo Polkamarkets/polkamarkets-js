@@ -301,6 +301,31 @@ class PolkamarketsSocialLogin {
     }
   }
 
+  async biconomyEmailLogin(email) {
+    if (!this.web3auth) {
+      console.info('web3auth not initialized yet')
+      return
+    }
+    try {
+      const web3authProvider = await this.web3auth.connectTo(
+        WALLET_ADAPTERS.OPENLOGIN, {
+          loginProvider: 'email_passwordless',
+          login_hint: email
+      });
+
+      if (!web3authProvider) {
+        console.error('web3authProvider is null')
+        return null
+      }
+
+      this.provider = web3authProvider
+      return web3authProvider
+    } catch (error) {
+      console.error(error)
+      return error
+    }
+  }
+
   async socialLogin(loginProvider) {
     const resp = await this.biconomySocialLogin(loginProvider);
 
@@ -308,8 +333,7 @@ class PolkamarketsSocialLogin {
   }
 
   async emailLogin(email) {
-    // NOT WORKING FOR NOW
-    // const resp = await super.emailLogin(email);
+    const resp = await this.biconomyEmailLogin(email);
 
     return this.afterSocialLogin(resp);
   }
