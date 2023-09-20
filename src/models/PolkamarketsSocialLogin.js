@@ -126,6 +126,7 @@ class PolkamarketsSocialLogin {
             defaultLanguage: 'en',
             dark: true
           },
+          sessionTime: 86400 * 30, // 30 days
         },
         privateKeyProvider
       })
@@ -301,6 +302,52 @@ class PolkamarketsSocialLogin {
     }
   }
 
+  async biconomyEmailLogin(email) {
+    if (!this.web3auth) {
+      console.info('web3auth not initialized yet')
+      return
+    }
+    try {
+      const web3authProvider = await this.web3auth.connectTo(
+        WALLET_ADAPTERS.OPENLOGIN, {
+          loginProvider: 'email_passwordless',
+          login_hint: email
+      });
+
+      if (!web3authProvider) {
+        console.error('web3authProvider is null')
+        return null
+      }
+
+      this.provider = web3authProvider
+      return web3authProvider
+    } catch (error) {
+      console.error(error)
+      return error
+    }
+  }
+
+  async biconomyMetamaskLogin() {
+    if (!this.web3auth) {
+      console.log('web3auth not initialized yet')
+      return
+    }
+    try {
+      const web3authProvider = await this.web3auth.connectTo(WALLET_ADAPTERS.METAMASK)
+      if (!web3authProvider) {
+        console.log('web3authProvider is null')
+        return null
+      }
+
+      this.provider = web3authProvider
+      return web3authProvider
+    } catch (error) {
+      console.error(error)
+      return error
+    }
+  }
+
+
   async socialLogin(loginProvider) {
     const resp = await this.biconomySocialLogin(loginProvider);
 
@@ -308,15 +355,13 @@ class PolkamarketsSocialLogin {
   }
 
   async emailLogin(email) {
-    // NOT WORKING FOR NOW
-    // const resp = await super.emailLogin(email);
+    const resp = await this.biconomyEmailLogin(email);
 
     return this.afterSocialLogin(resp);
   }
 
   async metamaskLogin() {
-    // NOT WORKING FOR NOW
-    // const resp = await super.metamaskLogin();
+    const resp = await this.biconomyMetamaskLogin();
 
     return this.afterSocialLogin(resp);
   }
