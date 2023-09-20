@@ -126,6 +126,7 @@ class PolkamarketsSocialLogin {
             defaultLanguage: 'en',
             dark: true
           },
+          sessionTime: 86400 * 30, // 30 days
         },
         privateKeyProvider
       })
