@@ -1,6 +1,7 @@
 
-const merkleDistributor = require("../interfaces").merkledistributor;
+const merkleDistributor = require('../interfaces').merkledistributor;
 
+const Numbers = require('../utils/Numbers');
 const IContract = require('./IContract');
 
 /**
@@ -17,6 +18,23 @@ class MerkleDistributorContract extends IContract {
   }
 
   /* Get Functions */
+
+  /**
+   * @function getTokenDecimals
+   * @description Get Token Decimals
+   * @return {Integer} decimals
+   */
+  async getTokenDecimals() {
+    try {
+      const contractAddress = await this.params.contract.getContract().methods.getTokenAddress().call();
+      const erc20Contract = new ERC20Contract({ ...this.params, contractAddress });
+
+      return await erc20Contract.getDecimalsAsync();
+    } catch (err) {
+      // defaulting to 18 decimals
+      return 18;
+    }
+  }
 
   /**
    * @function isClaimed
@@ -44,8 +62,11 @@ class MerkleDistributorContract extends IContract {
    * @param {String[]} merkleProof
    */
   async claim({index, account, amount, merkleProof }) {
+    const decimals = await this.getTokenDecimals();
+    const amountDecimals = Numbers.toSmartContractDecimals(amount, decimals);
+
     return await this.__sendTx(
-      this.getContract().methods.claim(index, account, amount, merkleProof)
+      this.getContract().methods.claim(index, account, `0x${Number(amountDecimals).toString(16)}`, merkleProof)
     );
   };
 

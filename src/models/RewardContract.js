@@ -1,9 +1,9 @@
 // const _ =  require("lodash");
 // const moment = require("moment");
 
-const reward = require("../interfaces").reward;
+const reward = require('../interfaces').reward;
 
-const Numbers = require("../utils/Numbers");
+const Numbers = require('../utils/Numbers');
 const IContract = require('./IContract');
 
 const actions = {

@@ -37,7 +37,7 @@ class PolkamarketsSocialLogin extends SocialLogin {
 
       await socialLogin.init(initData);
 
-      if (socialLogin?.provider) {
+      if (socialLogin && socialLogin.provider) {
         socialLogin.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(socialLogin.provider, socialLogin.socialLoginParams.networkConfig);
       }
 

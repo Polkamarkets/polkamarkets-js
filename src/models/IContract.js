@@ -86,7 +86,7 @@ class IContract {
 
   async sendGaslessTransactions(f) {
     const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
-    const smartAccount = PolkamarketsSmartAccount.singleton.getInstance(socialLogin?.provider);
+    const smartAccount = PolkamarketsSmartAccount.singleton.getInstance((socialLogin ? socialLogin.provider : null));
 
     const { isMetamask, signer } = await socialLogin.providerIsMetamask();
 
