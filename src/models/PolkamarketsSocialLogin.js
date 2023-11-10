@@ -126,7 +126,7 @@ class PolkamarketsSocialLogin {
             defaultLanguage: 'en',
             dark: true
           },
-          sessionTime: 86400 * 30, // 30 days
+          redirectUrl: typeof window !== 'undefined' ? window.location.href : '',
         },
         privateKeyProvider
       })
@@ -259,6 +259,7 @@ class PolkamarketsSocialLogin {
     let connectToOptions = {
       loginProvider,
       mfaLevel: 'none',
+      sessionTime: 86400 * 7,
       extraLoginOptions: {
         scope: 'email'
       }
@@ -268,6 +269,7 @@ class PolkamarketsSocialLogin {
       connectToOptions = {
         loginProvider: 'discordcustom',
         mfaLevel: 'none',
+        sessionTime: 86400 * 7,
         extraLoginOptions: {
           scope: 'identify email guilds',
         }
