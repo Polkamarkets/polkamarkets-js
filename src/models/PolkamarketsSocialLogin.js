@@ -17,16 +17,16 @@ class PolkamarketsSocialLogin {
       // convert int to hex
       const chainId = networkConfig.chainId.toString(16);
 
-      const initData = {
+      const web3AuthConfig = {
         network: isTestnet ? 'testnet' : 'cyan',
         chainId: `0x${chainId}`,
       };
 
       if (whiteLabelData) {
-        initData.whiteLabelData = whiteLabelData;
+        web3AuthConfig.whiteLabelData = whiteLabelData;
       }
 
-      await socialLogin.init(initData);
+      await socialLogin.init(web3AuthConfig);
 
       if (socialLogin?.provider) {
         socialLogin.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(socialLogin.provider, socialLogin.socialLoginParams.networkConfig);
@@ -76,22 +76,18 @@ class PolkamarketsSocialLogin {
     }
   }
 
-  async init(socialLoginDTO) {
-    const finalDTO = {
-      chainId: '0x1',
-      network: 'mainnet',
-      whiteLabelData: this.whiteLabel
-    }
-    if (socialLoginDTO) {
-      if (socialLoginDTO.chainId) finalDTO.chainId = socialLoginDTO.chainId
-      if (socialLoginDTO.network) finalDTO.network = socialLoginDTO.network
-      if (socialLoginDTO.whiteLabelData) this.whiteLabel = socialLoginDTO.whiteLabelData
-    }
+  async init(web3AuthConfig) {
+    const web3AuthNetwork = {
+      network: web3AuthConfig?.network || this.socialLoginParams?.isTestnet ? 'testnet' : 'cyan',
+      chainId: web3AuthConfig?.chainId || `0x${this.socialLoginParams?.networkConfig?.chainId?.toString(16) || '1'}`,
+    };
+
+    if (web3AuthConfig?.whiteLabelData) this.whiteLabel = web3AuthConfig.whiteLabelData
 
     try {
       const chainConfig = {
         chainNamespace: CHAIN_NAMESPACES.EIP155,
-        chainId: finalDTO.chainId
+        chainId: web3AuthNetwork.chainId
       };
 
       const web3AuthCore = new Web3AuthNoModal({
@@ -116,7 +112,7 @@ class PolkamarketsSocialLogin {
       const openloginAdapter = new OpenloginAdapter({
         adapterSettings: {
           clientId: this.clientId,
-          network: finalDTO.network,
+          network: web3AuthNetwork.network,
           uxMode: 'redirect',
           loginConfig,
           whiteLabel: {
