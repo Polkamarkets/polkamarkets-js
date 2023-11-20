@@ -1,7 +1,7 @@
 const Contract = require("../utils/Contract");
 const _ = require("lodash");
 const axios = require('axios');
-const PolkamarketsSmartAccount = require("./PolkamarketsSmartAccount");
+const PolkamarketsSocialLogin = require('./PolkamarketsSocialLogin');
 const ethers = require('ethers').ethers;
 
 /**
@@ -84,9 +84,8 @@ class IContract {
   };
 
   async sendGaslessTransactions(f) {
-    const PolkamarketsSocialLogin = require("./PolkamarketsSocialLogin");
     const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
-    const smartAccount = PolkamarketsSmartAccount.singleton.getInstance(socialLogin?.provider);
+    const smartAccount = socialLogin.smartAccount;
 
     const { isMetamask, signer } = await socialLogin.providerIsMetamask();
 
@@ -100,35 +99,43 @@ class IContract {
       data: methodCallData,
     };
 
-    let txResponse
     try {
+      let receipt;
+
       if (isMetamask) {
-        txResponse = await signer.sendTransaction({ ...tx, gasLimit: 210000 });
+        const txResponse = await signer.sendTransaction({ ...tx, gasLimit: 210000 });
+        receipt = await txResponse.wait();
       } else {
-        txResponse = await smartAccount.sendTransaction({
-          transaction: tx
-        });
+        const feeQuotesResult = await smartAccount.getFeeQuotes(tx);
+
+        const txResponse = await smartAccount.sendUserOperation(
+          {
+            userOp: feeQuotesResult.verifyingPaymasterGasless?.userOp,
+            userOpHash: feeQuotesResult.verifyingPaymasterGasless?.userOpHash,
+          });
+
+        const web3Provider = new ethers.providers.Web3Provider(socialLogin?.provider)
+
+        receipt = await web3Provider.waitForTransaction(txResponse);
       }
+
+      if (receipt.logs) {
+        const events = receipt.logs.map(log => {
+          try {
+            const event = contractInterface.parseLog(log);
+            return event;
+          } catch (error) {
+            return null;
+          }
+        });
+        receipt.events = this.convertEtherEventsToWeb3Events(events);
+      }
+
+      return receipt;
     } catch (error) {
+      console.error(error);
       throw error;
     }
-
-    // https://docs.ethers.org/v5/api/providers/types/#providers-TransactionResponse
-    const receipt = await txResponse.wait();
-
-    if (receipt.logs) {
-      const events = receipt.logs.map(log => {
-        try {
-          const event = contractInterface.parseLog(log);
-          return event;
-        } catch (error) {
-          return null;
-        }
-      });
-      receipt.events = this.convertEtherEventsToWeb3Events(events);
-    }
-
-    return receipt;
   }
 
   convertEtherEventsToWeb3Events(events) {

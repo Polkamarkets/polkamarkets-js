@@ -28,6 +28,7 @@
         "@openzeppelin/contracts": "^4.8.2",
         "@openzeppelin/contracts-upgradeable": "^4.8.2",
         "@openzeppelin/truffle-upgrades": "^1.7.0",
+        "@particle-network/aa": "^1.2.0",
         "@reality.eth/reality-eth-lib": "^3.2.10",
         "@web3auth/base": "^6.1.7",
         "@web3auth/ethereum-provider": "^6.1.7",

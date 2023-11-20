@@ -10,37 +10,11 @@ const { WALLET_ADAPTERS, CHAIN_NAMESPACES } = require('@web3auth/base');
 const { MetamaskAdapter } = require('@web3auth/metamask-adapter');
 
 class PolkamarketsSocialLogin {
-
-  static initSocialLogin = async (socialLogin, urls, isTestnet, whiteLabelData, networkConfig) => {
-    if (!socialLogin.isInit) {
-
-      // convert int to hex
-      const chainId = networkConfig.chainId.toString(16);
-
-      const initData = {
-        network: isTestnet ? 'testnet' : 'cyan',
-        chainId: `0x${chainId}`,
-      };
-
-      if (whiteLabelData) {
-        initData.whiteLabelData = whiteLabelData;
-      }
-
-      await socialLogin.init(initData);
-
-      if (socialLogin?.provider) {
-        socialLogin.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(socialLogin.provider, socialLogin.socialLoginParams.networkConfig);
-      }
-
-      socialLogin.eventEmitter.emit('init');
-    }
-  }
-
   static singleton = (() => {
     let socialLogin;
 
-    function createInstance(web3AuthConfig, web3Provider, useCustomModal) {
-      const instance = new PolkamarketsSocialLogin(web3AuthConfig, web3Provider, useCustomModal);
+    function createInstance(web3AuthConfig, web3Provider) {
+      const instance = new PolkamarketsSocialLogin(web3AuthConfig, web3Provider);
       instance.eventEmitter = new SafeEventEmitter();
       return instance;
     }
@@ -48,155 +22,112 @@ class PolkamarketsSocialLogin {
     return {
       getInstance: (socialLoginParams, web3Provider) => {
         if (!socialLogin) {
-          socialLogin = createInstance(socialLoginParams.web3AuthConfig, web3Provider, socialLoginParams.useCustomModal);
-          socialLogin.socialLoginParams = socialLoginParams;
-          this.initSocialLogin(socialLogin, socialLoginParams.urls, socialLoginParams.isTestnet, socialLoginParams.whiteLabelData, socialLoginParams.networkConfig);
+          socialLogin = createInstance(socialLoginParams, web3Provider);
+          socialLogin.init();
         }
         return socialLogin;
       }
     };
   })();
 
-  constructor(web3AuthConfig = null, web3Provider = null, useCustomModal = false) {
+  constructor(socialLoginParams = null, web3Provider = null) {
     this.isInit = false
     this.web3auth = null
     this.web3Provider = web3Provider;
-    this.provider = null
+    this.provider = null;
 
-    this.whiteLabel = {
-      name: 'Biconomy SDK',
-      logo: 'https://s2.coinmarketcap.com/static/img/coins/64x64/9543.png'
-    }
-
-    this.useCustomModal = useCustomModal;
-    this.web3AuthConfig = web3AuthConfig;
-
-    if (this.web3AuthConfig && this.web3AuthConfig.clientId) {
-      this.clientId = this.web3AuthConfig.clientId;
-    }
+    this.web3AuthConfig = socialLoginParams.web3AuthConfig;
+    this.isTestnet = socialLoginParams.isTestnet;
+    this.whiteLabelData = socialLoginParams.whiteLabelData;
+    this.networkConfig = socialLoginParams.networkConfig;
   }
 
-  async init(socialLoginDTO) {
-    const finalDTO = {
-      chainId: '0x1',
-      network: 'mainnet',
-      whiteLabelData: this.whiteLabel
-    }
-    if (socialLoginDTO) {
-      if (socialLoginDTO.chainId) finalDTO.chainId = socialLoginDTO.chainId
-      if (socialLoginDTO.network) finalDTO.network = socialLoginDTO.network
-      if (socialLoginDTO.whiteLabelData) this.whiteLabel = socialLoginDTO.whiteLabelData
-    }
+  async init() {
+    if (!this.isInit) {
+      // convert int to hex
+      const chainId = `0x${this.networkConfig.chainId.toString(16)}`;
 
-    try {
-      const chainConfig = {
-        chainNamespace: CHAIN_NAMESPACES.EIP155,
-        chainId: finalDTO.chainId
-      };
-
-      const web3AuthCore = new Web3AuthNoModal({
-        clientId: this.clientId,
-        chainConfig
-      })
-
-      const loginConfig = {};
-
-      if (this.web3AuthConfig && this.web3AuthConfig.discord) {
-        loginConfig.discordcustom = {
-          name: 'Discord',
-          verifier: this.web3AuthConfig.discord.customVerifier,
-          typeOfLogin: 'discord',
-          clientId: this.web3AuthConfig.discord.clientId,
-        };
-      }
-
-      const privateKeyProvider = new EthereumPrivateKeyProvider({
-        config: { chainConfig: { ...chainConfig, rpcTarget: this.web3Provider }},
-      });
-      const openloginAdapter = new OpenloginAdapter({
-        adapterSettings: {
-          clientId: this.clientId,
-          network: finalDTO.network,
-          uxMode: 'redirect',
-          loginConfig,
-          whiteLabel: {
-            name: this.whiteLabel.name,
-            logoLight: this.whiteLabel.logo,
-            logoDark: this.whiteLabel.logo,
-            defaultLanguage: 'en',
-            dark: true
-          },
-          redirectUrl: typeof window !== 'undefined' ? window.location.href : '',
-        },
-        privateKeyProvider
-      })
-      // const metamaskAdapter = new MetamaskAdapter({
-      //   clientId: this.clientId
-      // })
-
-      web3AuthCore.configureAdapter(openloginAdapter)
-      // web3AuthCore.configureAdapter(metamaskAdapter)
-
-      await web3AuthCore.init()
-      this.web3auth = web3AuthCore
-      if (web3AuthCore && web3AuthCore.provider) {
-        try {
-          await this.web3auth.getUserInfo()
-          this.provider = web3AuthCore.provider;
-        } catch (error) {
-          // ignore, provider is invalid
-        }
-      }
-
-      this.isInit = true
-    } catch (error) {
-      console.error(error)
-    }
-  }
-
-  hideWallet() {
-    // super.hideWallet();
-    this.eventEmitter.emit('finishLogin', false);
-  }
-
-  async showWallet() {
-    return new Promise((resolve, reject) => {
       try {
-        this.eventEmitter.on('finishLogin', (resp) => {
-          if (resp && this.provider) {
-            this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.socialLoginParams.networkConfig);
-          }
-          resolve(resp)
+        const chainConfig = {
+          chainNamespace: CHAIN_NAMESPACES.EIP155,
+          chainId,
+          rpcTarget: this.web3Provider,
+        };
+
+        const loginConfig = {};
+
+        if (this.web3AuthConfig && this.web3AuthConfig.discord) {
+          loginConfig.discordcustom = {
+            name: 'Discord',
+            verifier: this.web3AuthConfig.discord.customVerifier,
+            typeOfLogin: 'discord',
+            clientId: this.web3AuthConfig.discord.clientId,
+          };
+        }
+
+        const privateKeyProvider = new EthereumPrivateKeyProvider({
+          config: { chainConfig },
         });
-        // super.showWallet();
+
+        const openloginAdapter = new OpenloginAdapter({
+          adapterSettings: {
+            clientId: this.web3AuthConfig.clientId,
+            network: this.isTestnet ? 'testnet' : 'cyan',
+            uxMode: 'redirect',
+            loginConfig,
+            whiteLabel: {
+              name: this.whiteLabelData.name,
+              logoLight: this.whiteLabelData.logo,
+              logoDark: this.whiteLabelData.logo,
+              defaultLanguage: 'en',
+              dark: true
+            },
+            redirectUrl: typeof window !== 'undefined' ? window.location.href : '',
+          },
+          privateKeyProvider
+        })
+
+        const metamaskAdapter = new MetamaskAdapter({
+          clientId: this.web3AuthConfig.clientId
+        })
+
+        const web3AuthCore = new Web3AuthNoModal({
+          clientId: this.web3AuthConfig.clientId,
+          chainConfig
+        });
+
+        web3AuthCore.configureAdapter(openloginAdapter)
+        web3AuthCore.configureAdapter(metamaskAdapter)
+
+        await web3AuthCore.init();
+        this.web3auth = web3AuthCore;
+
+        if (web3AuthCore && web3AuthCore.provider) {
+          try {
+            await this.web3auth.getUserInfo()
+            this.provider = web3AuthCore.provider;
+            this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.networkConfig);
+          } catch (error) {
+            // ignore, provider is invalid
+          }
+        }
+
+        this.isInit = true;
+        this.eventEmitter.emit('init');
       } catch (error) {
-        reject(error);
+        console.error(error)
       }
-    })
+    }
   }
 
-  async login() {
+  async awaitForInit() {
     if (this.isInit) {
-      if (this.provider) {
-        return true;
-      }
-      if (this.useCustomModal) {
-        return false;
-      }
-      return this.showWallet();
+      return;
     } else {
       return new Promise((resolve, reject) => {
         try {
           this.eventEmitter.on('init', async () => {
-            if (this.provider) {
-              resolve(true);
-              return
-            }
-            if (this.useCustomModal) {
-              resolve(false)
-              return;
-            }
-            resolve(await this.showWallet());
+            resolve();
           });
         } catch (error) {
           reject(error);
@@ -205,167 +136,74 @@ class PolkamarketsSocialLogin {
     }
   }
 
-  // function called to login withotu showing the biconomy model
-  async directLogin(provider, email = null) {
-    if (this.isInit) {
-      if (this.provider) {
-        return true;
-      }
-      return this.callLoginProvider(provider, email);
-    } else {
-      return new Promise((resolve, reject) => {
-        try {
-          this.eventEmitter.on('init', async () => {
-            if (this.provider) {
-              resolve(true);
-            }
-            resolve(await this.callLoginProvider(provider, email));
-          });
-        } catch (error) {
-          reject(error);
-        }
-      })
-    }
-  }
+  async login(loginProvider, email = null) {
+    await this.awaitForInit();
 
-  async callLoginProvider(provider, email = null) {
-    switch (provider) {
-      case 'metamask':
-        return this.metamaskLogin();
-      case 'email':
-        return this.emailLogin(email);
-      default:
-        return this.socialLogin(provider);
-    }
-  }
-
-  async afterSocialLogin(resp) {
-    let success = true;
-    if (resp instanceof Error) {
-      success = false;
+    if (this.provider) {
+      return true;
     }
 
-    this.eventEmitter.emit('finishLogin', success);
-
-    if (success) {
-      this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.socialLoginParams.networkConfig);
-      this.hideWallet();
-    }
-
-    return success;
-  }
-
-  getConnectToOptions(loginProvider) {
-    let connectToOptions = {
-      loginProvider,
-      mfaLevel: 'none',
-      sessionTime: 86400 * 7,
-      extraLoginOptions: {
-        scope: 'email'
-      }
-    }
-
-    if (loginProvider === 'discord' && this.web3AuthConfig && this.web3AuthConfig.discord) {
-      connectToOptions = {
-        loginProvider: 'discordcustom',
-        mfaLevel: 'none',
-        sessionTime: 86400 * 7,
-        extraLoginOptions: {
-          scope: 'identify email guilds',
-        }
-      };
-    }
-
-    return connectToOptions;
-  }
-
-  async biconomySocialLogin(loginProvider) {
-    if (!this.web3auth) {
-      console.info('web3auth not initialized yet')
-      return
-    }
     try {
-
       const web3authProvider = await this.web3auth.connectTo(
-        WALLET_ADAPTERS.OPENLOGIN,
-        this.getConnectToOptions(loginProvider)
+        this.getWalletAdapter(loginProvider),
+        this.getConnectToOptions(loginProvider, {email})
       );
 
       if (!web3authProvider) {
-        console.error('web3authProvider is null')
-        return null
+        throw new Error('web3authProvider is null');
       }
 
-      this.provider = web3authProvider
-      return web3authProvider
+      this.provider = web3authProvider;
+
+      this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.networkConfig);
+
+      return true;
     } catch (error) {
       console.error(error)
-      return error
+      return false;
     }
   }
 
-  async biconomyEmailLogin(email) {
-    if (!this.web3auth) {
-      console.info('web3auth not initialized yet')
-      return
+  getWalletAdapter(loginProvider) {
+    switch (loginProvider) {
+      case 'metamask':
+        return WALLET_ADAPTERS.METAMASK;
+      default:
+        return WALLET_ADAPTERS.OPENLOGIN;
     }
-    try {
-      const web3authProvider = await this.web3auth.connectTo(
-        WALLET_ADAPTERS.OPENLOGIN, {
+  }
+
+  getConnectToOptions(loginProvider, loginData = null) {
+    switch (loginProvider) {
+      case 'metamask':
+        return {};
+      case 'email':
+        return {
           loginProvider: 'email_passwordless',
-          login_hint: email
-      });
-
-      if (!web3authProvider) {
-        console.error('web3authProvider is null')
-        return null
-      }
-
-      this.provider = web3authProvider
-      return web3authProvider
-    } catch (error) {
-      console.error(error)
-      return error
+          login_hint: loginData.email,
+        };
+      default:
+        let connectToOptions = {
+          loginProvider,
+          mfaLevel: 'none',
+          sessionTime: 86400 * 7,
+          extraLoginOptions: {
+            scope: 'email'
+          }
+        }
+    
+        if (loginProvider === 'discord' && this.web3AuthConfig && this.web3AuthConfig.discord) {
+          connectToOptions = {
+            loginProvider: 'discordcustom',
+            mfaLevel: 'none',
+            sessionTime: 86400 * 7,
+            extraLoginOptions: {
+              scope: 'identify email guilds',
+            }
+          };
+        }
+        return connectToOptions;
     }
-  }
-
-  async biconomyMetamaskLogin() {
-    if (!this.web3auth) {
-      console.log('web3auth not initialized yet')
-      return
-    }
-    try {
-      const web3authProvider = await this.web3auth.connectTo(WALLET_ADAPTERS.METAMASK)
-      if (!web3authProvider) {
-        console.log('web3authProvider is null')
-        return null
-      }
-
-      this.provider = web3authProvider
-      return web3authProvider
-    } catch (error) {
-      console.error(error)
-      return error
-    }
-  }
-
-
-  async socialLogin(loginProvider) {
-    const resp = await this.biconomySocialLogin(loginProvider);
-
-    return this.afterSocialLogin(resp);
-  }
-
-  async emailLogin(email) {
-    const resp = await this.biconomyEmailLogin(email);
-
-    return this.afterSocialLogin(resp);
-  }
-
-  async metamaskLogin() {
-    const resp = await this.biconomyMetamaskLogin();
-
-    return this.afterSocialLogin(resp);
   }
 
   async providerIsMetamask() {
@@ -382,41 +220,12 @@ class PolkamarketsSocialLogin {
   }
 
   async getAddress() {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const { isMetamask, address } = await this.providerIsMetamask();
-        if (isMetamask) {
-          resolve(address);
-          return;
-        }
+    const { isMetamask, address } = await this.providerIsMetamask();
+    if (isMetamask) {
+      return address;
+    }
 
-        if (this.smartAccount.isInit) {
-          resolve(this.smartAccount.address);
-        } else {
-          this.smartAccount.eventEmitter.on('init', (resp) => {
-            resolve(this.smartAccount.address);
-          });
-        }
-      } catch (error) {
-        reject(error);
-      }
-    })
-  }
-
-  async isLoggedIn() {
-    return new Promise(async (resolve, reject) => {
-      try {
-        if (this.isInit) {
-          resolve(!!this.provider);
-        } else {
-          this.eventEmitter.on('init', (resp) => {
-            resolve(!!this.provider);
-          });
-        }
-      } catch (error) {
-        reject(error);
-      }
-    })
+    return this.smartAccount.getAddress();
   }
 
   async getUserInfo() {
@@ -426,6 +235,12 @@ class PolkamarketsSocialLogin {
       return userInfo
     }
     return null
+  }
+
+  async isLoggedIn() {
+    await this.awaitForInit();
+
+    return !!this.provider;
   }
 
   async logout() {

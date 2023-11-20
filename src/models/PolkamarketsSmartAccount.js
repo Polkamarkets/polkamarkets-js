@@ -1,33 +1,24 @@
-const SafeEventEmitter = require('@metamask/safe-event-emitter').default;
-const ethers = require('ethers').ethers;
-const SmartAccount = require('@biconomy/smart-account').default;
+const { SmartAccount } = require('@particle-network/aa');
 
 class PolkamarketsSmartAccount extends SmartAccount {
-
-  static initSmartAccount = async (smartAccount) => {
-    if (!smartAccount.isInit) {
-      await smartAccount.init();
-      smartAccount.isInit = true;
-
-      smartAccount.eventEmitter.emit('init', true);
-    }
-  }
 
   static singleton = (() => {
     let smartAccount;
 
     function createInstance(provider, networkConfig) {
-      const web3Provider = new ethers.providers.Web3Provider(provider);
-
       const options = {
-        // debug: true,
-        activeNetworkId: networkConfig.chainId,
-        supportedNetworksIds: [networkConfig.chainId],
-        networkConfig: [networkConfig]
+        projectId: networkConfig.particleProjectId,
+        clientKey: networkConfig.particleClientKey,
+        appId: networkConfig.particleAppId,
+        aaOptions: {
+          simple: [{
+            chainId: networkConfig.chainId,
+            version: '1.0.0',
+          }],
+        },
       };
 
-      const instance = new PolkamarketsSmartAccount(web3Provider, options);
-      instance.eventEmitter = new SafeEventEmitter();
+      const instance = new PolkamarketsSmartAccount(provider, options);
       return instance;
     }
 
@@ -35,7 +26,6 @@ class PolkamarketsSmartAccount extends SmartAccount {
       getInstance: (provider, networkConfig) => {
         if (!smartAccount) {
           smartAccount = createInstance(provider, networkConfig);
-          this.initSmartAccount(smartAccount);
         }
         return smartAccount;
       },

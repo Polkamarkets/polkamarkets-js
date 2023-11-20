@@ -77,7 +77,7 @@ class Application {
    */
   async login() {
     if (this.isSocialLogin) {
-      return this.socialLogin.login();
+      return this.socialLogin.isLoggedIn();
     } else {
       try {
         if (typeof window === "undefined") { return false; }
@@ -100,7 +100,7 @@ class Application {
    */
   async isLoggedIn() {
     if (this.isSocialLogin) {
-      return await this.socialLogin?.isLoggedIn();
+      return this.socialLogin.isLoggedIn();
     } else {
       try {
         if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
@@ -366,31 +366,31 @@ class Application {
   };
 
   async socialLoginGoogle() {
-    return await this.socialLogin.directLogin('google');
+    return await this.socialLogin.login('google');
   }
 
   async socialLoginFacebook() {
-    return await this.socialLogin.directLogin('facebook');
+    return await this.socialLogin.login('facebook');
   }
 
   async socialLoginTwitter() {
-    return await this.socialLogin.directLogin('twitter');
+    return await this.socialLogin.login('twitter');
   }
 
   async socialLoginGithub() {
-    return await this.socialLogin.directLogin('github');
+    return await this.socialLogin.login('github');
   }
 
   async socialLoginDiscord() {
-    return await this.socialLogin.directLogin('discord');
+    return await this.socialLogin.login('discord');
   }
 
   async socialLoginEmail(email) {
-    return await this.socialLogin.directLogin('email', email);
+    return await this.socialLogin.login('email', email);
   }
 
   async socialLoginMetamask() {
-    return await this.socialLogin.directLogin('metamask');
+    return await this.socialLogin.login('metamask');
   }
 
   async socialLoginLogout() {
