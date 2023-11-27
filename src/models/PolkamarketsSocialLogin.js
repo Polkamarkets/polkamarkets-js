@@ -56,6 +56,14 @@ class PolkamarketsSocialLogin {
 
         const loginConfig = {};
 
+        if (this.web3AuthConfig && this.web3AuthConfig.jwt) {
+          loginConfig.jwt = {
+            verifier: this.web3AuthConfig.jwt.customVerifier, // name of the verifier created on Web3Auth Dashboard
+            typeOfLogin: 'jwt',
+            clientId: this.web3AuthConfig.clientId,
+          };
+        }
+
         if (this.web3AuthConfig && this.web3AuthConfig.discord) {
           loginConfig.discordcustom = {
             name: 'Discord',
@@ -136,7 +144,7 @@ class PolkamarketsSocialLogin {
     }
   }
 
-  async login(loginProvider, email = null) {
+  async login(loginProvider, email = null, jwtToken = null) {
     await this.awaitForInit();
 
     if (this.provider) {
@@ -146,7 +154,7 @@ class PolkamarketsSocialLogin {
     try {
       const web3authProvider = await this.web3auth.connectTo(
         this.getWalletAdapter(loginProvider),
-        this.getConnectToOptions(loginProvider, {email})
+        this.getConnectToOptions(loginProvider, { email, jwtToken })
       );
 
       if (!web3authProvider) {
@@ -177,6 +185,14 @@ class PolkamarketsSocialLogin {
     switch (loginProvider) {
       case 'metamask':
         return {};
+      case 'jwt':
+        return {
+          loginProvider: 'jwt',
+          extraLoginOptions: {
+            id_token: loginData.jwtToken,
+            verifierIdField: 'sub',
+          },
+        }
       case 'email':
         return {
           loginProvider: 'email_passwordless',

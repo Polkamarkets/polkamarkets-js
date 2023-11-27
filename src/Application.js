@@ -393,6 +393,10 @@ class Application {
     return await this.socialLogin.login('metamask');
   }
 
+  async socialLoginWithJWT() {
+    return await this.socialLogin.login('jwt', null, jwtToken);
+  }
+
   async socialLoginLogout() {
     if (this.socialLogin?.provider) {
       this.socialLogin.logout();
