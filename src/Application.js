@@ -409,6 +409,11 @@ class Application {
       return await this.socialLogin.getUserInfo();
     }
   }
+
+  async forceInit() {
+    this.socialLogin.isInit = false;
+    await this.socialLogin?.init();
+  }
 }
 
 module.exports = Application;

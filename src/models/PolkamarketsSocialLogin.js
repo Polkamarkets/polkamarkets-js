@@ -188,6 +188,7 @@ class PolkamarketsSocialLogin {
       case 'jwt':
         return {
           loginProvider: 'jwt',
+          mfaLevel: 'none',
           extraLoginOptions: {
             id_token: loginData.jwtToken,
             verifierIdField: 'sub',
@@ -197,6 +198,7 @@ class PolkamarketsSocialLogin {
         return {
           loginProvider: 'email_passwordless',
           login_hint: loginData.email,
+          mfaLevel: 'none',
         };
       default:
         let connectToOptions = {
