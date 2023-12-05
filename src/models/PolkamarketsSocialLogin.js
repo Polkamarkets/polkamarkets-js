@@ -92,7 +92,8 @@ class PolkamarketsSocialLogin {
 
       const web3AuthCore = new Web3AuthNoModal({
         clientId: this.clientId,
-        chainConfig
+        chainConfig,
+        sessionTime: 86400 * 7,
       })
 
       const loginConfig = {};
@@ -255,7 +256,6 @@ class PolkamarketsSocialLogin {
     let connectToOptions = {
       loginProvider,
       mfaLevel: 'none',
-      sessionTime: 86400 * 7,
       extraLoginOptions: {
         scope: 'email'
       }
@@ -265,7 +265,6 @@ class PolkamarketsSocialLogin {
       connectToOptions = {
         loginProvider: 'discordcustom',
         mfaLevel: 'none',
-        sessionTime: 86400 * 7,
         extraLoginOptions: {
           scope: 'identify email guilds',
         }
