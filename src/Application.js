@@ -365,7 +365,7 @@ class Application {
   };
 
   async socialLoginWithJWT(id, jwtToken) {
-    return await this.socialLogin.login('jwt', id, jwtToken);
+    return await this.socialLogin.login(id, jwtToken);
   }
 
   async socialLoginLogout() {
