@@ -4,10 +4,9 @@ const SafeEventEmitter = require('@metamask/safe-event-emitter').default;
 const ethers = require('ethers').ethers;
 
 const { EthereumPrivateKeyProvider } = require('@web3auth/ethereum-provider');
-const { OpenloginAdapter } = require('@web3auth/openlogin-adapter');
-const Web3AuthNoModal = require('@web3auth/no-modal').Web3AuthNoModal;
-const { WALLET_ADAPTERS, CHAIN_NAMESPACES } = require('@web3auth/base');
-const { MetamaskAdapter } = require('@web3auth/metamask-adapter');
+const { CHAIN_NAMESPACES } = require('@web3auth/base');
+
+const { Web3Auth } = require('@web3auth/single-factor-auth');
 
 class PolkamarketsSocialLogin {
   static singleton = (() => {
@@ -54,66 +53,25 @@ class PolkamarketsSocialLogin {
           rpcTarget: this.web3Provider,
         };
 
-        const loginConfig = {};
-
-        if (this.web3AuthConfig && this.web3AuthConfig.jwt) {
-          loginConfig.jwt = {
-            verifier: this.web3AuthConfig.jwt.customVerifier, // name of the verifier created on Web3Auth Dashboard
-            typeOfLogin: 'jwt',
-            clientId: this.web3AuthConfig.clientId,
-          };
-        }
-
-        if (this.web3AuthConfig && this.web3AuthConfig.discord) {
-          loginConfig.discordcustom = {
-            name: 'Discord',
-            verifier: this.web3AuthConfig.discord.customVerifier,
-            typeOfLogin: 'discord',
-            clientId: this.web3AuthConfig.discord.clientId,
-          };
-        }
 
         const privateKeyProvider = new EthereumPrivateKeyProvider({
           config: { chainConfig },
         });
 
-        const openloginAdapter = new OpenloginAdapter({
-          adapterSettings: {
-            clientId: this.web3AuthConfig.clientId,
-            network: this.isTestnet ? 'testnet' : 'cyan',
-            uxMode: 'redirect',
-            loginConfig,
-            whiteLabel: {
-              name: this.whiteLabelData.name,
-              logoLight: this.whiteLabelData.logo,
-              logoDark: this.whiteLabelData.logo,
-              defaultLanguage: 'en',
-              dark: true
-            },
-            redirectUrl: typeof window !== 'undefined' ? window.location.href : '',
-          },
-          privateKeyProvider
-        })
-
-        const metamaskAdapter = new MetamaskAdapter({
-          clientId: this.web3AuthConfig.clientId
-        })
-
-        const web3AuthCore = new Web3AuthNoModal({
+        const web3AuthCore = new Web3Auth({
           clientId: this.web3AuthConfig.clientId,
-          chainConfig
+          web3AuthNetwork: this.isTestnet ? 'testnet' : 'sapphire_mainnet',
+          enableLogging: true,
+          sessionTime: 86400 * 7,
         });
 
-        web3AuthCore.configureAdapter(openloginAdapter)
-        web3AuthCore.configureAdapter(metamaskAdapter)
-
-        await web3AuthCore.init();
+        await web3AuthCore.init(privateKeyProvider);
         this.web3auth = web3AuthCore;
 
-        if (web3AuthCore && web3AuthCore.provider) {
+        if (web3AuthCore && web3AuthCore.provider.provider) {
           try {
             await this.web3auth.getUserInfo()
-            this.provider = web3AuthCore.provider;
+            this.provider = web3AuthCore.provider.provider;
             this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.networkConfig);
           } catch (error) {
             // ignore, provider is invalid
@@ -144,7 +102,7 @@ class PolkamarketsSocialLogin {
     }
   }
 
-  async login(loginProvider, email = null, jwtToken = null) {
+  async login(id = null, jwtToken = null) {
     await this.awaitForInit();
 
     if (this.provider) {
@@ -152,16 +110,17 @@ class PolkamarketsSocialLogin {
     }
 
     try {
-      const web3authProvider = await this.web3auth.connectTo(
-        this.getWalletAdapter(loginProvider),
-        this.getConnectToOptions(loginProvider, { email, jwtToken })
-      );
+      const web3authProvider = await this.web3auth.connect({
+        verifier: this.web3AuthConfig.jwt.customVerifier,
+        verifierId: id,
+        idToken: jwtToken,
+      });
 
       if (!web3authProvider) {
         throw new Error('web3authProvider is null');
       }
 
-      this.provider = web3authProvider;
+      this.provider = web3authProvider.provider;
 
       this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(this.provider, this.networkConfig);
 
@@ -169,58 +128,6 @@ class PolkamarketsSocialLogin {
     } catch (error) {
       console.error(error)
       return false;
-    }
-  }
-
-  getWalletAdapter(loginProvider) {
-    switch (loginProvider) {
-      case 'metamask':
-        return WALLET_ADAPTERS.METAMASK;
-      default:
-        return WALLET_ADAPTERS.OPENLOGIN;
-    }
-  }
-
-  getConnectToOptions(loginProvider, loginData = null) {
-    switch (loginProvider) {
-      case 'metamask':
-        return {};
-      case 'jwt':
-        return {
-          loginProvider: 'jwt',
-          mfaLevel: 'none',
-          extraLoginOptions: {
-            id_token: loginData.jwtToken,
-            verifierIdField: 'sub',
-          },
-        }
-      case 'email':
-        return {
-          loginProvider: 'email_passwordless',
-          login_hint: loginData.email,
-          mfaLevel: 'none',
-        };
-      default:
-        let connectToOptions = {
-          loginProvider,
-          mfaLevel: 'none',
-          sessionTime: 86400 * 7,
-          extraLoginOptions: {
-            scope: 'email'
-          }
-        }
-    
-        if (loginProvider === 'discord' && this.web3AuthConfig && this.web3AuthConfig.discord) {
-          connectToOptions = {
-            loginProvider: 'discordcustom',
-            mfaLevel: 'none',
-            sessionTime: 86400 * 7,
-            extraLoginOptions: {
-              scope: 'identify email guilds',
-            }
-          };
-        }
-        return connectToOptions;
     }
   }
 
@@ -266,8 +173,7 @@ class PolkamarketsSocialLogin {
       console.log('web3auth not initialized yet')
       return
     }
-    await this.web3auth.logout()
-    this.web3auth.clearCache()
+    await this.web3auth.logout();
     this.provider = null
   }
 }
