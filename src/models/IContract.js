@@ -379,11 +379,11 @@ class IContract {
    * @description Gets contract events
    * @returns {String | undefined} address
    */
-  async getEvents(event, filter) {
+  async getEvents(event, filter, fromBlock = 0, toBlock = 'latest') {
     if (!this.params.web3EventsProvider) {
       const events = this.getContract().getPastEvents(event, {
-        fromBlock: 0,
-        toBlock: 'latest',
+        fromBlock,
+        toBlock,
         filter
       });
 
