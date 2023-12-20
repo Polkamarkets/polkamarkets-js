@@ -155,9 +155,12 @@ class PolkamarketsSocialLogin {
 
   async getUserInfo() {
     if (this.web3auth) {
-      const userInfo = await this.web3auth.getUserInfo()
-      this.userInfo = userInfo
-      return userInfo
+      const [userInfo, {idToken}] = await Promise.all([
+        this.web3auth.getUserInfo(),
+        this.web3auth.authenticateUser(),
+      ]);
+
+      return {...userInfo, idToken};
     }
     return null
   }
