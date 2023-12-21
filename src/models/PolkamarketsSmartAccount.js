@@ -11,10 +11,12 @@ class PolkamarketsSmartAccount extends SmartAccount {
         clientKey: networkConfig.particleClientKey,
         appId: networkConfig.particleAppId,
         aaOptions: {
-          simple: [{
-            chainId: networkConfig.chainId,
-            version: '1.0.0',
-          }],
+          accountContracts: {
+            simple: [{
+              chainId: networkConfig.chainId,
+              version: '1.0.0',
+            }],
+          }
         },
       };
 
