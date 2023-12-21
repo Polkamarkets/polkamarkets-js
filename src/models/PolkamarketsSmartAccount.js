@@ -21,6 +21,7 @@ class PolkamarketsSmartAccount extends SmartAccount {
       };
 
       const instance = new PolkamarketsSmartAccount(provider, options);
+      instance.setSmartAccountContract({ name: 'SIMPLE', version: '1.0.0' })
       return instance;
     }
 
