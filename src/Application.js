@@ -1,5 +1,4 @@
 const Web3 = require("web3");
-require('dotenv').config();
 
 const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
 
@@ -77,7 +76,7 @@ class Application {
    */
   async login() {
     if (this.isSocialLogin) {
-      return this.socialLogin.login();
+      return this.socialLogin.isLoggedIn();
     } else {
       try {
         if (typeof window === "undefined") { return false; }
@@ -100,7 +99,7 @@ class Application {
    */
   async isLoggedIn() {
     if (this.isSocialLogin) {
-      return await this.socialLogin?.isLoggedIn();
+      return this.socialLogin.isLoggedIn();
     } else {
       try {
         if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
@@ -365,38 +364,16 @@ class Application {
     return this.web3.utils.fromWei(wei, "ether");
   };
 
-  async socialLoginGoogle() {
-    return await this.socialLogin.directLogin('google');
-  }
-
-  async socialLoginFacebook() {
-    return await this.socialLogin.directLogin('facebook');
-  }
-
-  async socialLoginTwitter() {
-    return await this.socialLogin.directLogin('twitter');
-  }
-
-  async socialLoginGithub() {
-    return await this.socialLogin.directLogin('github');
-  }
-
-  async socialLoginDiscord() {
-    return await this.socialLogin.directLogin('discord');
-  }
-
-  async socialLoginEmail(email) {
-    return await this.socialLogin.directLogin('email', email);
-  }
-
-  async socialLoginMetamask() {
-    return await this.socialLogin.directLogin('metamask');
+  async socialLoginWithJWT(id, jwtToken) {
+    return await this.socialLogin.login(id, jwtToken);
   }
 
   async socialLoginLogout() {
     if (this.socialLogin?.provider) {
-      this.socialLogin.logout();
+      await this.socialLogin.logout();
       PolkamarketsSmartAccount.singleton.clearInstance();
+      this.socialLogin.isInit = false;
+      await this.socialLogin?.init();
     }
   }
 

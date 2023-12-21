@@ -20,6 +20,16 @@ module.exports = {
       gasPrice: 100000000000,
       websockets: true
     },
+    chiado: {
+      provider: function () {
+        return new HDWalletProvider(
+          mnemonic,
+          "https://rpc.chiadochain.net")
+      },
+      network_id: 10200,
+      gas: 5000000,
+      gasPrice: 10000000
+    },
     moonriver: {
       provider: new HDWalletProvider(mnemonic, "https://rpc.api.moonriver.moonbeam.network/"),
       network_id: 1285
