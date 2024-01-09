@@ -79,16 +79,16 @@ contract PredictionMarketV3Manager is Ownable {
   function disableLand(IERC20 landToken) external {
     Land storage land = lands[address(landToken)];
 
-    require(land.active, "Land does not exist");
+    require(land.active, "Land is not active");
     require(land.admins[msg.sender], "Not admin of the land");
 
-    uint256 amountToUnlock = lockAmount > land.amountLocked ? land.amountLocked : lockAmount;
+    uint256 amountToUnlock = land.amountLocked;
 
     token.transfer(msg.sender, amountToUnlock);
 
     // disable the land
     land.active = false;
-    land.amountLocked = land.amountLocked - amountToUnlock;
+    land.amountLocked = 0;
   }
 
   function enableLand(IERC20 landToken) external {
