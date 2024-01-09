@@ -68,7 +68,9 @@ contract PredictionMarketV3Manager is Ownable {
     IERC20 realitioToken = address(landToken) == address(tokenToAnswer) ? tokenToAnswer : token;
 
     // creating the realityETH_ERC20 contract
-    realitioFactory.createInstance(address(realitioToken));
+    if (realitioFactory.deployments(address(realitioToken)) == address(0)) {
+      realitioFactory.createInstance(address(realitioToken));
+    }
     land.realitio = IRealityETH_IERC20(realitioFactory.deployments(address(realitioToken)));
 
     // transfer the lockAmount to the contract
