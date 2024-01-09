@@ -28,7 +28,7 @@ interface IWETH {
 }
 
 /// @title Market Contract Factory
-contract PredictionMarketV2 is ReentrancyGuard {
+contract PredictionMarketV3 is ReentrancyGuard {
   using SafeERC20 for IERC20;
   using CeilDiv for uint256;
 
