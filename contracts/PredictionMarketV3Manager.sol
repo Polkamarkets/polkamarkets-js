@@ -53,7 +53,6 @@ contract PredictionMarketV3Manager is Ownable {
     IERC20 tokenToAnswer
   ) external {
     require(token.balanceOf(msg.sender) >= lockAmount, "Not enough tokens to lock");
-    require(!lands[msg.sender].active, "Land already exists");
 
     // create a new fantasyERC20 token
     FantasyERC20 landToken = new FantasyERC20(name, symbol, tokenAmountToClaim, address(PMV3));
