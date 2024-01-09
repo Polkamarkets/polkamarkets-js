@@ -23,6 +23,7 @@ contract PredictionMarketV3Manager is Ownable {
   }
 
   mapping(address => Land) public lands;
+  address[] public landTokens;
 
   constructor(
     IPredictionMarketV3 _PMV3,
@@ -63,6 +64,7 @@ contract PredictionMarketV3Manager is Ownable {
     land.active = true;
     land.admins[msg.sender] = true;
     land.amountLocked = lockAmount;
+    landTokens.push(address(landToken));
 
     IERC20 realitioToken = address(tokenToAnswer) == address(0) ? landToken : tokenToAnswer;
 
