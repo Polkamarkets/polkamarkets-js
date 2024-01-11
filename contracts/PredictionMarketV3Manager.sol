@@ -97,6 +97,9 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     // disable the land
     land.active = false;
     land.amountLocked = 0;
+
+    // pausing token
+    FantasyERC20(address(landToken)).pause();
   }
 
   function enableLand(IERC20 landToken) external {
@@ -113,6 +116,9 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     // enable the land
     land.active = true;
     land.amountLocked = land.amountLocked + amountToLock;
+
+    // unpausing token
+    FantasyERC20(address(landToken)).unpause();
   }
 
   function unlockOffsetFromLand(IERC20 landToken) external returns (uint256) {
