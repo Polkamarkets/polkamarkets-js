@@ -15,6 +15,18 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
   uint256 public lockAmount; // amount necessary to lock to create a land
   RealityETH_ERC20_Factory public immutable realitioFactory;
 
+  event LandCreated(address indexed user, address indexed token, address indexed tokenToAnswer, uint256 amountLocked);
+
+  event LandDisabled(address indexed user, address indexed token, uint256 amountUnlocked);
+
+  event LandEnabled(address indexed user, address indexed token, uint256 amountLocked);
+
+  event LandOffsetUnlocked(address indexed user, address indexed token, uint256 amountUnlocked);
+
+  event LandAdminAdded(address indexed user, address indexed token, address indexed admin);
+
+  event LandAdminRemoved(address indexed user, address indexed token, address indexed admin);
+
   struct Land {
     IERC20 token;
     bool active;
@@ -53,7 +65,7 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     string memory symbol,
     uint256 tokenAmountToClaim,
     IERC20 tokenToAnswer
-  ) external {
+  ) external returns (FantasyERC20) {
     require(token.balanceOf(msg.sender) >= lockAmount, "Not enough tokens to lock");
 
     // create a new fantasyERC20 token
@@ -82,9 +94,13 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
 
     // transfer the lockAmount to the contract
     token.transferFrom(msg.sender, address(this), lockAmount);
+
+    emit LandCreated(msg.sender, address(landToken), address(tokenToAnswer), lockAmount);
+
+    return landToken;
   }
 
-  function disableLand(IERC20 landToken) external {
+  function disableLand(IERC20 landToken) external returns (uint256) {
     Land storage land = lands[address(landToken)];
 
     require(land.active, "Land is not active");
@@ -100,9 +116,13 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
 
     // pausing token
     FantasyERC20(address(landToken)).pause();
+
+    emit LandDisabled(msg.sender, address(landToken), amountToUnlock);
+
+    return amountToUnlock;
   }
 
-  function enableLand(IERC20 landToken) external {
+  function enableLand(IERC20 landToken) external returns (uint256) {
     Land storage land = lands[address(landToken)];
 
     require(!land.active, "Land is already active");
@@ -119,6 +139,10 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
 
     // unpausing token
     FantasyERC20(address(landToken)).unpause();
+
+    emit LandEnabled(msg.sender, address(landToken), amountToLock);
+
+    return amountToLock;
   }
 
   function unlockOffsetFromLand(IERC20 landToken) external returns (uint256) {
@@ -134,6 +158,8 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
       land.amountLocked = land.amountLocked - amountToUnlock;
     }
 
+    emit LandOffsetUnlocked(msg.sender, address(landToken), amountToUnlock);
+
     return amountToUnlock;
   }
 
@@ -144,6 +170,8 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     require(land.admins[msg.sender], "Not admin of the land");
 
     land.admins[admin] = true;
+
+    emit LandAdminAdded(msg.sender, address(landToken), admin);
   }
 
   function removeAdminFromLand(IERC20 landToken, address admin) external {
@@ -153,6 +181,8 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     require(land.admins[msg.sender], "Not admin of the land");
 
     land.admins[admin] = false;
+
+    emit LandAdminRemoved(msg.sender, address(landToken), admin);
   }
 
   function isAllowedToCreateMarket(IERC20 marketToken, address user) public view returns (bool) {
