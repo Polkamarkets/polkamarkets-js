@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // local imports
+import "./IFantasyERC20.sol";
 import "./IRealityETH_ERC20.sol";
 import "./IPredictionMarketV3Manager.sol";
 
@@ -320,6 +321,17 @@ contract PredictionMarketV3 is ReentrancyGuard {
     );
     // transferring funds
     IWETH(WETH).deposit{value: msg.value}();
+
+    return marketId;
+  }
+
+  function mintAndCreateMarket(CreateMarketDescription calldata desc) external returns (uint256) {
+    // mint the amount of tokens to the user
+    IFantasyERC20(address(desc.token)).mint(msg.sender, desc.value);
+
+    uint256 marketId = _createMarket(desc);
+    // transferring funds
+    desc.token.safeTransferFrom(msg.sender, address(this), desc.value);
 
     return marketId;
   }

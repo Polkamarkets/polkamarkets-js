@@ -7,8 +7,9 @@ import "./IPredictionMarketV3.sol";
 
 // openzeppelin ownable contract import
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract PredictionMarketV3Manager is Ownable {
+contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
   IPredictionMarketV3 public immutable PMV3; // PredictionMarketV3 contract
   IERC20 public immutable token; // PredictionMarketV3 contract
   uint256 public lockAmount; // amount necessary to lock to create a land
@@ -57,6 +58,11 @@ contract PredictionMarketV3Manager is Ownable {
 
     // create a new fantasyERC20 token
     FantasyERC20 landToken = new FantasyERC20(name, symbol, tokenAmountToClaim, address(PMV3));
+
+    // adding minting privileges to the PMV3 contract
+    landToken.grantRole(keccak256("MINTER_ROLE"), address(PMV3));
+    // adding admin privileges to the msg.sender
+    landToken.grantRole(0x00, msg.sender);
 
     // store the new token in the contract
     Land storage land = lands[address(landToken)];
@@ -162,24 +168,5 @@ contract PredictionMarketV3Manager is Ownable {
     Land storage land = lands[address(marketToken)];
 
     return land.active && land.admins[user];
-  }
-
-  function mintAndCreateMarket(IPredictionMarketV3.CreateMarketDescription calldata description, uint256 amount)
-    external
-  {
-    Land storage land = lands[address(description.token)];
-
-    require(land.active, "Land is not active");
-    require(land.admins[msg.sender], "Not admin of the land");
-    require(isAllowedToCreateMarket(description.token, msg.sender), "Not allowed to create market");
-
-    // mint the amount of tokens to the user
-    FantasyERC20(address(description.token)).mint(address(this), amount);
-
-    // approve the amount of tokens to the PMV3 contract
-    FantasyERC20(address(description.token)).approve(address(PMV3), amount);
-
-    // create the market
-    PMV3.createMarket(description);
   }
 }
