@@ -234,7 +234,7 @@ contract PredictionMarketV3 is ReentrancyGuard {
     require(desc.treasuryFee <= MAX_FEE, "treasury fee must be <= 5%");
     require(address(desc.realitio) != address(0), "_realitioAddress is address 0");
     require(desc.realitioTimeout > 0, "timeout must be positive");
-    require(desc.manager.isAllowedToCreateMarket(desc.token), "not allowed to create market");
+    require(desc.manager.isAllowedToCreateMarket(desc.token, msg.sender), "not allowed to create market");
 
     market.token = desc.token;
     market.closesAtTimestamp = desc.closesAt;

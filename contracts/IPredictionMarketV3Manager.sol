@@ -4,7 +4,7 @@ pragma solidity ^0.8.18;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IPredictionMarketV3Manager {
-  function isAllowedToCreateMarket(IERC20 token) external view returns (bool);
+  function isAllowedToCreateMarket(IERC20 token, address user) external view returns (bool);
 
   function isAllowedToResolveMarket(IERC20 token, address user) external view returns (bool);
 

@@ -143,10 +143,13 @@ contract PredictionMarketV3Manager is Ownable {
     land.admins[admin] = false;
   }
 
-  function isAllowedToCreateMarket(IERC20 marketToken) external view returns (bool) {
+  function isAllowedToCreateMarket(IERC20 marketToken, address user) public view returns (bool) {
+    // call from the mintAndCreateMarket function
+    if (user == address(this)) return true;
+
     Land storage land = lands[address(marketToken)];
 
-    return land.active && land.admins[msg.sender];
+    return land.active && land.admins[user];
   }
 
   function isIERC20TokenSocial(IERC20 marketToken) external view returns (bool) {
@@ -168,9 +171,13 @@ contract PredictionMarketV3Manager is Ownable {
 
     require(land.active, "Land is not active");
     require(land.admins[msg.sender], "Not admin of the land");
+    require(isAllowedToCreateMarket(description.token, msg.sender), "Not allowed to create market");
 
     // mint the amount of tokens to the user
-    FantasyERC20(address(description.token)).mint(msg.sender, amount);
+    FantasyERC20(address(description.token)).mint(address(this), amount);
+
+    // approve the amount of tokens to the PMV3 contract
+    FantasyERC20(address(description.token)).approve(address(PMV3), amount);
 
     // create the market
     PMV3.createMarket(description);
