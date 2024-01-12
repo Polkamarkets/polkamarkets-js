@@ -605,7 +605,11 @@ class PredictionMarketV2Contract extends IContract {
       treasury,
     });
 
-    return await this.__sendTx(this.getContract().methods.createMarketWithETH(desc));
+    return await this.__sendTx(
+      this.getContract().methods.createMarketWithETH(desc),
+      false,
+      desc.value
+    );
   };
 
   /**

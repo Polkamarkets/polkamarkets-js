@@ -124,12 +124,16 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
       treasury,
     });
 
-    return await this.__sendTx(this.getContract().methods.createMarketWithETH({
-      ...desc,
-      realitio: realitioAddress,
-      realitioTimeout,
-      manager: PM3ManagerAddress
-    }));
+    return await this.__sendTx(
+      this.getContract().methods.createMarketWithETH({
+        ...desc,
+        realitio: realitioAddress,
+        realitioTimeout,
+        manager: PM3ManagerAddress
+      }),
+      false,
+      desc.value
+    );
   };
 }
 
