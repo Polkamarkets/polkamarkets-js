@@ -6,6 +6,7 @@ let index = {
   ierc20: require("../../build/contracts/ERC20PresetMinterPauser.json"),
   prediction: require("../../build/contracts/PredictionMarket.json"),
   predictionV2: require("../../build/contracts/PredictionMarketV2.json"),
+  predictionV3: require("../../build/contracts/PredictionMarketV3.json"),
   realitio: require("../../build/contracts/RealitioERC20.json"),
   voting: require("../../build/contracts/Voting.json"),
   weth: require("../../build/contracts/WETH9.json"),

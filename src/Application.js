@@ -140,11 +140,31 @@ class Application {
   /**
    * @name getPredictionMarketV2Contract
    * @param {Address} ContractAddress (Opt) If it is deployed
-   * @description Create a PredictionMarket Contract
+   * @description Create a PredictionMarketV2 Contract
    */
   getPredictionMarketV2Contract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketV2Contract({
+        web3: this.web3,
+        contractAddress,
+        acc: this.account,
+        web3EventsProvider: this.web3EventsProvider,
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name getPredictionMarketV3Contract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PredictionMarketV3 Contract
+   */
+  getPredictionMarketV3Contract({ contractAddress = null } = {}) {
+    try {
+      return new PredictionMarketV3Contract({
         web3: this.web3,
         contractAddress,
         acc: this.account,
