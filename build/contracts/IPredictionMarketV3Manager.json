@@ -1,0 +1,494 @@
+{
+  "contractName": "IPredictionMarketV3Manager",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "isAllowedToCreateMarket",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "isAllowedToResolveMarket",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IERC20",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "isIERC20TokenSocial",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "metadata": "{\"compiler\":{\"version\":\"0.8.18+commit.87f61d96\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"contract IERC20\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"isAllowedToCreateMarket\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IERC20\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"isAllowedToResolveMarket\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IERC20\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"isIERC20TokenSocial\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"project:/contracts/IPredictionMarketV3Manager.sol\":\"IPredictionMarketV3Manager\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"@openzeppelin/contracts/token/ERC20/IERC20.sol\":{\"keccak256\":\"0x9750c6b834f7b43000631af5cc30001c5f547b3ceb3635488f140f60e897ea6b\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://5a7d5b1ef5d8d5889ad2ed89d8619c09383b80b72ab226e0fe7bde1636481e34\",\"dweb:/ipfs/QmebXWgtEfumQGBdVeM6c71McLixYXQP5Bk6kKXuoY4Bmr\"]},\"project:/contracts/IPredictionMarketV3Manager.sol\":{\"keccak256\":\"0x5b8dca067534f46da015c26afa502d9825d058d4ce40b79c4f0204f8219718c8\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://dc04293027364acdf1a362232e6c96cc9ccfd642410a9247323f36d394fcba1d\",\"dweb:/ipfs/QmPL8eLBf26tsAsv9ma8E4HpwKgvbZojmNvCKSd5D4V8H8\"]}},\"version\":1}",
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "immutableReferences": {},
+  "generatedSources": [],
+  "deployedGeneratedSources": [],
+  "sourceMap": "",
+  "deployedSourceMap": "",
+  "source": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.18;\n\nimport \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\n\ninterface IPredictionMarketV3Manager {\n  function isAllowedToCreateMarket(IERC20 token, address user) external view returns (bool);\n\n  function isAllowedToResolveMarket(IERC20 token, address user) external view returns (bool);\n\n  function isIERC20TokenSocial(IERC20 token) external view returns (bool);\n}\n",
+  "sourcePath": "/Users/ricardomarques/dev/workspace/polkamarkets/bepro-js/contracts/IPredictionMarketV3Manager.sol",
+  "ast": {
+    "absolutePath": "project:/contracts/IPredictionMarketV3Manager.sol",
+    "exportedSymbols": {
+      "IERC20": [
+        1478
+      ],
+      "IPredictionMarketV3Manager": [
+        4294
+      ]
+    },
+    "id": 4295,
+    "license": "MIT",
+    "nodeType": "SourceUnit",
+    "nodes": [
+      {
+        "id": 4264,
+        "literals": [
+          "solidity",
+          "^",
+          "0.8",
+          ".18"
+        ],
+        "nodeType": "PragmaDirective",
+        "src": "32:24:24"
+      },
+      {
+        "absolutePath": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
+        "file": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
+        "id": 4265,
+        "nameLocation": "-1:-1:-1",
+        "nodeType": "ImportDirective",
+        "scope": 4295,
+        "sourceUnit": 1479,
+        "src": "58:56:24",
+        "symbolAliases": [],
+        "unitAlias": ""
+      },
+      {
+        "abstract": false,
+        "baseContracts": [],
+        "canonicalName": "IPredictionMarketV3Manager",
+        "contractDependencies": [],
+        "contractKind": "interface",
+        "fullyImplemented": false,
+        "id": 4294,
+        "linearizedBaseContracts": [
+          4294
+        ],
+        "name": "IPredictionMarketV3Manager",
+        "nameLocation": "126:26:24",
+        "nodeType": "ContractDefinition",
+        "nodes": [
+          {
+            "functionSelector": "25c72059",
+            "id": 4275,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "isAllowedToCreateMarket",
+            "nameLocation": "166:23:24",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 4271,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 4268,
+                  "mutability": "mutable",
+                  "name": "token",
+                  "nameLocation": "197:5:24",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4275,
+                  "src": "190:12:24",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_contract$_IERC20_$1478",
+                    "typeString": "contract IERC20"
+                  },
+                  "typeName": {
+                    "id": 4267,
+                    "nodeType": "UserDefinedTypeName",
+                    "pathNode": {
+                      "id": 4266,
+                      "name": "IERC20",
+                      "nameLocations": [
+                        "190:6:24"
+                      ],
+                      "nodeType": "IdentifierPath",
+                      "referencedDeclaration": 1478,
+                      "src": "190:6:24"
+                    },
+                    "referencedDeclaration": 1478,
+                    "src": "190:6:24",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_contract$_IERC20_$1478",
+                      "typeString": "contract IERC20"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 4270,
+                  "mutability": "mutable",
+                  "name": "user",
+                  "nameLocation": "212:4:24",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4275,
+                  "src": "204:12:24",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 4269,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "204:7:24",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "189:28:24"
+            },
+            "returnParameters": {
+              "id": 4274,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 4273,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4275,
+                  "src": "241:4:24",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bool",
+                    "typeString": "bool"
+                  },
+                  "typeName": {
+                    "id": 4272,
+                    "name": "bool",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "241:4:24",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bool",
+                      "typeString": "bool"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "240:6:24"
+            },
+            "scope": 4294,
+            "src": "157:90:24",
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "functionSelector": "d1aeb5c2",
+            "id": 4285,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "isAllowedToResolveMarket",
+            "nameLocation": "260:24:24",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 4281,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 4278,
+                  "mutability": "mutable",
+                  "name": "token",
+                  "nameLocation": "292:5:24",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4285,
+                  "src": "285:12:24",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_contract$_IERC20_$1478",
+                    "typeString": "contract IERC20"
+                  },
+                  "typeName": {
+                    "id": 4277,
+                    "nodeType": "UserDefinedTypeName",
+                    "pathNode": {
+                      "id": 4276,
+                      "name": "IERC20",
+                      "nameLocations": [
+                        "285:6:24"
+                      ],
+                      "nodeType": "IdentifierPath",
+                      "referencedDeclaration": 1478,
+                      "src": "285:6:24"
+                    },
+                    "referencedDeclaration": 1478,
+                    "src": "285:6:24",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_contract$_IERC20_$1478",
+                      "typeString": "contract IERC20"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 4280,
+                  "mutability": "mutable",
+                  "name": "user",
+                  "nameLocation": "307:4:24",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4285,
+                  "src": "299:12:24",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 4279,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "299:7:24",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "284:28:24"
+            },
+            "returnParameters": {
+              "id": 4284,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 4283,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4285,
+                  "src": "336:4:24",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bool",
+                    "typeString": "bool"
+                  },
+                  "typeName": {
+                    "id": 4282,
+                    "name": "bool",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "336:4:24",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bool",
+                      "typeString": "bool"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "335:6:24"
+            },
+            "scope": 4294,
+            "src": "251:91:24",
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "functionSelector": "d13acee1",
+            "id": 4293,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "isIERC20TokenSocial",
+            "nameLocation": "355:19:24",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 4289,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 4288,
+                  "mutability": "mutable",
+                  "name": "token",
+                  "nameLocation": "382:5:24",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4293,
+                  "src": "375:12:24",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_contract$_IERC20_$1478",
+                    "typeString": "contract IERC20"
+                  },
+                  "typeName": {
+                    "id": 4287,
+                    "nodeType": "UserDefinedTypeName",
+                    "pathNode": {
+                      "id": 4286,
+                      "name": "IERC20",
+                      "nameLocations": [
+                        "375:6:24"
+                      ],
+                      "nodeType": "IdentifierPath",
+                      "referencedDeclaration": 1478,
+                      "src": "375:6:24"
+                    },
+                    "referencedDeclaration": 1478,
+                    "src": "375:6:24",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_contract$_IERC20_$1478",
+                      "typeString": "contract IERC20"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "374:14:24"
+            },
+            "returnParameters": {
+              "id": 4292,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 4291,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4293,
+                  "src": "412:4:24",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bool",
+                    "typeString": "bool"
+                  },
+                  "typeName": {
+                    "id": 4290,
+                    "name": "bool",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "412:4:24",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bool",
+                      "typeString": "bool"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "411:6:24"
+            },
+            "scope": 4294,
+            "src": "346:72:24",
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          }
+        ],
+        "scope": 4295,
+        "src": "116:304:24",
+        "usedErrors": []
+      }
+    ],
+    "src": "32:389:24"
+  },
+  "compiler": {
+    "name": "solc",
+    "version": "0.8.18+commit.87f61d96.Emscripten.clang"
+  },
+  "networks": {},
+  "schemaVersion": "3.4.10",
+  "updatedAt": "2024-01-12T19:13:30.534Z",
+  "devdoc": {
+    "kind": "dev",
+    "methods": {},
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {},
+    "version": 1
+  }
+}
