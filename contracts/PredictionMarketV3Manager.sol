@@ -31,7 +31,8 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     FantasyERC20 token;
     bool active;
     mapping(address => bool) admins;
-    uint256 amountLocked;
+    uint256 lockAmount;
+    address lockUser;
     IRealityETH_IERC20 realitio;
   }
 
@@ -81,7 +82,8 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     land.token = landToken;
     land.active = true;
     land.admins[msg.sender] = true;
-    land.amountLocked = lockAmount;
+    land.lockAmount = lockAmount;
+    land.lockUser = msg.sender;
     landTokens.push(address(landToken));
 
     IERC20 realitioToken = address(tokenToAnswer) == address(0) ? landToken : tokenToAnswer;
@@ -106,13 +108,14 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     require(land.active, "Land is not active");
     require(land.admins[msg.sender], "Not admin of the land");
 
-    uint256 amountToUnlock = land.amountLocked;
+    uint256 amountToUnlock = land.lockAmount;
 
-    token.transfer(msg.sender, amountToUnlock);
+    token.transfer(land.lockUser, amountToUnlock);
 
     // disable the land
     land.active = false;
-    land.amountLocked = 0;
+    land.lockAmount = 0;
+    land.lockUser = address(0);
 
     // pausing token
     FantasyERC20(address(landToken)).pause();
@@ -128,14 +131,15 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     require(!land.active, "Land is already active");
     require(land.admins[msg.sender], "Not admin of the land");
 
-    uint256 amountToLock = lockAmount > land.amountLocked ? lockAmount - land.amountLocked : 0;
+    uint256 amountToLock = lockAmount > land.lockAmount ? lockAmount - land.lockAmount : 0;
 
     // transfer the lockAmount to the contract
     token.transferFrom(msg.sender, address(this), amountToLock);
 
     // enable the land
     land.active = true;
-    land.amountLocked = land.amountLocked + amountToLock;
+    land.lockAmount = land.lockAmount + amountToLock;
+    land.lockUser = msg.sender;
 
     // unpausing token
     FantasyERC20(address(landToken)).unpause();
@@ -151,11 +155,11 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     require(land.active, "Land does not exist");
     require(land.admins[msg.sender], "Not admin of the land");
 
-    uint256 amountToUnlock = land.amountLocked > lockAmount ? land.amountLocked - lockAmount : 0;
+    uint256 amountToUnlock = land.lockAmount > lockAmount ? land.lockAmount - lockAmount : 0;
 
     if (amountToUnlock > 0) {
       token.transfer(msg.sender, amountToUnlock);
-      land.amountLocked = land.amountLocked - amountToUnlock;
+      land.lockAmount = land.lockAmount - amountToUnlock;
     }
 
     emit LandOffsetUnlocked(msg.sender, address(landToken), amountToUnlock);
