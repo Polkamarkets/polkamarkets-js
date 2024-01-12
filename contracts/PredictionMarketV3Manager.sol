@@ -74,7 +74,7 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     // adding minting privileges to the PMV3 contract
     landToken.grantRole(keccak256("MINTER_ROLE"), address(PMV3));
     // adding admin privileges to the msg.sender
-    landToken.grantRole(0x00, msg.sender);
+    landToken.grantRole(keccak256("MINTER_ROLE"), msg.sender);
 
     // store the new token in the contract
     Land storage land = lands[address(landToken)];
