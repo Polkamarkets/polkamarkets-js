@@ -28,7 +28,7 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
   event LandAdminRemoved(address indexed user, address indexed token, address indexed admin);
 
   struct Land {
-    IERC20 token;
+    FantasyERC20 token;
     bool active;
     mapping(address => bool) admins;
     uint256 amountLocked;
@@ -73,7 +73,7 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
 
     // adding minting privileges to the PMV3 contract
     landToken.grantRole(keccak256("MINTER_ROLE"), address(PMV3));
-    // adding admin privileges to the msg.sender
+    // adding minting privileges to the msg.sender
     landToken.grantRole(keccak256("MINTER_ROLE"), msg.sender);
 
     // store the new token in the contract
@@ -169,6 +169,9 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     require(land.active, "Land does not exist");
     require(land.admins[msg.sender], "Not admin of the land");
 
+    // adding minting privileges to the admin
+    land.token.grantRole(keccak256("MINTER_ROLE"), admin);
+
     land.admins[admin] = true;
 
     emit LandAdminAdded(msg.sender, address(landToken), admin);
@@ -179,6 +182,9 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
 
     require(land.active, "Land does not exist");
     require(land.admins[msg.sender], "Not admin of the land");
+
+    // removing minting privileges from the admin
+    land.token.revokeRole(keccak256("MINTER_ROLE"), admin);
 
     land.admins[admin] = false;
 
