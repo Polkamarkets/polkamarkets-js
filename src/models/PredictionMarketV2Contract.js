@@ -467,17 +467,11 @@ class PredictionMarketV2Contract extends IContract {
     return await this.getTokenDecimals({ contractAddress });
   }
 
-  /* POST User Functions */
   /**
-   * @function createMarket
-   * @description Create a µarket
-   * @param {Integer} value
-   * @param {String} name
-   * @param {Integer} duration
-   * @param {Address} oracleAddress
-   * @param {Array} outcomes
+   * @function prepareCreateMarketDescription
+   * @description Prepare createMarket function call args
    */
-  async createMarket ({
+  async prepareCreateMarketDescription({
     value,
     name,
     description = '',
@@ -512,21 +506,63 @@ class PredictionMarketV2Contract extends IContract {
       distribution = this.calcDistribution({ odds });
     }
 
-    return await this.__sendTx(
-      this.getContract().methods.createMarket({
-        value: valueToWei,
-        closesAt: duration,
-        outcomes: outcomes.length,
-        token,
-        distribution,
-        question,
-        image,
-        arbitrator: oracleAddress,
-        fee,
-        treasuryFee,
-        treasury,
-      })
-    );
+    return {
+      value: valueToWei,
+      closesAt: duration,
+      outcomes: outcomes.length,
+      token,
+      distribution,
+      question,
+      image,
+      arbitrator: oracleAddress,
+      fee,
+      treasuryFee,
+      treasury,
+    };
+  }
+
+  /* POST User Functions */
+  /**
+   * @function createMarket
+   * @description Create a µarket
+   * @param {Integer} value
+   * @param {String} name
+   * @param {Integer} duration
+   * @param {Address} oracleAddress
+   * @param {Array} outcomes
+   */
+  async createMarket ({
+    value,
+    name,
+    description = '',
+    image,
+    duration,
+    oracleAddress,
+    outcomes,
+    category,
+    token,
+    odds = [],
+    fee = 0,
+    treasuryFee = 0,
+    treasury = '0x0000000000000000000000000000000000000000',
+  }) {
+    const desc = await this.prepareCreateMarketDescription({
+      value,
+      name,
+      description,
+      image,
+      duration,
+      oracleAddress,
+      outcomes,
+      category,
+      token,
+      odds,
+      fee,
+      treasuryFee,
+      treasury,
+    });
+
+    return await this.__sendTx(this.getContract().methods.createMarket(desc));
   };
 
 /**
@@ -553,45 +589,23 @@ class PredictionMarketV2Contract extends IContract {
     treasury = '0x0000000000000000000000000000000000000000',
   }) {
     const token = await this.getWETHAddress();
-    const decimals = await this.getTokenDecimals({ contractAddress: token });
-    const valueToWei = Numbers.toSmartContractDecimals(value, decimals);
-    const title = `${name};${description}`;
-    const question = realitioLib.encodeText('single-select', title, outcomes, category);
-    let distribution = [];
+    const desc = await this.prepareCreateMarketDescription({
+      value,
+      name,
+      description,
+      image,
+      duration,
+      oracleAddress,
+      outcomes,
+      category,
+      token,
+      odds,
+      fee,
+      treasuryFee,
+      treasury,
+    });
 
-    if (odds.length > 0) {
-      if (odds.length !== outcomes.length) {
-        throw new Error('Odds and outcomes must have the same length');
-      }
-
-      const oddsSum = odds.reduce((a, b) => a + b, 0);
-      // odds must match 100 (0.1 margin)
-      if (oddsSum < 99.9 || oddsSum > 100.1) {
-        throw new Error('Odds must sum 100');
-      }
-
-      distribution = this.calcDistribution({ odds });
-    }
-
-    return await this.__sendTx(
-      this.getContract().methods.createMarketWithETH(
-        {
-          value: valueToWei,
-          closesAt: duration,
-          outcomes: outcomes.length,
-          token,
-          distribution,
-          question,
-          image,
-          arbitrator: oracleAddress,
-          fee,
-          treasuryFee,
-          treasury,
-        }
-      ),
-      false,
-      valueToWei
-    );
+    return await this.__sendTx(this.getContract().methods.createMarketWithETH(desc));
   };
 
   /**
