@@ -3,15 +3,14 @@ pragma solidity ^0.8.18;
 
 import "./FantasyERC20.sol";
 import "./RealityETH_ERC20_Factory.sol";
-import "./IPredictionMarketV3.sol";
 
 // openzeppelin ownable contract import
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
-  IPredictionMarketV3 public immutable PMV3; // PredictionMarketV3 contract
-  IERC20 public immutable token; // PredictionMarketV3 contract
+  address public immutable PMV3; // PredictionMarketV3 contract
+  IERC20 public immutable token; // Governance IERC20
   uint256 public lockAmount; // amount necessary to lock to create a land
   RealityETH_ERC20_Factory public immutable realitioFactory;
 
@@ -40,7 +39,7 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
   address[] public landTokens;
 
   constructor(
-    IPredictionMarketV3 _PMV3,
+    address _PMV3,
     IERC20 _token,
     uint256 _lockAmount,
     address _realitioLibraryAddress
@@ -196,9 +195,12 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
   }
 
   function isAllowedToCreateMarket(IERC20 marketToken, address user) public view returns (bool) {
-    // call from the mintAndCreateMarket function
-    if (user == address(this)) return true;
+    Land storage land = lands[address(marketToken)];
 
+    return land.active && land.admins[user];
+  }
+
+  function isAllowedToResolveMarket(IERC20 marketToken, address user) external view returns (bool) {
     Land storage land = lands[address(marketToken)];
 
     return land.active && land.admins[user];
@@ -210,9 +212,9 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     return land.active;
   }
 
-  function isAllowedToResolveMarket(IERC20 marketToken, address user) external view returns (bool) {
+  function isMarketAdmin(IERC20 marketToken, address user) external view returns (bool) {
     Land storage land = lands[address(marketToken)];
 
-    return land.active && land.admins[user];
+    return land.admins[user];
   }
 }

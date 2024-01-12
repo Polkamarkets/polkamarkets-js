@@ -1,4 +1,6 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0-only
+// Based on https://github.com/RealityETH/reality-eth-monorepo/blob/main/packages/contracts/development/contracts/IRealityETH_ERC20.sol
+
 pragma solidity ^0.8.18;
 
 interface IRealityETH_ERC20 {
