@@ -6,6 +6,7 @@ const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
 const ERC20Contract = require("./models/index").ERC20Contract;
 const PredictionMarketContract = require("./models/index").PredictionMarketContract;
 const PredictionMarketV2Contract = require("./models/index").PredictionMarketV2Contract;
+const PredictionMarketV3Contract = require("./models/index").PredictionMarketV3Contract;
 const AchievementsContract = require("./models/index").AchievementsContract;
 const RealitioERC20Contract = require("./models/index").RealitioERC20Contract;
 const VotingContract = require("./models/index").VotingContract;

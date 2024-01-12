@@ -1,8 +1,9 @@
-const prediction = require("../interfaces").predictionV3;
+const predictionV3 = require("../interfaces").predictionV3;
+const PredictionMarketV2Contract = require("./PredictionMarketV2Contract");
 
 class PredictionMarketV3Contract extends PredictionMarketV2Contract {
   constructor(params) {
-    super({...params, abi: prediction});
+    super({ abi: predictionV3, ...params });
     this.contractName = 'predictionMarketV3';
   }
 
@@ -125,15 +126,15 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
     });
 
     return await this.__sendTx(
-      this.getContract().methods.createMarketWithETH({
-        ...desc,
-        realitio: realitioAddress,
-        realitioTimeout,
-        manager: PM3ManagerAddress
-      }),
-      false,
-      desc.value
-    );
+        this.getContract().methods.createMarketWithETH({
+          ...desc,
+          realitio: realitioAddress,
+          realitioTimeout,
+          manager: PM3ManagerAddress
+        }),
+        false,
+        desc.value
+      );
   };
 }
 
