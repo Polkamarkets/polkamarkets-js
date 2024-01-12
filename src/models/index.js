@@ -2,6 +2,7 @@ const ERC20Contract = require('./ERC20Contract');
 const PredictionMarketContract = require('./PredictionMarketContract');
 const PredictionMarketV2Contract = require('./PredictionMarketV2Contract');
 const PredictionMarketV3Contract = require('./PredictionMarketV3Contract');
+const PredictionMarketV3ManagerContract = require('./PredictionMarketV3ManagerContract');
 const AchievementsContract = require('./AchievementsContract');
 const RealitioERC20Contract = require('./RealitioERC20Contract');
 const VotingContract = require('./VotingContract');
@@ -15,6 +16,7 @@ module.exports = {
   PredictionMarketContract,
   PredictionMarketV2Contract,
   PredictionMarketV3Contract,
+  PredictionMarketV3ManagerContract,
   AchievementsContract,
   RealitioERC20Contract,
   VotingContract,

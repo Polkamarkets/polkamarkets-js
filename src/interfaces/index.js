@@ -7,6 +7,7 @@ let index = {
   prediction: require("../../build/contracts/PredictionMarket.json"),
   predictionV2: require("../../build/contracts/PredictionMarketV2.json"),
   predictionV3: require("../../build/contracts/PredictionMarketV3.json"),
+  predictionV3Manager: require("../../build/contracts/PredictionMarketV3Manager.json"),
   realitio: require("../../build/contracts/RealitioERC20.json"),
   voting: require("../../build/contracts/Voting.json"),
   weth: require("../../build/contracts/WETH9.json"),

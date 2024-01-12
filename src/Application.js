@@ -7,6 +7,7 @@ const ERC20Contract = require("./models/index").ERC20Contract;
 const PredictionMarketContract = require("./models/index").PredictionMarketContract;
 const PredictionMarketV2Contract = require("./models/index").PredictionMarketV2Contract;
 const PredictionMarketV3Contract = require("./models/index").PredictionMarketV3Contract;
+const PredictionMarketV3ManagerContract = require("./models/index").PredictionMarketV3ManagerContract;
 const AchievementsContract = require("./models/index").AchievementsContract;
 const RealitioERC20Contract = require("./models/index").RealitioERC20Contract;
 const VotingContract = require("./models/index").VotingContract;
@@ -166,6 +167,26 @@ class Application {
   getPredictionMarketV3Contract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketV3Contract({
+        web3: this.web3,
+        contractAddress,
+        acc: this.account,
+        web3EventsProvider: this.web3EventsProvider,
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name getPredictionMarketV3ManagerContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PredictionMarketV3Manager Contract
+   */
+  getPredictionMarketV3ManagerContract({ contractAddress = null } = {}) {
+    try {
+      return new PredictionMarketV3ManagerContract({
         web3: this.web3,
         contractAddress,
         acc: this.account,
