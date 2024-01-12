@@ -32,7 +32,7 @@ const actions = {
 
 class PredictionMarketV2Contract extends IContract {
   constructor(params) {
-    super({...params, abi: prediction});
+    super({...params, abi: params.abi || prediction});
     this.contractName = 'predictionMarketV2';
   }
 
