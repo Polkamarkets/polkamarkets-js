@@ -37,6 +37,7 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
 
   mapping(address => Land) public lands;
   address[] public landTokens;
+  uint256 public landTokensLength;
 
   constructor(
     address _PMV3,
@@ -84,6 +85,7 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     land.lockAmount = lockAmount;
     land.lockUser = msg.sender;
     landTokens.push(address(landToken));
+    landTokensLength++;
 
     IERC20 realitioToken = address(tokenToAnswer) == address(0) ? landToken : tokenToAnswer;
 
@@ -212,7 +214,7 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     return land.active;
   }
 
-  function isMarketAdmin(IERC20 marketToken, address user) external view returns (bool) {
+  function isLandAdmin(IERC20 marketToken, address user) external view returns (bool) {
     Land storage land = lands[address(marketToken)];
 
     return land.admins[user];

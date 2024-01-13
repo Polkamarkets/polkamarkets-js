@@ -201,6 +201,11 @@ contract PredictionMarketV3 is ReentrancyGuard {
     nextState(marketId);
   }
 
+  modifier transitionLast(uint256 marketId) {
+    _;
+    lastState(marketId);
+  }
+
   modifier isWETHMarket(uint256 marketId) {
     require(address(WETH) != address(0), "WETH address is address 0");
     require(address(markets[marketId].token) == address(WETH), "Market token is not WETH");
@@ -752,10 +757,11 @@ contract PredictionMarketV3 is ReentrancyGuard {
     return market.resolution.outcomeId;
   }
 
-  /// @dev Fetches winning outcome from Realitio and resolves the market
+  /// @dev overrides market resolution, instead of using realitio
   function adminResolveMarketOutcome(uint256 marketId, uint256 outcomeId)
     external
     notAtState(marketId, MarketState.resolved)
+    transitionLast(marketId)
     returns (uint256)
   {
     Market storage market = markets[marketId];
@@ -975,6 +981,12 @@ contract PredictionMarketV3 is ReentrancyGuard {
   function nextState(uint256 marketId) private {
     Market storage market = markets[marketId];
     market.state = MarketState(uint256(market.state) + 1);
+  }
+
+  /// @dev Transitions market to last state
+  function lastState(uint256 marketId) private {
+    Market storage market = markets[marketId];
+    market.state = MarketState.resolved;
   }
 
   /// @dev Emits a outcome price event for every outcome
