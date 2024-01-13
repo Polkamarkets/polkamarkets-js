@@ -25,10 +25,7 @@ context('Prediction Market Contract V3 Manager', async () => {
   let realitioERC20Contract
   let pmmTokenContract;
 
-  // market / outcome ids we'll make unit tests with
-  let outcomeIds = [0, 1];
-  const value = 0.01;
-  let landId;
+  let landId = 0;
 
   context('Contract Deployment', async () => {
     it('should start the Application', mochaAsync(async () => {
@@ -399,54 +396,179 @@ context('Prediction Market Contract V3 Manager', async () => {
     });
   });
 
-  // context('Market Creation', async () => {
-  //   let marketId;
+  context('Land Markets', async () => {
+    let landId = 0;
+    let marketId = 0;
+    let outcomeId = 0;
+    let value = 0.01;
+    let land;
 
-  //   it('should create a Market', mochaAsync(async () => {
-  //     try {
-  //       const res = await predictionMarketContract.mintAndCreateMarket({
-  //         value,
-  //         name: 'Will BTC price close above 100k$ on May 1st 2024',
-  //         description: 'This is a description',
-  //         image: 'foo-bar',
-  //         category: 'Foo;Bar',
-  //         oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-  //         duration: moment('2024-05-01').unix(),
-  //         outcomes: ['Yes', 'No'],
-  //         token: tokenERC20Contract.getAddress(),
-  //         realitioAddress: realitioERC20Contract.getAddress(),
-  //         realitioTimeout: 300,
-  //         PM3ManagerAddress: predictionMarketManagerContract.getAddress()
-  //       });
-  //       expect(res.status).to.equal(true);
-  //     } catch(e) {
-  //       console.log(e);
-  //     }
+    let user1;
+    let user1App;
+    let user1PredictionMarketContract;
 
-  //     const marketIds = await predictionMarketContract.getMarkets();
-  //     marketId = marketIds[marketIds.length - 1];
-  //     expect(marketIds.length).to.equal(1);
-  //     expect(marketIds[marketIds.length - 1]).to.equal(marketId);
-  //   }));
+    let landTokenContract;
+    let user1LandTokenContract;
 
-  //   it('should create another Market', mochaAsync(async () => {
-  //     const res = await predictionMarketContract.mintAndCreateMarket({
-  //       name: 'Will ETH price close above 10k$ on May 1st 2024',
-  //       image: 'foo-bar',
-  //       category: 'Foo;Bar',
-  //       oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-  //       duration: moment('2024-05-01').unix(),
-  //       outcomes: ['Yes', 'No'],
-  //       value: 0.001,
-  //       token: tokenERC20Contract.getAddress(),
-  //       realitioAddress: realitioERC20Contract.getAddress(),
-  //       realitioTimeout: 300,
-  //       PM3ManagerAddress: predictionMarketManagerContract.getAddress()
-  //     });
-  //     expect(res.status).to.equal(true);
+    before(mochaAsync(async () => {
+      land = await predictionMarketManagerContract.getLandById({ id: landId });
 
-  //     const marketIds = await predictionMarketContract.getMarkets();
-  //     expect(marketIds.length).to.equal(2);
-  //   }));
-  // });
+      user1 = USER1_ADDRESS;
+      user1App = new Application({
+        web3Provider: process.env.WEB3_PROVIDER,
+        web3PrivateKey: USER1_PRIVATE_KEY
+      });
+      user1PredictionMarketContract = user1App.getPredictionMarketV3Contract({
+        contractAddress: predictionMarketContract.getAddress()
+      });
+
+      landTokenContract = app.getFantasyERC20Contract({contractAddress: land.token});
+      user1LandTokenContract = user1App.getFantasyERC20Contract({contractAddress: land.token});
+      // approving land token to spend tokens
+      await landTokenContract.claimAndApproveTokens();
+      await user1LandTokenContract.claimAndApproveTokens();
+    }));
+
+    context('Market Creation', async () => {
+      it('should not be able to create a Market if not an admin making the call', mochaAsync(async () => {
+        const currentMarketIds = await predictionMarketContract.getMarkets();
+        const currentLandTokenBalance = await landTokenContract.balanceOf({ address: user1 });
+        expect(currentLandTokenBalance).to.equal(TOKEN_AMOUNT_TO_CLAIM);
+
+        try {
+          await user1PredictionMarketContract.mintAndCreateMarket({
+            value,
+            name: 'Will BTC price close above 100k$ on May 1st 2025',
+            description: 'This is a description',
+            image: 'foo-bar',
+            category: 'Foo;Bar',
+            oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
+            duration: moment('2025-05-01').unix(),
+            outcomes: ['Yes', 'No'],
+            token: landTokenContract.getAddress(),
+            realitioAddress: land.realitio,
+            realitioTimeout: 300,
+            PM3ManagerAddress: predictionMarketManagerContract.getAddress()
+          });
+        } catch(e) {
+          // not logging error, as tx is expected to fail
+        }
+
+        const newMarketIds = await predictionMarketContract.getMarkets();
+        expect(newMarketIds.length).to.equal(currentMarketIds.length);
+      }));
+
+      it('should create a Market', mochaAsync(async () => {
+        const currentMarketIds = await predictionMarketContract.getMarkets();
+        const currentLandTokenBalance = await landTokenContract.balanceOf({ address: accountAddress });
+        expect(currentLandTokenBalance).to.equal(TOKEN_AMOUNT_TO_CLAIM);
+
+        try {
+          const res = await predictionMarketContract.mintAndCreateMarket({
+            value,
+            name: 'Will BTC price close above 100k$ on May 1st 2025',
+            description: 'This is a description',
+            image: 'foo-bar',
+            category: 'Foo;Bar',
+            oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
+            duration: moment('2025-05-01').unix(),
+            outcomes: ['Yes', 'No'],
+            token: landTokenContract.getAddress(),
+            realitioAddress: land.realitio,
+            realitioTimeout: 300,
+            PM3ManagerAddress: predictionMarketManagerContract.getAddress()
+          });
+          expect(res.status).to.equal(true);
+        } catch(e) {
+          console.log(e);
+        }
+
+        const newLandTokenBalance = await landTokenContract.balanceOf({ address: accountAddress });
+        const newMarketIds = await predictionMarketContract.getMarkets();
+        expect(newMarketIds.length).to.equal(currentMarketIds.length + 1);
+        // balance remains the same since tokens were minted
+        expect(newLandTokenBalance).to.equal(currentLandTokenBalance);
+      }));
+    });
+
+    context('Market Interaction', async () => {
+      it('should be able to buy shares when land enabled', mochaAsync(async () => {
+        const minOutcomeSharesToBuy = 0.015;
+        const currentLandTokenBalance = await landTokenContract.balanceOf({ address: accountAddress });
+
+        try {
+          const res = await predictionMarketContract.buy({marketId, outcomeId, value, minOutcomeSharesToBuy});
+          expect(res.status).to.equal(true);
+        } catch(e) {
+          console.log(e);
+        }
+
+        const newLandTokenBalance = await landTokenContract.balanceOf({ address: accountAddress });
+        const amountTransferred = Number((currentLandTokenBalance - newLandTokenBalance).toFixed(5));
+
+        expect(amountTransferred).to.equal(value);
+      }));
+
+      it('should sell outcome shares', mochaAsync(async () => {
+        const outcomeId = 0;
+        const maxOutcomeSharesToSell = 0.015;
+
+        const currentLandTokenBalance = await landTokenContract.balanceOf({ address: accountAddress });
+
+        try {
+          const res = await predictionMarketContract.sell({marketId, outcomeId, value, maxOutcomeSharesToSell});
+          expect(res.status).to.equal(true);
+        } catch(e) {
+          console.log(e);
+        }
+
+        const newLandTokenBalance = await landTokenContract.balanceOf({ address: accountAddress });
+        const amountTransferred = Number((newLandTokenBalance - currentLandTokenBalance).toFixed(5));
+
+        expect(amountTransferred).to.equal(value);
+      }));
+
+      it('should not be able to buy shares when land disabled', mochaAsync(async () => {
+        const minOutcomeSharesToBuy = 0.015;
+        const currentLandTokenBalance = await landTokenContract.balanceOf({ address: accountAddress });
+
+        await predictionMarketManagerContract.disableLand({
+          token: land.token
+        });
+
+        try {
+          const res = await predictionMarketContract.buy({marketId, outcomeId, value, minOutcomeSharesToBuy});
+          expect(res.status).to.equal(true);
+        } catch(e) {
+          // not logging error, as tx is expected to fail
+        }
+
+        const newLandTokenBalance = await landTokenContract.balanceOf({ address: accountAddress });
+        const amountTransferred = currentLandTokenBalance - newLandTokenBalance;
+
+        expect(amountTransferred).to.equal(0);
+      }));
+
+      it('should be able to buy shares when land enabled again', mochaAsync(async () => {
+        const minOutcomeSharesToBuy = 0.015;
+        const currentLandTokenBalance = await landTokenContract.balanceOf({ address: accountAddress });
+
+        await predictionMarketManagerContract.enableLand({
+          token: land.token
+        });
+
+        try {
+          const res = await predictionMarketContract.buy({marketId, outcomeId, value, minOutcomeSharesToBuy});
+          expect(res.status).to.equal(true);
+        } catch(e) {
+          console.log(e);
+        }
+
+        const newLandTokenBalance = await landTokenContract.balanceOf({ address: accountAddress });
+        const amountTransferred = Number((currentLandTokenBalance - newLandTokenBalance).toFixed(5));
+
+        expect(amountTransferred).to.equal(value);
+      }));
+    });
+  });
 });
