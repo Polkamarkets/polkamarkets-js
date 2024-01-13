@@ -10,7 +10,8 @@ context('Prediction Market Contract V3 Manager', async () => {
   require('dotenv').config();
 
   const TOKEN_AMOUNT_TO_CLAIM = 10;
-  const LOCK_AMOUNT = 1;
+  const LOCK_AMOUNT = 5;
+  const NEW_LOCK_AMOUNT = 1;
 
   const USER1_ADDRESS = process.env.TEST_USER1_ADDRESS;
   const USER1_PRIVATE_KEY = process.env.TEST_USER1_PRIVATE_KEY;
@@ -193,7 +194,6 @@ context('Prediction Market Contract V3 Manager', async () => {
           });
         } catch(e) {
           // not logging error, as tx is expected to fail
-          // console.log(e);
         }
         const newIsAdmin = await predictionMarketManagerContract.isLandAdmin({ token, user: user2 });
 
@@ -224,9 +224,168 @@ context('Prediction Market Contract V3 Manager', async () => {
         const lastNewIsAdmin = await predictionMarketManagerContract.isLandAdmin({ token, user: user2 });
 
         expect(lastNewIsAdmin).to.equal(false);
+
+        // resetting user1 admin status
+        await predictionMarketManagerContract.removeAdminFromLand({
+          token,
+          user: user1
+        });
       }));
     });
 
+    context('Land Disabling + Enabling + Offset', async () => {
+      let landId = 0;
+      let land;
+      let token;
+
+      let user1App;
+      let user1PredictionMarketManagerContract;
+
+      before(mochaAsync(async () => {
+        land = await predictionMarketManagerContract.getLandById({ id: landId });
+        token = land.token;
+
+        user1App = new Application({
+          web3Provider: process.env.WEB3_PROVIDER,
+          web3PrivateKey: USER1_PRIVATE_KEY
+        });
+        user1PredictionMarketManagerContract = user1App.getPredictionMarketV3ManagerContract({
+          contractAddress: predictionMarketManagerContract.getAddress()
+        });
+      }));
+
+      it('should not be able to disable a Land if not an admin making the call', mochaAsync(async () => {
+        try {
+          await user1PredictionMarketManagerContract.disableLand({
+            token
+          });
+        } catch(e) {
+          // not logging error, as tx is expected to fail
+        }
+
+        const refreshedLand = await predictionMarketManagerContract.getLandById({ id: landId });
+        const newPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+
+        expect(land.active).to.equal(true);
+        expect(refreshedLand.active).to.equal(true);
+      }));
+
+      it('should disable a Land', mochaAsync(async () => {
+        const currentPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+        await predictionMarketManagerContract.disableLand({
+          token: land.token
+        });
+
+        const refreshedLand = await predictionMarketManagerContract.getLandById({ id: landId });
+        const newPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+
+        expect(land.active).to.equal(true);
+        expect(newPmmTokenBalance).to.equal(currentPmmTokenBalance + LOCK_AMOUNT);
+        expect(refreshedLand.token).to.equal(land.token);
+        expect(refreshedLand.active).to.equal(false);
+        expect(refreshedLand.lockAmount).to.equal(0);
+        expect(refreshedLand.lockUser).to.equal('0x0000000000000000000000000000000000000000');
+        expect(refreshedLand.realitio).to.equal(land.realitio);
+      }));
+
+      it('should not be able to disable a Land if already disabled', mochaAsync(async () => {
+        const currentPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+        try {
+          await predictionMarketManagerContract.disableLand({
+            token
+          });
+        } catch(e) {
+          // not logging error, as tx is expected to fail
+        }
+
+        const refreshedLand = await predictionMarketManagerContract.getLandById({ id: landId });
+        const newPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+
+        expect(refreshedLand.active).to.equal(false);
+        expect(newPmmTokenBalance).to.equal(currentPmmTokenBalance);
+      }));
+
+      it('should enable a Land', mochaAsync(async () => {
+        const currentPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+        await predictionMarketManagerContract.enableLand({
+          token: land.token
+        });
+
+        const refreshedLand = await predictionMarketManagerContract.getLandById({ id: landId });
+        const newPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+
+        expect(newPmmTokenBalance).to.equal(currentPmmTokenBalance - LOCK_AMOUNT);
+        expect(refreshedLand.token).to.equal(land.token);
+        expect(refreshedLand.active).to.equal(true);
+        expect(refreshedLand.lockAmount).to.equal(LOCK_AMOUNT);
+        expect(refreshedLand.lockUser).to.equal(accountAddress);
+        expect(refreshedLand.realitio).to.equal(land.realitio);
+      }));
+
+      it('should be able to update lock amount if not the contract owner', mochaAsync(async () => {
+        const currentLockAmount = await predictionMarketManagerContract.lockAmount();
+        expect(currentLockAmount).to.equal(LOCK_AMOUNT);
+
+        try {
+          await user1PredictionMarketManagerContract.updateLockAmount({
+            amount: NEW_LOCK_AMOUNT
+          });
+        } catch(e) {
+          // not logging error, as tx is expected to fail
+        }
+
+        const newLockAmount = await predictionMarketManagerContract.lockAmount();
+        expect(newLockAmount).to.equal(LOCK_AMOUNT);
+      }));
+
+      it('should be able to update lock amount', mochaAsync(async () => {
+        const currentLockAmount = await predictionMarketManagerContract.lockAmount();
+        expect(currentLockAmount).to.equal(LOCK_AMOUNT);
+
+        await predictionMarketManagerContract.updateLockAmount({
+          amount: NEW_LOCK_AMOUNT
+        });
+
+        const newLockAmount = await predictionMarketManagerContract.lockAmount();
+        expect(newLockAmount).to.equal(NEW_LOCK_AMOUNT);
+      }));
+
+      it('should not be able to unlock offset from land if not an admin', mochaAsync(async () => {
+        const currentLockAmount = await predictionMarketManagerContract.lockAmount();
+        expect(currentLockAmount).to.equal(NEW_LOCK_AMOUNT);
+        const currentPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+
+        try {
+          await user1PredictionMarketManagerContract.unlockOffsetFromLand({
+            token: land.token
+          });
+        } catch(e) {
+          // not logging error, as tx is expected to fail
+        }
+
+        const refreshedLand = await predictionMarketManagerContract.getLandById({ id: landId });
+        const newPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+
+        expect(newPmmTokenBalance).to.equal(currentPmmTokenBalance);
+        expect(refreshedLand.lockAmount).to.equal(LOCK_AMOUNT);
+      }));
+
+      it('should be able to unlock offset from land', mochaAsync(async () => {
+        const currentLockAmount = await predictionMarketManagerContract.lockAmount();
+        expect(currentLockAmount).to.equal(NEW_LOCK_AMOUNT);
+        const currentPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+
+        await predictionMarketManagerContract.unlockOffsetFromLand({
+          token: land.token
+        });
+
+        const refreshedLand = await predictionMarketManagerContract.getLandById({ id: landId });
+        const newPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+
+        expect(newPmmTokenBalance).to.equal(currentPmmTokenBalance + LOCK_AMOUNT - NEW_LOCK_AMOUNT);
+        expect(refreshedLand.lockAmount).to.equal(NEW_LOCK_AMOUNT);
+      }));
+    });
   });
 
   // context('Market Creation', async () => {
