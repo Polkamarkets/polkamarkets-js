@@ -570,5 +570,41 @@ context('Prediction Market Contract V3 Manager', async () => {
         expect(amountTransferred).to.equal(value);
       }));
     });
+
+    context('Market Resolution', async () => {
+      let outcomeId = 1;
+
+      it('should not be able to resolve a Market if not an admin making the call', mochaAsync(async () => {
+        try {
+          await user1PredictionMarketContract.adminResolveMarketOutcome({
+            marketId,
+            outcomeId
+          });
+        } catch(e) {
+          // not logging error, as tx is expected to fail
+        }
+
+        const market = await predictionMarketContract.getMarketData({ marketId });
+        expect(market.state).to.equal(0);
+      }));
+
+      it('should be able to resolve a Market', mochaAsync(async () => {
+        try {
+          const res = await predictionMarketContract.adminResolveMarketOutcome({
+            marketId,
+            outcomeId
+          });
+          expect(res.status).to.equal(true);
+        } catch(e) {
+          console.log(e);
+        }
+
+        // doing dummy transaction to get the latest block
+        await landTokenContract.approve({ address: '0x000000000000000000000000000000000000dead', amount: 0 });
+
+        const market = await predictionMarketContract.getMarketData({ marketId });
+        expect(market.state).to.equal(2);
+      }));
+    });
   });
 });
