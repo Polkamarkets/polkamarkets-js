@@ -22,10 +22,16 @@ class PredictionMarketV3ManagerContract extends IContract {
     return {
       token: res.token,
       active: res.active,
-      lockAmount: res.lockAmount,
+      lockAmount: Numbers.fromDecimalsNumber(res.lockAmount, 18),
       lockUser: res.lockUser,
       realitio: res.realitio,
     }
+  }
+
+  async getLandTokensLength() {
+    const index = await this.getContract().methods.landTokensLength().call();
+
+    return parseInt(index);
   }
 
   async isAllowedToCreateMarket({ token, user }) {
@@ -40,12 +46,14 @@ class PredictionMarketV3ManagerContract extends IContract {
     return await this.params.contract.getContract().methods.isIERC20TokenSocial(token, user).call();
   }
 
-  async isMarketAdmin({ token, user }) {
-    return await this.params.contract.getContract().methods.isMarketAdmin(token, user).call();
+  async isLandAdmin({ token, user }) {
+    return await this.params.contract.getContract().methods.isLandAdmin(token, user).call();
   }
 
   async lockAmount() {
-    return await this.params.contract.getContract().methods.lockAmount().call();
+    const amount = await this.params.contract.getContract().methods.lockAmount().call();
+    // TODO: fetch ERC20 decimals
+    return Numbers.fromDecimalsNumber(amount, 18);
   }
 
   async lockToken() {

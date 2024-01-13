@@ -136,6 +136,13 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
         desc.value
       );
   };
+
+  async adminResolveMarketOutcome({marketId, outcomeId}) {
+    return await this.__sendTx(
+      this.getContract().methods.adminResolveMarketOutcome(marketId, outcomeId),
+      false,
+    );
+  };
 }
 
 module.exports = PredictionMarketV3Contract;
