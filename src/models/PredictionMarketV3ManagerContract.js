@@ -10,6 +10,24 @@ class PredictionMarketV3ManagerContract extends IContract {
     this.contractName = 'PredictionMarketV3Manager';
   }
 
+  async getLandById({ id }) {
+    const token = await this.getContract().methods.landTokens(id).call();
+
+    return await this.getLandByAddress({ token });
+  }
+
+  async getLandByAddress({ token }) {
+    const res = await this.getContract().methods.lands(token).call();
+
+    return {
+      token: res.token,
+      active: res.active,
+      lockAmount: res.lockAmount,
+      lockUser: res.lockUser,
+      realitio: res.realitio,
+    }
+  }
+
   async isAllowedToCreateMarket({ token, user }) {
     return await this.params.contract.getContract().methods.isAllowedToCreateMarket(token, user).call();
   }
