@@ -241,8 +241,11 @@ context('Prediction Market Contract V3 Manager', async () => {
       let user1App;
       let user1PredictionMarketManagerContract;
 
+      let landTokenContract;
+
       before(mochaAsync(async () => {
         land = await predictionMarketManagerContract.getLandById({ id: landId });
+        landTokenContract = app.getFantasyERC20Contract({contractAddress: land.token});
         token = land.token;
 
         user1App = new Application({
@@ -272,14 +275,18 @@ context('Prediction Market Contract V3 Manager', async () => {
 
       it('should disable a Land', mochaAsync(async () => {
         const currentPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+        const currentPaused = await landTokenContract.paused();
         await predictionMarketManagerContract.disableLand({
           token: land.token
         });
 
         const refreshedLand = await predictionMarketManagerContract.getLandById({ id: landId });
         const newPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+        const newPaused = await landTokenContract.paused();
 
         expect(land.active).to.equal(true);
+        expect(currentPaused).to.equal(false);
+        expect(newPaused).to.equal(true);
         expect(newPmmTokenBalance).to.equal(currentPmmTokenBalance + LOCK_AMOUNT);
         expect(refreshedLand.token).to.equal(land.token);
         expect(refreshedLand.active).to.equal(false);
@@ -307,13 +314,17 @@ context('Prediction Market Contract V3 Manager', async () => {
 
       it('should enable a Land', mochaAsync(async () => {
         const currentPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+        const currentPaused = await landTokenContract.paused();
         await predictionMarketManagerContract.enableLand({
           token: land.token
         });
 
         const refreshedLand = await predictionMarketManagerContract.getLandById({ id: landId });
         const newPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
+        const newPaused = await landTokenContract.paused();
 
+        expect(currentPaused).to.equal(true);
+        expect(newPaused).to.equal(false);
         expect(newPmmTokenBalance).to.equal(currentPmmTokenBalance - LOCK_AMOUNT);
         expect(refreshedLand.token).to.equal(land.token);
         expect(refreshedLand.active).to.equal(true);
