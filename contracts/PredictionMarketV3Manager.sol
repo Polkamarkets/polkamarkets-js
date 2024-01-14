@@ -68,6 +68,7 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     IERC20 tokenToAnswer
   ) external returns (FantasyERC20) {
     require(token.balanceOf(msg.sender) >= lockAmount, "Not enough tokens to lock");
+    require(address(tokenToAnswer) != address(0), "Token to answer cannot be 0 address");
 
     // create a new fantasyERC20 token
     FantasyERC20 landToken = new FantasyERC20(name, symbol, tokenAmountToClaim, address(PMV3));
@@ -87,13 +88,11 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     landTokens.push(address(landToken));
     landTokensLength++;
 
-    IERC20 realitioToken = address(tokenToAnswer) == address(0) ? landToken : tokenToAnswer;
-
     // creating the realityETH_ERC20 contract
-    if (realitioFactory.deployments(address(realitioToken)) == address(0)) {
-      realitioFactory.createInstance(address(realitioToken));
+    if (realitioFactory.deployments(address(tokenToAnswer)) == address(0)) {
+      realitioFactory.createInstance(address(tokenToAnswer));
     }
-    land.realitio = IRealityETH_IERC20(realitioFactory.deployments(address(realitioToken)));
+    land.realitio = IRealityETH_IERC20(realitioFactory.deployments(address(tokenToAnswer)));
 
     // transfer the lockAmount to the contract
     token.transferFrom(msg.sender, address(this), lockAmount);
