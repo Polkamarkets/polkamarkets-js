@@ -127,24 +127,57 @@ class IContract {
         const txResponse = await signer.sendTransaction({ ...tx, gasLimit: 210000 });
         receipt = await txResponse.wait();
       } else {
-        const feeQuotesResult = await smartAccount.getFeeQuotes(tx);
+        // trying operation 3 times
+        const retries = 3;
+        let feeQuotesResult;
+        for (let i = 0; i < retries; i++) {
+          try {
+            console.log(`trying to get fee quotes... #${i}`);
+            feeQuotesResult = await smartAccount.getFeeQuotes(tx);
+            break;
+          } catch (error) {
+            console.error(error); await new Promise((resolve) => setTimeout(resolve, 5000));
+
+            if (i === retries - 1) {
+              throw error;
+            } else {
+              // 1s interval between retries
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+          }
+        }
 
         const userOp = feeQuotesResult.verifyingPaymasterGasless?.userOp;
         const userOpHash = feeQuotesResult.verifyingPaymasterGasless?.userOpHash;
 
         const signedUserOp = await smartAccount.signUserOperation({ userOpHash, userOp });
 
+        let txResponse;
+        for (let i = 0; i < retries; i++) {
+          try {
+            txResponse = await axios.post(`${networkConfig.bundlerRPC}/rpc?chainId=${networkConfig.chainId}`,
+              {
 
-        const txResponse = await axios.post(`${networkConfig.bundlerRPC}/rpc?chainId=${networkConfig.chainId}`,
-          {
+                "method": "eth_sendUserOperation",
+                "params": [
+                  signedUserOp,
+                  "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+                ]
+              }
+            );
+            if (txResponse.data.error) console.log(txResponse.data.error.message)
+            if (!txResponse.data.error) break;
+          } catch (error) {
+            console.error(error); await new Promise((resolve) => setTimeout(resolve, 5000));
 
-            "method": "eth_sendUserOperation",
-            "params": [
-              signedUserOp,
-              "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
-            ]
+            if (i === retries - 1) {
+              throw error;
+            } else {
+              // 1s interval between retries
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
           }
-        );
+        }
 
         if (txResponse.data.error) {
           throw new Error(txResponse.data.error.message);
