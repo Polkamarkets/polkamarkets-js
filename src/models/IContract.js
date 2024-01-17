@@ -132,11 +132,10 @@ class IContract {
         let feeQuotesResult;
         for (let i = 0; i < retries; i++) {
           try {
-            console.log(`trying to get fee quotes... #${i}`);
             feeQuotesResult = await smartAccount.getFeeQuotes(tx);
             break;
           } catch (error) {
-            console.error(error); await new Promise((resolve) => setTimeout(resolve, 5000));
+            await new Promise((resolve) => setTimeout(resolve, 5000));
 
             if (i === retries - 1) {
               throw error;
@@ -149,6 +148,10 @@ class IContract {
 
         const userOp = feeQuotesResult.verifyingPaymasterGasless?.userOp;
         const userOpHash = feeQuotesResult.verifyingPaymasterGasless?.userOpHash;
+
+        // TODO: remove console.log
+        console.log(userOp);
+        console.log(userOpHash);
 
         const signedUserOp = await smartAccount.signUserOperation({ userOpHash, userOp });
 
@@ -165,10 +168,9 @@ class IContract {
                 ]
               }
             );
-            if (txResponse.data.error) console.log(txResponse.data.error.message)
             if (!txResponse.data.error) break;
           } catch (error) {
-            console.error(error); await new Promise((resolve) => setTimeout(resolve, 5000));
+            await new Promise((resolve) => setTimeout(resolve, 5000));
 
             if (i === retries - 1) {
               throw error;
