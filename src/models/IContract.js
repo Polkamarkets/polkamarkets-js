@@ -98,6 +98,18 @@ class IContract {
         if (userOperation.data.result && userOperation.data.result.transactionHash) {
           clearInterval(interval);
           resolve(userOperation.data.result.transactionHash);
+        } else if (networkConfig.bundlerAPI) {
+          let userOperationData;
+          try {
+            userOperationData = await axios.get(`${networkConfig.bundlerAPI}/user_operations/${userOpHash}`);
+          } catch (error) {
+            // fetch should be non-blocking
+          }
+
+          if (userOperationData?.data?.status === 'failed') {
+            clearInterval(interval);
+            reject(new Error('User operation failed'));
+          }
         }
       }, 1000);
     });
