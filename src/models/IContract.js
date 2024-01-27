@@ -103,6 +103,14 @@ class IContract {
     });
   }
 
+  operationDataFromCall(f) {
+    return {
+      contract: this.params.abi.contractName,
+      method: f._method.name,
+      arguments: f.arguments,
+    };
+  }
+
   async sendGaslessTransactions(f) {
     const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
     const smartAccount = socialLogin.smartAccount;
@@ -158,20 +166,32 @@ class IContract {
         let txResponse;
         for (let i = 0; i < retries; i++) {
           try {
-            txResponse = await axios.post(`${networkConfig.bundlerRPC}/rpc?chainId=${networkConfig.chainId}`,
-              {
+            if (networkConfig.bundlerAPI) {
+              txResponse = await axios.post(`${networkConfig.bundlerAPI}/user_operations`,
+                {
+                  user_operation: {
+                    user_operation: signedUserOp,
+                    user_operation_hash: userOpHash,
+                    user_operation_data: [this.operationDataFromCall(f)],
+                    network_id: networkConfig.chainId,
+                  }
+                }
+              );
+            } else {
+              txResponse = await axios.post(`${networkConfig.bundlerRPC}/rpc?chainId=${networkConfig.chainId}`,
+                {
 
-                "method": "eth_sendUserOperation",
-                "params": [
-                  signedUserOp,
-                  "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
-                ]
-              }
-            );
+                  "method": "eth_sendUserOperation",
+                  "params": [
+                    signedUserOp,
+                    "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+                  ]
+                }
+              );
+            }
+
             if (!txResponse.data.error) break;
           } catch (error) {
-            await new Promise((resolve) => setTimeout(resolve, 5000));
-
             if (i === retries - 1) {
               throw error;
             } else {
@@ -185,7 +205,7 @@ class IContract {
           throw new Error(txResponse.data.error.message);
         }
 
-        const transactionHash = await this.waitForTransactionHashToBeGenerated(txResponse.data.result, networkConfig);
+        const transactionHash = await this.waitForTransactionHashToBeGenerated(userOpHash, networkConfig);
 
         const web3Provider = new ethers.providers.Web3Provider(socialLogin?.provider)
 
