@@ -278,9 +278,16 @@ class PredictionMarketV2Contract extends IContract {
    * @returns {Array} Outcome Shares
    */
   async getPortfolio({ user }) {
-    const events = await this.getActions({ user });
     const allMarketIds = await this.getMarkets();
-    const userMarketIds = events.map(e => e.marketId).filter((x, i, a) => a.indexOf(x) == i);
+    let userMarketIds;
+    let events = [];
+    try {
+      events = await this.getActions({ user });
+      userMarketIds = events.map(e => e.marketId).filter((x, i, a) => a.indexOf(x) == i);
+    } catch (err) {
+      // defaulting to allMarketIds if query fails
+      userMarketIds = allMarketIds;
+    }
 
     return await allMarketIds.reduce(async (obj, marketId) => {
       let portfolio;
