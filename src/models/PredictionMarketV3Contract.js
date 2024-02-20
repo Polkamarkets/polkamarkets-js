@@ -5,6 +5,10 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
   constructor(params) {
     super({ abi: predictionV3, ...params });
     this.contractName = 'predictionMarketV3';
+    if (params.isSocialLogin) {
+      // social login tokens are standard ERC20 tokens
+      this.marketDecimals = 18;
+    }
   }
 
   async mintAndCreateMarket ({
