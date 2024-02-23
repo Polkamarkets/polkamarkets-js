@@ -185,6 +185,7 @@ class IContract {
                     user_operation: signedUserOp,
                     user_operation_hash: userOpHash,
                     user_operation_data: [this.operationDataFromCall(f)],
+                    user_method_call_data: methodCallData,
                     network_id: networkConfig.chainId,
                   }
                 }
