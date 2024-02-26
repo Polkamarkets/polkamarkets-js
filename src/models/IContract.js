@@ -1,7 +1,7 @@
 const Contract = require("../utils/Contract");
 const _ = require("lodash");
 const axios = require('axios');
-const PolkamarketsSocialLogin = require('./PolkamarketsSocialLogin');
+const AccountAbstraction = require("../utils/AccountAbstraction");
 const ethers = require('ethers').ethers;
 
 /**
@@ -22,6 +22,7 @@ class IContract {
     web3EventsProvider,
     gasPrice,
     isSocialLogin = false,
+    socialLoginType = 'SFAParticle'
   }) {
     try {
       if (!abi) {
@@ -45,6 +46,7 @@ class IContract {
         gasPrice,
         contract: new Contract(web3, abi, contractAddress),
         isSocialLogin,
+        socialLoginType
       };
     } catch (err) {
       throw err;
@@ -124,8 +126,10 @@ class IContract {
   }
 
   async sendGaslessTransactions(f) {
+    const PolkamarketsSocialLogin = AccountAbstraction.getSocialLogin(this.params.socialLoginType);
     const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
     const smartAccount = socialLogin.smartAccount;
+
     const networkConfig = smartAccount.networkConfig;
 
     const { isMetamask, signer } = await socialLogin.providerIsMetamask();
@@ -147,82 +151,91 @@ class IContract {
         const txResponse = await signer.sendTransaction({ ...tx, gasLimit: 210000 });
         receipt = await txResponse.wait();
       } else {
-        // trying operation 3 times
-        const retries = 3;
-        let feeQuotesResult;
-        for (let i = 0; i < retries; i++) {
-          try {
-            feeQuotesResult = await smartAccount.getFeeQuotes(tx);
-            break;
-          } catch (error) {
-            await new Promise((resolve) => setTimeout(resolve, 5000));
+        if (this.params.socialLoginType === 'PnPBiconomy') {
+          const txResponse = await smartAccount.sendTransaction({
+            transaction: tx
+          });
 
-            if (i === retries - 1) {
-              throw error;
-            } else {
-              // 1s interval between retries
-              await new Promise((resolve) => setTimeout(resolve, 1000));
+          receipt = await txResponse.wait();
+
+        } else {
+          // trying operation 3 times
+          const retries = 3;
+          let feeQuotesResult;
+          for (let i = 0; i < retries; i++) {
+            try {
+              feeQuotesResult = await smartAccount.getFeeQuotes(tx);
+              break;
+            } catch (error) {
+              await new Promise((resolve) => setTimeout(resolve, 5000));
+
+              if (i === retries - 1) {
+                throw error;
+              } else {
+                // 1s interval between retries
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+              }
             }
           }
-        }
 
-        const userOp = feeQuotesResult.verifyingPaymasterGasless?.userOp;
-        const userOpHash = feeQuotesResult.verifyingPaymasterGasless?.userOpHash;
+          const userOp = feeQuotesResult.verifyingPaymasterGasless?.userOp;
+          const userOpHash = feeQuotesResult.verifyingPaymasterGasless?.userOpHash;
 
-        // TODO: remove console.log
-        console.log(userOp);
-        console.log(userOpHash);
+          // TODO: remove console.log
+          console.log(userOp);
+          console.log(userOpHash);
 
-        const signedUserOp = await smartAccount.signUserOperation({ userOpHash, userOp });
+          const signedUserOp = await smartAccount.signUserOperation({ userOpHash, userOp });
 
-        let txResponse;
-        for (let i = 0; i < retries; i++) {
-          try {
-            if (networkConfig.bundlerAPI) {
-              txResponse = await axios.post(`${networkConfig.bundlerAPI}/user_operations`,
-                {
-                  user_operation: {
-                    user_operation: signedUserOp,
-                    user_operation_hash: userOpHash,
-                    user_operation_data: [this.operationDataFromCall(f)],
-                    user_method_call_data: methodCallData,
-                    network_id: networkConfig.chainId,
+          let txResponse;
+          for (let i = 0; i < retries; i++) {
+            try {
+              if (networkConfig.bundlerAPI) {
+                txResponse = await axios.post(`${networkConfig.bundlerAPI}/user_operations`,
+                  {
+                    user_operation: {
+                      user_operation: signedUserOp,
+                      user_operation_hash: userOpHash,
+                      user_operation_data: [this.operationDataFromCall(f)],
+                      user_method_call_data: methodCallData,
+                      network_id: networkConfig.chainId,
+                    }
                   }
-                }
-              );
-            } else {
-              txResponse = await axios.post(`${networkConfig.bundlerRPC}/rpc?chainId=${networkConfig.chainId}`,
-                {
+                );
+              } else {
+                txResponse = await axios.post(`${networkConfig.bundlerRPC}/rpc?chainId=${networkConfig.chainId}`,
+                  {
 
-                  "method": "eth_sendUserOperation",
-                  "params": [
-                    signedUserOp,
-                    "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
-                  ]
-                }
-              );
-            }
+                    "method": "eth_sendUserOperation",
+                    "params": [
+                      signedUserOp,
+                      "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+                    ]
+                  }
+                );
+              }
 
-            if (!txResponse.data.error) break;
-          } catch (error) {
-            if (i === retries - 1) {
-              throw error;
-            } else {
-              // 1s interval between retries
-              await new Promise((resolve) => setTimeout(resolve, 1000));
+              if (!txResponse.data.error) break;
+            } catch (error) {
+              if (i === retries - 1) {
+                throw error;
+              } else {
+                // 1s interval between retries
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+              }
             }
           }
+
+          if (txResponse.data.error) {
+            throw new Error(txResponse.data.error.message);
+          }
+
+          const transactionHash = await this.waitForTransactionHashToBeGenerated(userOpHash, networkConfig);
+
+          const web3Provider = new ethers.providers.Web3Provider(socialLogin?.provider)
+
+          receipt = await web3Provider.waitForTransaction(transactionHash);
         }
-
-        if (txResponse.data.error) {
-          throw new Error(txResponse.data.error.message);
-        }
-
-        const transactionHash = await this.waitForTransactionHashToBeGenerated(userOpHash, networkConfig);
-
-        const web3Provider = new ethers.providers.Web3Provider(socialLogin?.provider)
-
-        receipt = await web3Provider.waitForTransaction(transactionHash);
       }
 
       if (receipt.logs) {

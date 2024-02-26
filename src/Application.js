@@ -16,7 +16,7 @@ const ArbitrationContract = require("./models/index").ArbitrationContract;
 const ArbitrationProxyContract = require("./models/index").ArbitrationProxyContract;
 
 const Account = require('./utils/Account');
-
+const AccountAbstraction = require("./utils/AccountAbstraction");
 
 const networksEnum = Object.freeze({
   1: "Main",
@@ -43,8 +43,9 @@ class Application {
     this.isSocialLogin = isSocialLogin;
 
     if (this.isSocialLogin) {
-      const PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
       this.socialLoginParams = socialLoginParams;
+
+      const PolkamarketsSocialLogin = AccountAbstraction.getSocialLoginClass(this.socialLoginParams.type);
       this.socialLogin = PolkamarketsSocialLogin.singleton.getInstance(this.socialLoginParams, this.web3Provider);
     }
 
@@ -78,7 +79,11 @@ class Application {
    */
   async login() {
     if (this.isSocialLogin) {
-      return this.socialLogin.isLoggedIn();
+      if (this.socialLoginParams.type === 'PnPBiconomy') {
+        return this.socialLogin.login();
+      } else {
+        return this.socialLogin.isLoggedIn();
+      }
     } else {
       try {
         if (typeof window === "undefined") { return false; }
@@ -101,7 +106,11 @@ class Application {
    */
   async isLoggedIn() {
     if (this.isSocialLogin) {
-      return this.socialLogin.isLoggedIn();
+      if (this.socialLoginParams.type === 'PnPBiconomy') {
+        return this.socialLogin ? (await this.socialLogin.isLoggedIn()) : false;
+      } else {
+        return this.socialLogin.isLoggedIn();
+      }
     } else {
       try {
         if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
@@ -132,6 +141,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        socialLoginType: this.socialLoginParams.type,
       });
     } catch (err) {
       throw err;
@@ -152,6 +162,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        socialLoginType: this.socialLoginParams.type,
       });
     } catch (err) {
       throw err;
@@ -172,6 +183,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        socialLoginType: this.socialLoginParams.type,
       });
     } catch (err) {
       throw err;
@@ -192,6 +204,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        socialLoginType: this.socialLoginParams.type,
       });
     } catch (err) {
       throw err;
@@ -218,6 +231,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        socialLoginType: this.socialLoginParams.type,
       });
     } catch (err) {
       throw err;
@@ -238,6 +252,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        socialLoginType: this.socialLoginParams.type,
       });
     } catch (err) {
       throw err;
@@ -258,6 +273,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        socialLoginType: this.socialLoginParams.type,
       });
     } catch (err) {
       throw err;
@@ -278,6 +294,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        socialLoginType: this.socialLoginParams.type,
       });
     } catch (err) {
       throw err;
@@ -298,6 +315,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        socialLoginType: this.socialLoginParams.type,
       });
     } catch (err) {
       throw err;
@@ -318,6 +336,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        socialLoginType: this.socialLoginParams.type,
       });
     } catch (err) {
       throw err;
@@ -338,6 +357,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        socialLoginType: this.socialLoginParams.type,
       });
     } catch (err) {
       throw err;
@@ -358,6 +378,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        socialLoginType: this.socialLoginParams.type,
       });
     } catch (err) {
       throw err;
@@ -406,16 +427,49 @@ class Application {
     return this.web3.utils.fromWei(wei, "ether");
   };
 
+  async socialLoginGoogle() {
+    return await this.socialLogin.directLogin('google');
+  }
+
+  async socialLoginFacebook() {
+    return await this.socialLogin.directLogin('facebook');
+  }
+
+  async socialLoginTwitter() {
+    return await this.socialLogin.directLogin('twitter');
+  }
+
+  async socialLoginGithub() {
+    return await this.socialLogin.directLogin('github');
+  }
+
+  async socialLoginDiscord() {
+    return await this.socialLogin.directLogin('discord');
+  }
+
+  async socialLoginEmail(email) {
+    return await this.socialLogin.directLogin('email', email);
+  }
+
+  async socialLoginMetamask() {
+    return await this.socialLogin.directLogin('metamask');
+  }
+
   async socialLoginWithJWT(id, jwtToken) {
     return await this.socialLogin.login(id, jwtToken);
   }
 
   async socialLoginLogout() {
     if (this.socialLogin?.provider) {
-      await this.socialLogin.logout();
-      PolkamarketsSmartAccount.singleton.clearInstance();
-      this.socialLogin.isInit = false;
-      await this.socialLogin?.init();
+      if (this.socialLoginParams.type === 'PnPParticle') {
+        await this.socialLogin.logout();
+        PolkamarketsSmartAccount.singleton.clearInstance();
+        this.socialLogin.isInit = false;
+        await this.socialLogin?.init();
+      } else {
+        this.socialLogin.logout();
+        PolkamarketsSmartAccount.singleton.clearInstance();
+      }
     }
   }
 
