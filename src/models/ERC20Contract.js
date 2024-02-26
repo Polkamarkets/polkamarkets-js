@@ -48,7 +48,8 @@ class ERC20Contract extends IContract {
   }
 
   async balanceOf({ address }) {
-    return Numbers.fromDecimalsNumber(await this.getContract().methods.balanceOf(address).call(), this.getDecimals());
+    const decimals = this.getDecimals() || (await this.getDecimalsAsync());
+    return Numbers.fromDecimalsNumber(await this.getContract().methods.balanceOf(address).call(), decimals);
   }
 
   async isApproved({ address, amount, spenderAddress }) {
@@ -67,7 +68,7 @@ class ERC20Contract extends IContract {
     try {
       let amountWithDecimals = Numbers.toSmartContractDecimals(
         amount,
-        this.getDecimals()
+        this.getDecimals() || (await this.getDecimalsAsync())
       );
       let res = await this.__sendTx(
         this.getContract().methods.approve(address, amountWithDecimals),
@@ -89,6 +90,22 @@ class ERC20Contract extends IContract {
       );
       let res = await this.__sendTx(
         this.getContract().methods.burn(amountWithDecimals),
+        false,
+      );
+      return res;
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  async mint({ address, amount }) {
+    try {
+      let amountWithDecimals = Numbers.toSmartContractDecimals(
+        amount,
+        this.getDecimals()
+      );
+      let res = await this.__sendTx(
+        this.getContract().methods.mint(address, amountWithDecimals),
         false,
       );
       return res;
@@ -120,6 +137,10 @@ class ERC20Contract extends IContract {
 
   async symbol() {
     return await this.getContract().methods.symbol().call();
+  }
+
+  async paused() {
+    return await this.getContract().methods.paused().call();
   }
 
   async getTokenInfo() {

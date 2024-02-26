@@ -1,0 +1,737 @@
+{
+  "contractName": "IPredictionMarketV3",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "value",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "closesAt",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "outcomes",
+              "type": "uint256"
+            },
+            {
+              "internalType": "contract IERC20",
+              "name": "token",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256[]",
+              "name": "distribution",
+              "type": "uint256[]"
+            },
+            {
+              "internalType": "string",
+              "name": "question",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "image",
+              "type": "string"
+            },
+            {
+              "internalType": "address",
+              "name": "arbitrator",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "fee",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "treasuryFee",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "treasury",
+              "type": "address"
+            },
+            {
+              "internalType": "contract IRealityETH_ERC20",
+              "name": "realitio",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "realitioTimeout",
+              "type": "uint256"
+            },
+            {
+              "internalType": "contract IPredictionMarketV3Manager",
+              "name": "manager",
+              "type": "address"
+            }
+          ],
+          "internalType": "struct IPredictionMarketV3.CreateMarketDescription",
+          "name": "description",
+          "type": "tuple"
+        }
+      ],
+      "name": "createMarket",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "metadata": "{\"compiler\":{\"version\":\"0.8.18+commit.87f61d96\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"closesAt\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"outcomes\",\"type\":\"uint256\"},{\"internalType\":\"contract IERC20\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256[]\",\"name\":\"distribution\",\"type\":\"uint256[]\"},{\"internalType\":\"string\",\"name\":\"question\",\"type\":\"string\"},{\"internalType\":\"string\",\"name\":\"image\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"arbitrator\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"treasuryFee\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"treasury\",\"type\":\"address\"},{\"internalType\":\"contract IRealityETH_ERC20\",\"name\":\"realitio\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"realitioTimeout\",\"type\":\"uint256\"},{\"internalType\":\"contract IPredictionMarketV3Manager\",\"name\":\"manager\",\"type\":\"address\"}],\"internalType\":\"struct IPredictionMarketV3.CreateMarketDescription\",\"name\":\"description\",\"type\":\"tuple\"}],\"name\":\"createMarket\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"project:/contracts/IPredictionMarketV3.sol\":\"IPredictionMarketV3\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"@openzeppelin/contracts/token/ERC20/IERC20.sol\":{\"keccak256\":\"0x9750c6b834f7b43000631af5cc30001c5f547b3ceb3635488f140f60e897ea6b\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://5a7d5b1ef5d8d5889ad2ed89d8619c09383b80b72ab226e0fe7bde1636481e34\",\"dweb:/ipfs/QmebXWgtEfumQGBdVeM6c71McLixYXQP5Bk6kKXuoY4Bmr\"]},\"project:/contracts/IPredictionMarketV3.sol\":{\"keccak256\":\"0x1d37a30a202094977803e4c4937931938e81d098ff0cd3f0d59e4e86a7a97d3b\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://3333c1938eab44d321ca5aa570989ef3c48f75b668625864d2d0ab57a1aa7026\",\"dweb:/ipfs/QmfADCTyscr4qp4mwmDo8uocv3DyoJ8AhrnyMCiCwrV22U\"]},\"project:/contracts/IPredictionMarketV3Manager.sol\":{\"keccak256\":\"0x5b8dca067534f46da015c26afa502d9825d058d4ce40b79c4f0204f8219718c8\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://dc04293027364acdf1a362232e6c96cc9ccfd642410a9247323f36d394fcba1d\",\"dweb:/ipfs/QmPL8eLBf26tsAsv9ma8E4HpwKgvbZojmNvCKSd5D4V8H8\"]},\"project:/contracts/IRealityETH_ERC20.sol\":{\"keccak256\":\"0xe367047f36f407dfe9b51b3b4cf9931e8d174a9239487bebe7c2b2c2240a62bd\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://810bab9494eca0246bc61b5e2c97032545884b165d45b78899ff0e4e759f4cf3\",\"dweb:/ipfs/QmequuqWD9ybiQFzjQjHbrAhQEuwfYRRv41tvTCEULwUuX\"]}},\"version\":1}",
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "immutableReferences": {},
+  "generatedSources": [],
+  "deployedGeneratedSources": [],
+  "sourceMap": "",
+  "deployedSourceMap": "",
+  "source": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.18;\n\nimport \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\n\nimport \"./IRealityETH_ERC20.sol\";\nimport \"./IPredictionMarketV3Manager.sol\";\n\ninterface IPredictionMarketV3 {\n  struct CreateMarketDescription {\n    uint256 value;\n    uint256 closesAt;\n    uint256 outcomes;\n    IERC20 token;\n    uint256[] distribution;\n    string question;\n    string image;\n    address arbitrator;\n    uint256 fee;\n    uint256 treasuryFee;\n    address treasury;\n    IRealityETH_ERC20 realitio;\n    uint256 realitioTimeout;\n    IPredictionMarketV3Manager manager;\n  }\n\n  function createMarket(CreateMarketDescription calldata description) external returns (uint256);\n  // TODO: add remaining functions\n}\n",
+  "sourcePath": "/Users/ricardomarques/dev/workspace/polkamarkets/bepro-js/contracts/IPredictionMarketV3.sol",
+  "ast": {
+    "absolutePath": "project:/contracts/IPredictionMarketV3.sol",
+    "exportedSymbols": {
+      "IERC20": [
+        1478
+      ],
+      "IPredictionMarketV3": [
+        4309
+      ],
+      "IPredictionMarketV3Manager": [
+        4341
+      ],
+      "IRealityETH_ERC20": [
+        4912
+      ]
+    },
+    "id": 4310,
+    "license": "MIT",
+    "nodeType": "SourceUnit",
+    "nodes": [
+      {
+        "id": 4264,
+        "literals": [
+          "solidity",
+          "^",
+          "0.8",
+          ".18"
+        ],
+        "nodeType": "PragmaDirective",
+        "src": "32:24:24"
+      },
+      {
+        "absolutePath": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
+        "file": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
+        "id": 4265,
+        "nameLocation": "-1:-1:-1",
+        "nodeType": "ImportDirective",
+        "scope": 4310,
+        "sourceUnit": 1479,
+        "src": "58:56:24",
+        "symbolAliases": [],
+        "unitAlias": ""
+      },
+      {
+        "absolutePath": "project:/contracts/IRealityETH_ERC20.sol",
+        "file": "./IRealityETH_ERC20.sol",
+        "id": 4266,
+        "nameLocation": "-1:-1:-1",
+        "nodeType": "ImportDirective",
+        "scope": 4310,
+        "sourceUnit": 4913,
+        "src": "116:33:24",
+        "symbolAliases": [],
+        "unitAlias": ""
+      },
+      {
+        "absolutePath": "project:/contracts/IPredictionMarketV3Manager.sol",
+        "file": "./IPredictionMarketV3Manager.sol",
+        "id": 4267,
+        "nameLocation": "-1:-1:-1",
+        "nodeType": "ImportDirective",
+        "scope": 4310,
+        "sourceUnit": 4342,
+        "src": "150:42:24",
+        "symbolAliases": [],
+        "unitAlias": ""
+      },
+      {
+        "abstract": false,
+        "baseContracts": [],
+        "canonicalName": "IPredictionMarketV3",
+        "contractDependencies": [],
+        "contractKind": "interface",
+        "fullyImplemented": false,
+        "id": 4309,
+        "linearizedBaseContracts": [
+          4309
+        ],
+        "name": "IPredictionMarketV3",
+        "nameLocation": "204:19:24",
+        "nodeType": "ContractDefinition",
+        "nodes": [
+          {
+            "canonicalName": "IPredictionMarketV3.CreateMarketDescription",
+            "id": 4300,
+            "members": [
+              {
+                "constant": false,
+                "id": 4269,
+                "mutability": "mutable",
+                "name": "value",
+                "nameLocation": "273:5:24",
+                "nodeType": "VariableDeclaration",
+                "scope": 4300,
+                "src": "265:13:24",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_uint256",
+                  "typeString": "uint256"
+                },
+                "typeName": {
+                  "id": 4268,
+                  "name": "uint256",
+                  "nodeType": "ElementaryTypeName",
+                  "src": "265:7:24",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 4271,
+                "mutability": "mutable",
+                "name": "closesAt",
+                "nameLocation": "292:8:24",
+                "nodeType": "VariableDeclaration",
+                "scope": 4300,
+                "src": "284:16:24",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_uint256",
+                  "typeString": "uint256"
+                },
+                "typeName": {
+                  "id": 4270,
+                  "name": "uint256",
+                  "nodeType": "ElementaryTypeName",
+                  "src": "284:7:24",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 4273,
+                "mutability": "mutable",
+                "name": "outcomes",
+                "nameLocation": "314:8:24",
+                "nodeType": "VariableDeclaration",
+                "scope": 4300,
+                "src": "306:16:24",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_uint256",
+                  "typeString": "uint256"
+                },
+                "typeName": {
+                  "id": 4272,
+                  "name": "uint256",
+                  "nodeType": "ElementaryTypeName",
+                  "src": "306:7:24",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 4276,
+                "mutability": "mutable",
+                "name": "token",
+                "nameLocation": "335:5:24",
+                "nodeType": "VariableDeclaration",
+                "scope": 4300,
+                "src": "328:12:24",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_contract$_IERC20_$1478",
+                  "typeString": "contract IERC20"
+                },
+                "typeName": {
+                  "id": 4275,
+                  "nodeType": "UserDefinedTypeName",
+                  "pathNode": {
+                    "id": 4274,
+                    "name": "IERC20",
+                    "nameLocations": [
+                      "328:6:24"
+                    ],
+                    "nodeType": "IdentifierPath",
+                    "referencedDeclaration": 1478,
+                    "src": "328:6:24"
+                  },
+                  "referencedDeclaration": 1478,
+                  "src": "328:6:24",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_contract$_IERC20_$1478",
+                    "typeString": "contract IERC20"
+                  }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 4279,
+                "mutability": "mutable",
+                "name": "distribution",
+                "nameLocation": "356:12:24",
+                "nodeType": "VariableDeclaration",
+                "scope": 4300,
+                "src": "346:22:24",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_array$_t_uint256_$dyn_storage_ptr",
+                  "typeString": "uint256[]"
+                },
+                "typeName": {
+                  "baseType": {
+                    "id": 4277,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "346:7:24",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "id": 4278,
+                  "nodeType": "ArrayTypeName",
+                  "src": "346:9:24",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_array$_t_uint256_$dyn_storage_ptr",
+                    "typeString": "uint256[]"
+                  }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 4281,
+                "mutability": "mutable",
+                "name": "question",
+                "nameLocation": "381:8:24",
+                "nodeType": "VariableDeclaration",
+                "scope": 4300,
+                "src": "374:15:24",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_string_storage_ptr",
+                  "typeString": "string"
+                },
+                "typeName": {
+                  "id": 4280,
+                  "name": "string",
+                  "nodeType": "ElementaryTypeName",
+                  "src": "374:6:24",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_string_storage_ptr",
+                    "typeString": "string"
+                  }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 4283,
+                "mutability": "mutable",
+                "name": "image",
+                "nameLocation": "402:5:24",
+                "nodeType": "VariableDeclaration",
+                "scope": 4300,
+                "src": "395:12:24",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_string_storage_ptr",
+                  "typeString": "string"
+                },
+                "typeName": {
+                  "id": 4282,
+                  "name": "string",
+                  "nodeType": "ElementaryTypeName",
+                  "src": "395:6:24",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_string_storage_ptr",
+                    "typeString": "string"
+                  }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 4285,
+                "mutability": "mutable",
+                "name": "arbitrator",
+                "nameLocation": "421:10:24",
+                "nodeType": "VariableDeclaration",
+                "scope": 4300,
+                "src": "413:18:24",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_address",
+                  "typeString": "address"
+                },
+                "typeName": {
+                  "id": 4284,
+                  "name": "address",
+                  "nodeType": "ElementaryTypeName",
+                  "src": "413:7:24",
+                  "stateMutability": "nonpayable",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 4287,
+                "mutability": "mutable",
+                "name": "fee",
+                "nameLocation": "445:3:24",
+                "nodeType": "VariableDeclaration",
+                "scope": 4300,
+                "src": "437:11:24",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_uint256",
+                  "typeString": "uint256"
+                },
+                "typeName": {
+                  "id": 4286,
+                  "name": "uint256",
+                  "nodeType": "ElementaryTypeName",
+                  "src": "437:7:24",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 4289,
+                "mutability": "mutable",
+                "name": "treasuryFee",
+                "nameLocation": "462:11:24",
+                "nodeType": "VariableDeclaration",
+                "scope": 4300,
+                "src": "454:19:24",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_uint256",
+                  "typeString": "uint256"
+                },
+                "typeName": {
+                  "id": 4288,
+                  "name": "uint256",
+                  "nodeType": "ElementaryTypeName",
+                  "src": "454:7:24",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 4291,
+                "mutability": "mutable",
+                "name": "treasury",
+                "nameLocation": "487:8:24",
+                "nodeType": "VariableDeclaration",
+                "scope": 4300,
+                "src": "479:16:24",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_address",
+                  "typeString": "address"
+                },
+                "typeName": {
+                  "id": 4290,
+                  "name": "address",
+                  "nodeType": "ElementaryTypeName",
+                  "src": "479:7:24",
+                  "stateMutability": "nonpayable",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 4294,
+                "mutability": "mutable",
+                "name": "realitio",
+                "nameLocation": "519:8:24",
+                "nodeType": "VariableDeclaration",
+                "scope": 4300,
+                "src": "501:26:24",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_contract$_IRealityETH_ERC20_$4912",
+                  "typeString": "contract IRealityETH_ERC20"
+                },
+                "typeName": {
+                  "id": 4293,
+                  "nodeType": "UserDefinedTypeName",
+                  "pathNode": {
+                    "id": 4292,
+                    "name": "IRealityETH_ERC20",
+                    "nameLocations": [
+                      "501:17:24"
+                    ],
+                    "nodeType": "IdentifierPath",
+                    "referencedDeclaration": 4912,
+                    "src": "501:17:24"
+                  },
+                  "referencedDeclaration": 4912,
+                  "src": "501:17:24",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_contract$_IRealityETH_ERC20_$4912",
+                    "typeString": "contract IRealityETH_ERC20"
+                  }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 4296,
+                "mutability": "mutable",
+                "name": "realitioTimeout",
+                "nameLocation": "541:15:24",
+                "nodeType": "VariableDeclaration",
+                "scope": 4300,
+                "src": "533:23:24",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_uint256",
+                  "typeString": "uint256"
+                },
+                "typeName": {
+                  "id": 4295,
+                  "name": "uint256",
+                  "nodeType": "ElementaryTypeName",
+                  "src": "533:7:24",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  }
+                },
+                "visibility": "internal"
+              },
+              {
+                "constant": false,
+                "id": 4299,
+                "mutability": "mutable",
+                "name": "manager",
+                "nameLocation": "589:7:24",
+                "nodeType": "VariableDeclaration",
+                "scope": 4300,
+                "src": "562:34:24",
+                "stateVariable": false,
+                "storageLocation": "default",
+                "typeDescriptions": {
+                  "typeIdentifier": "t_contract$_IPredictionMarketV3Manager_$4341",
+                  "typeString": "contract IPredictionMarketV3Manager"
+                },
+                "typeName": {
+                  "id": 4298,
+                  "nodeType": "UserDefinedTypeName",
+                  "pathNode": {
+                    "id": 4297,
+                    "name": "IPredictionMarketV3Manager",
+                    "nameLocations": [
+                      "562:26:24"
+                    ],
+                    "nodeType": "IdentifierPath",
+                    "referencedDeclaration": 4341,
+                    "src": "562:26:24"
+                  },
+                  "referencedDeclaration": 4341,
+                  "src": "562:26:24",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_contract$_IPredictionMarketV3Manager_$4341",
+                    "typeString": "contract IPredictionMarketV3Manager"
+                  }
+                },
+                "visibility": "internal"
+              }
+            ],
+            "name": "CreateMarketDescription",
+            "nameLocation": "235:23:24",
+            "nodeType": "StructDefinition",
+            "scope": 4309,
+            "src": "228:373:24",
+            "visibility": "public"
+          },
+          {
+            "functionSelector": "f1da56e9",
+            "id": 4308,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "createMarket",
+            "nameLocation": "614:12:24",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 4304,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 4303,
+                  "mutability": "mutable",
+                  "name": "description",
+                  "nameLocation": "660:11:24",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4308,
+                  "src": "627:44:24",
+                  "stateVariable": false,
+                  "storageLocation": "calldata",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_struct$_CreateMarketDescription_$4300_calldata_ptr",
+                    "typeString": "struct IPredictionMarketV3.CreateMarketDescription"
+                  },
+                  "typeName": {
+                    "id": 4302,
+                    "nodeType": "UserDefinedTypeName",
+                    "pathNode": {
+                      "id": 4301,
+                      "name": "CreateMarketDescription",
+                      "nameLocations": [
+                        "627:23:24"
+                      ],
+                      "nodeType": "IdentifierPath",
+                      "referencedDeclaration": 4300,
+                      "src": "627:23:24"
+                    },
+                    "referencedDeclaration": 4300,
+                    "src": "627:23:24",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_struct$_CreateMarketDescription_$4300_storage_ptr",
+                      "typeString": "struct IPredictionMarketV3.CreateMarketDescription"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "626:46:24"
+            },
+            "returnParameters": {
+              "id": 4307,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 4306,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4308,
+                  "src": "691:7:24",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 4305,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "691:7:24",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "690:9:24"
+            },
+            "scope": 4309,
+            "src": "605:95:24",
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          }
+        ],
+        "scope": 4310,
+        "src": "194:543:24",
+        "usedErrors": []
+      }
+    ],
+    "src": "32:706:24"
+  },
+  "compiler": {
+    "name": "solc",
+    "version": "0.8.18+commit.87f61d96.Emscripten.clang"
+  },
+  "networks": {},
+  "schemaVersion": "3.4.10",
+  "updatedAt": "2024-01-12T19:03:30.797Z",
+  "devdoc": {
+    "kind": "dev",
+    "methods": {},
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {},
+    "version": 1
+  }
+}
