@@ -79,7 +79,7 @@ class Application {
    */
   async login() {
     if (this.isSocialLogin) {
-      if (this.socialLoginParams.type === 'PnPBiconomy') {
+      if (this.socialLoginParams.type === 'biconomy') {
         return this.socialLogin.login();
       } else {
         return this.socialLogin.isLoggedIn();
@@ -106,7 +106,7 @@ class Application {
    */
   async isLoggedIn() {
     if (this.isSocialLogin) {
-      if (this.socialLoginParams.type === 'PnPBiconomy') {
+      if (this.socialLoginParams.type === 'biconomy') {
         return this.socialLogin ? (await this.socialLogin.isLoggedIn()) : false;
       } else {
         return this.socialLogin.isLoggedIn();
@@ -461,7 +461,7 @@ class Application {
 
   async socialLoginLogout() {
     if (this.socialLogin?.provider) {
-      if (this.socialLoginParams.type === 'PnPParticle') {
+      if (this.socialLoginParams.type === 'particle') {
         await this.socialLogin.logout();
         PolkamarketsSmartAccount.singleton.clearInstance();
         this.socialLogin.isInit = false;

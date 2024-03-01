@@ -8,7 +8,7 @@ const { OpenloginAdapter } = require('@web3auth/openlogin-adapter');
 const Web3AuthNoModal = require('@web3auth/no-modal').Web3AuthNoModal;
 const { WALLET_ADAPTERS, CHAIN_NAMESPACES } = require('@web3auth/base');
 
-class PolkamarketsSocialLoginPnPBiconomy {
+class PolkamarketsSocialLoginBiconomy {
 
   static initSocialLogin = async (socialLogin, urls, isTestnet, whiteLabelData, networkConfig) => {
     if (!socialLogin.isInit) {
@@ -39,7 +39,7 @@ class PolkamarketsSocialLoginPnPBiconomy {
     let socialLogin;
 
     function createInstance(web3AuthConfig, web3Provider, useCustomModal) {
-      const instance = new PolkamarketsSocialLoginPnPBiconomy(web3AuthConfig, web3Provider, useCustomModal);
+      const instance = new PolkamarketsSocialLoginBiconomy(web3AuthConfig, web3Provider, useCustomModal);
       instance.eventEmitter = new SafeEventEmitter();
       return instance;
     }
@@ -429,4 +429,4 @@ class PolkamarketsSocialLoginPnPBiconomy {
   }
 }
 
-module.exports = PolkamarketsSocialLoginPnPBiconomy;
+module.exports = PolkamarketsSocialLoginBiconomy;

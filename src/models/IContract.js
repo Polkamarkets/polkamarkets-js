@@ -22,7 +22,7 @@ class IContract {
     web3EventsProvider,
     gasPrice,
     isSocialLogin = false,
-    socialLoginType = 'SFAParticle'
+    socialLoginType = 'particle'
   }) {
     try {
       if (!abi) {
@@ -151,7 +151,7 @@ class IContract {
         const txResponse = await signer.sendTransaction({ ...tx, gasLimit: 210000 });
         receipt = await txResponse.wait();
       } else {
-        if (this.params.socialLoginType === 'PnPBiconomy') {
+        if (this.params.socialLoginType === 'biconomy') {
           const txResponse = await smartAccount.sendTransaction({
             transaction: tx
           });

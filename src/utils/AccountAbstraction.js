@@ -1,15 +1,12 @@
-const PolkamarketsSocialLoginPnPBiconomy = require("../models/PolkamarketsSocialLoginPnPBiconomy");
-const PolkamarketsSocialLoginPnPParticle = require("../models/PolkamarketsSocialLoginPnPParticle");
+const PolkamarketsSocialLoginBiconomy = require("../models/PolkamarketsSocialLoginBiconomy");
 const PolkamarketsSocialLogin = require("../models/PolkamarketsSocialLogin");
 
 class AccountAbstraction {
 
   static getSocialLoginClass(type) {
     switch (type) {
-      case 'PnPBiconomy':
-        return PolkamarketsSocialLoginPnPBiconomy;
-      case 'PnPParticle':
-        return PolkamarketsSocialLoginPnPParticle;
+      case 'biconomy':
+        return PolkamarketsSocialLoginBiconomy;
       default:
         return PolkamarketsSocialLogin;
     }
