@@ -45,6 +45,12 @@ class Application {
     if (this.isSocialLogin) {
       this.socialLoginParams = socialLoginParams;
 
+      if (this.socialLoginParams.networkConfig.particleProjectId) {
+        this.socialLoginParams.type = 'particle';
+      } else {
+        this.socialLoginParams.type = 'biconomy';
+      }
+
       const PolkamarketsSocialLogin = AccountAbstraction.getSocialLoginClass(this.socialLoginParams.type);
       this.socialLogin = PolkamarketsSocialLogin.singleton.getInstance(this.socialLoginParams, this.web3Provider);
     }
