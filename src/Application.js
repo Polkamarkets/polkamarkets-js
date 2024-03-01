@@ -112,11 +112,7 @@ class Application {
    */
   async isLoggedIn() {
     if (this.isSocialLogin) {
-      if (this.socialLoginParams.type === 'biconomy') {
-        return this.socialLogin ? (await this.socialLogin.isLoggedIn()) : false;
-      } else {
-        return this.socialLogin.isLoggedIn();
-      }
+      return this.socialLogin ? (await this.socialLogin.isLoggedIn()) : false;
     } else {
       try {
         if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }

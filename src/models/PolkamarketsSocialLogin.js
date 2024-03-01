@@ -8,7 +8,6 @@ const { CHAIN_NAMESPACES } = require('@web3auth/base');
 
 const { Web3Auth } = require('@web3auth/single-factor-auth');
 
-// SFA
 class PolkamarketsSocialLogin {
   static singleton = (() => {
     let socialLogin;
