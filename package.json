@@ -23,6 +23,7 @@
         "install": "( [ ! -d ./build ] && [ ! -f ./built ] && echo \"\" > ./built && npm install . && npm run build ) || echo \"Already built\""
     },
     "dependencies": {
+        "@biconomy/smart-account": "^2.0.0",
         "@metamask/safe-event-emitter": "^2.0.0",
         "@metamask/utils": "^8.2.1",
         "@openzeppelin/contracts": "^4.8.2",
@@ -30,6 +31,7 @@
         "@openzeppelin/truffle-upgrades": "^1.7.0",
         "@particle-network/aa": "^1.2.0",
         "@reality.eth/reality-eth-lib": "^3.2.10",
+        "@web3auth/base": "^6.1.7",
         "@web3auth/ethereum-provider": "^6.1.7",
         "@web3auth/metamask-adapter": "^6.1.7",
         "@web3auth/mpc-core-kit": "^0.3.1",
