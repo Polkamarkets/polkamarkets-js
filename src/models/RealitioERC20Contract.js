@@ -129,18 +129,22 @@ class RealitioERC20Contract extends IContract {
     );
   }
 
+  async getMyBonds() {
+    const user = await this.getMyAccount();
+    if (!user) return {};
+
+    return await this.getUserBonds({ user });
+  }
+
   /**
    * @function getMyBonds
    * @description Get My Bonds
    * @returns {Array} Outcome Shares
    */
-  async getMyBonds() {
-    const account = await this.getMyAccount();
-    if (!account) return {};
-
-    const events = await this.getEvents('LogNewAnswer', { user: account });
-    const claimEvents = await this.getEvents('LogClaim', { user: account });
-    const withdrawEvents = await this.getEvents('LogWithdraw', { user: account });
+  async getUserBonds({ user }) {
+    const events = await this.getEvents('LogNewAnswer', { user });
+    const claimEvents = await this.getEvents('LogClaim', { user });
+    const withdrawEvents = await this.getEvents('LogWithdraw', { user });
     const decimals = await this.getTokenDecimals();
 
     const lastWithdrawBlockNumber = withdrawEvents[withdrawEvents.length - 1]
@@ -179,17 +183,20 @@ class RealitioERC20Contract extends IContract {
     return bonds;
   }
 
+  async getMyActions() {
+    const user = await this.getMyAccount();
+    if (!user) return [];
+
+    return await this.getUserActions({ user });
+  }
 
   /**
    * @function getMyActions
    * @description Get My Actions
    * @returns {Array} Actions
    */
-  async getMyActions() {
-    const account = await this.getMyAccount();
-    if (!account) return [];
-
-    const events = await this.getEvents('LogNewAnswer', { user: account });
+  async getUserActions({ user }) {
+    const events = await this.getEvents('LogNewAnswer', { user });
     const decimals = await this.getTokenDecimals();
 
     return events.map(event => {
@@ -204,16 +211,20 @@ class RealitioERC20Contract extends IContract {
     })
   }
 
+  async getMyQuestions() {
+    const user = await this.getMyAccount();
+    if (!user) return [];
+
+    return await this.getUserQuestions({ user });
+  }
+
   /**
    * @function getMyQuestions
    * @description Get My Questions
    * @returns {Array} Questions
    */
-  async getMyQuestions() {
-    const account = await this.getMyAccount();
-    if (!account) return [];
-
-    const events = await this.getEvents('LogNewAnswer', { user: account });
+  async getUserQuestions({ user }) {
+    const events = await this.getEvents('LogNewAnswer', { user });
     const logQuestionEvents = await this.getEvents('LogNewQuestion');
 
     // getting unique question ids
