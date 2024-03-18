@@ -125,7 +125,6 @@ class IContract {
   }
 
   async sendGaslessTransactions(f) {
-    console.log('sendGaslessTransactions:');
     // const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
     // const smartAccount = socialLogin.smartAccount;
     const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
@@ -145,7 +144,6 @@ class IContract {
       data: methodCallData,
     };
 
-    console.log('tx:', tx);
     try {
       let receipt;
 
@@ -225,7 +223,7 @@ class IContract {
 
         const transactionHash = await this.waitForTransactionHashToBeGenerated(userOpHash, networkConfig);
 
-        const web3Provider = new ethers.providers.Web3Provider(socialLogin?.provider)
+        const web3Provider = new ethers.providers.Web3Provider(smartAccount?.provider)
 
         receipt = await web3Provider.waitForTransaction(transactionHash);
       }
@@ -284,8 +282,6 @@ class IContract {
   }
 
   async __sendTx(f, call = false, value, callback = () => { }) {
-    console.log('__sendTx:');
-    console.log('this.params.isSocialLogin :', this.params.isSocialLogin );
     if (this.params.isSocialLogin && !call) {
       return await this.sendGaslessTransactions(f);
     } else {
