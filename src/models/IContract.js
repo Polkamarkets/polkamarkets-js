@@ -1,7 +1,8 @@
 const Contract = require("../utils/Contract");
 const _ = require("lodash");
 const axios = require('axios');
-const PolkamarketsSocialLogin = require('./PolkamarketsSocialLogin');
+// const PolkamarketsSocialLogin = require('./PolkamarketsSocialLogin');
+const PolkamarketsSmartAccount = require('./PolkamarketsSmartAccount');
 const ethers = require('ethers').ethers;
 
 /**
@@ -124,11 +125,14 @@ class IContract {
   }
 
   async sendGaslessTransactions(f) {
-    const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
-    const smartAccount = socialLogin.smartAccount;
+    // const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
+    // const smartAccount = socialLogin.smartAccount;
+    const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
     const networkConfig = smartAccount.networkConfig;
 
-    const { isMetamask, signer } = await socialLogin.providerIsMetamask();
+    // const { isMetamask, signer } = await socialLogin.providerIsMetamask();
+    const isMetamask = false;
+    const signer = null;
 
     const methodName = f._method.name;
 
