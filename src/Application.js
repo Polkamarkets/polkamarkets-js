@@ -43,9 +43,9 @@ class Application {
     this.isSocialLogin = isSocialLogin;
 
     if (this.isSocialLogin) {
-      const PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
+      // const PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
       this.socialLoginParams = socialLoginParams;
-      this.socialLogin = PolkamarketsSocialLogin.singleton.getInstance(this.socialLoginParams, this.web3Provider);
+      // this.socialLogin = PolkamarketsSocialLogin.singleton.getInstance(this.socialLoginParams, this.web3Provider);
     }
 
     // IMPORTANT: this parameter should only be used for testing purposes
@@ -76,9 +76,11 @@ class Application {
    * @name login
    * @description Login with Metamask or a web3 provider
    */
-  async login() {
+  async login(provider = null) {
     if (this.isSocialLogin) {
-      return this.socialLogin.isLoggedIn();
+      const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
+      this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig);
+      return true;
     } else {
       try {
         if (typeof window === "undefined") { return false; }
@@ -101,7 +103,7 @@ class Application {
    */
   async isLoggedIn() {
     if (this.isSocialLogin) {
-      return this.socialLogin.isLoggedIn();
+      return this.socialLogin.isLoggedIn(); // FIXME
     } else {
       try {
         if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
@@ -388,7 +390,7 @@ class Application {
    */
   async getAddress() {
     if (this.isSocialLogin) {
-      return await this.socialLogin.getAddress();
+      return await this.smartAccount.getAddress();
     } else {
       const accounts = await this.web3.eth.getAccounts();
       return accounts[0];
@@ -406,11 +408,11 @@ class Application {
     return this.web3.utils.fromWei(wei, "ether");
   };
 
-  async socialLoginWithJWT(id, jwtToken) {
+  async socialLoginWithJWT(id, jwtToken) { // FIXME
     return await this.socialLogin.login(id, jwtToken);
   }
 
-  async socialLoginLogout() {
+  async socialLoginLogout() { // FIXME
     if (this.socialLogin?.provider) {
       await this.socialLogin.logout();
       PolkamarketsSmartAccount.singleton.clearInstance();
@@ -419,7 +421,7 @@ class Application {
     }
   }
 
-  async getSocialLoginUserInfo() {
+  async getSocialLoginUserInfo() { // FIXME
     if (this.socialLogin?.provider) {
       return await this.socialLogin.getUserInfo();
     }
