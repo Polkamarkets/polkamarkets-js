@@ -284,7 +284,7 @@ class IContract {
   }
 
   async __sendTx(f, call = false, value, callback = () => { }) {
-    console.log('__sendTx:', __sendTx);
+    console.log('__sendTx:');
     console.log('this.params.isSocialLogin :', this.params.isSocialLogin );
     if (this.params.isSocialLogin && !call) {
       return await this.sendGaslessTransactions(f);
