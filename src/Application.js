@@ -412,12 +412,10 @@ class Application {
     return await this.socialLogin.login(id, jwtToken);
   }
 
-  async socialLoginLogout() { // FIXME
-    if (this.socialLogin?.provider) {
-      await this.socialLogin.logout();
+  async socialLoginLogout() {
+    if (this.smartAccount?.provider) {
       PolkamarketsSmartAccount.singleton.clearInstance();
-      this.socialLogin.isInit = false;
-      await this.socialLogin?.init();
+      this.smartAccount = null;
     }
   }
 
