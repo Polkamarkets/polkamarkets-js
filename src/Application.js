@@ -78,8 +78,11 @@ class Application {
    */
   async login(provider = null) {
     if (this.isSocialLogin) {
-      const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
-      this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig);
+      if (!this.smartAccount) {
+        const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
+        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig);
+      }
+
       return true;
     } else {
       try {
@@ -408,20 +411,14 @@ class Application {
     return this.web3.utils.fromWei(wei, "ether");
   };
 
-  async socialLoginWithJWT(id, jwtToken) { // FIXME
-    return await this.socialLogin.login(id, jwtToken);
+  async socialLoginWithJWT(id, jwtToken) {
+    throw new Error("Not implemented");
   }
 
   async socialLoginLogout() {
     if (this.smartAccount?.provider) {
       PolkamarketsSmartAccount.singleton.clearInstance();
       this.smartAccount = null;
-    }
-  }
-
-  async getSocialLoginUserInfo() { // FIXME
-    if (this.socialLogin?.provider) {
-      return await this.socialLogin.getUserInfo();
     }
   }
 }
