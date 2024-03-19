@@ -106,7 +106,7 @@ class Application {
    */
   async isLoggedIn() {
     if (this.isSocialLogin) {
-      return this.smartAccount.isLoggedIn();
+      return this.smartAccount ? this.smartAccount.isLoggedIn() : false;
     } else {
       try {
         if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
@@ -416,7 +416,7 @@ class Application {
   }
 
   async socialLoginLogout() {
-    if (this.smartAccount?.provider) {
+    if (this.smartAccount && this.smartAccount.provider) {
       PolkamarketsSmartAccount.singleton.clearInstance();
       this.smartAccount = null;
     }
