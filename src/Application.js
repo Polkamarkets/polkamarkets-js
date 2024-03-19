@@ -106,7 +106,7 @@ class Application {
    */
   async isLoggedIn() {
     if (this.isSocialLogin) {
-      return this.smartAccount ? this.smartAccount.isLoggedIn() : false;
+      return !!this.smartAccount;
     } else {
       try {
         if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
@@ -393,7 +393,10 @@ class Application {
    */
   async getAddress() {
     if (this.isSocialLogin) {
-      return await this.smartAccount.getAddress();
+      if (this.smartAccount) {
+        return await this.smartAccount.getAddress();
+      }
+      return '';
     } else {
       const accounts = await this.web3.eth.getAccounts();
       return accounts[0];
@@ -416,7 +419,7 @@ class Application {
   }
 
   async socialLoginLogout() {
-    if (this.smartAccount && this.smartAccount.provider) {
+    if (this.smartAccount) {
       PolkamarketsSmartAccount.singleton.clearInstance();
       this.smartAccount = null;
     }
