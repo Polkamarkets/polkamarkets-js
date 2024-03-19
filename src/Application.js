@@ -103,7 +103,7 @@ class Application {
    */
   async isLoggedIn() {
     if (this.isSocialLogin) {
-      return this.socialLogin.isLoggedIn(); // FIXME
+      return this.smartAccount.isLoggedIn();
     } else {
       try {
         if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }

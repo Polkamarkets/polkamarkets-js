@@ -39,6 +39,10 @@ class PolkamarketsSmartAccount extends SmartAccount {
       }
     };
   })();
+
+  isLoggedIn() {
+    return !!this.provider;
+  }
 }
 
 module.exports = PolkamarketsSmartAccount;
