@@ -1,4 +1,5 @@
 const { SmartAccount } = require('@particle-network/aa');
+const ethers = require('ethers').ethers;
 
 class PolkamarketsSmartAccount extends SmartAccount {
 
