@@ -76,11 +76,11 @@ class Application {
    * @name login
    * @description Login with Metamask or a web3 provider
    */
-  async login(provider = null) {
+  async login(provider = null, isConnectedWallet = null) {
     if (this.isSocialLogin) {
       if (!this.smartAccount) {
         const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
-        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig);
+        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig, isConnectedWallet);
       }
 
       return true;

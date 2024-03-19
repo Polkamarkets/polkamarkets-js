@@ -130,7 +130,7 @@ class IContract {
     const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
     const networkConfig = smartAccount.networkConfig;
 
-    const { isMetamask, signer } = await smartAccount.providerIsMetamask();
+    const { isConnectedWallet, signer } = await smartAccount.providerIsConnectedWallet();
 
     const methodName = f._method.name;
 
@@ -145,7 +145,7 @@ class IContract {
     try {
       let receipt;
 
-      if (isMetamask) {
+      if (isConnectedWallet) {
         const txResponse = await signer.sendTransaction({ ...tx, gasLimit: 210000 });
         receipt = await txResponse.wait();
       } else {
