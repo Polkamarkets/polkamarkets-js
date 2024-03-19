@@ -130,9 +130,7 @@ class IContract {
     const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
     const networkConfig = smartAccount.networkConfig;
 
-    // const { isMetamask, signer } = await socialLogin.providerIsMetamask();
-    const isMetamask = false;
-    const signer = null;
+    const { isMetamask, signer } = await smartAccount.providerIsMetamask();
 
     const methodName = f._method.name;
 

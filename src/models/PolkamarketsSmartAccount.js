@@ -39,6 +39,28 @@ class PolkamarketsSmartAccount extends SmartAccount {
       }
     };
   })();
+
+  async providerIsMetamask() {
+    if (this.provider) {
+      const web3Provider = new ethers.providers.Web3Provider(this.provider)
+      if (web3Provider.connection.url === 'metamask') {
+        const signer = web3Provider.getSigner()
+        const address = await signer.getAddress();
+        return { isMetamask: true, address, signer };
+      }
+    }
+
+    return { isMetamask: false, address: null, signer: null };
+  }
+
+  async getAddress() {
+    const { isMetamask, address } = await this.providerIsMetamask();
+    if (isMetamask) {
+      return address;
+    }
+
+    return super.getAddress();
+  }
 }
 
 module.exports = PolkamarketsSmartAccount;
