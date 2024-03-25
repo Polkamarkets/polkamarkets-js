@@ -1,7 +1,6 @@
 const Contract = require("../utils/Contract");
 const _ = require("lodash");
 const axios = require('axios');
-// const PolkamarketsSocialLogin = require('./PolkamarketsSocialLogin');
 const PolkamarketsSmartAccount = require('./PolkamarketsSmartAccount');
 const ethers = require('ethers').ethers;
 
@@ -125,8 +124,6 @@ class IContract {
   }
 
   async sendGaslessTransactions(f) {
-    // const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
-    // const smartAccount = socialLogin.smartAccount;
     const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
     const networkConfig = smartAccount.networkConfig;
 
@@ -467,9 +464,8 @@ class IContract {
    */
   async getMyAccount() {
     if (this.params.isSocialLogin) {
-      const PolkamarketsSocialLogin = require("./PolkamarketsSocialLogin");
-      const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
-      return await socialLogin.getAddress();
+      const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
+      return await smartAccount.getAddress();
     }
 
     if (this.acc) {
