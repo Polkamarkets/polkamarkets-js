@@ -1,7 +1,7 @@
 const Contract = require("../utils/Contract");
 const _ = require("lodash");
 const axios = require('axios');
-const PolkamarketsSocialLogin = require('./PolkamarketsSocialLogin');
+const PolkamarketsSmartAccount = require('./PolkamarketsSmartAccount');
 const ethers = require('ethers').ethers;
 
 /**
@@ -124,11 +124,10 @@ class IContract {
   }
 
   async sendGaslessTransactions(f) {
-    const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
-    const smartAccount = socialLogin.smartAccount;
+    const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
     const networkConfig = smartAccount.networkConfig;
 
-    const { isMetamask, signer } = await socialLogin.providerIsMetamask();
+    const { isConnectedWallet, signer } = await smartAccount.providerIsConnectedWallet();
 
     const methodName = f._method.name;
 
@@ -143,7 +142,7 @@ class IContract {
     try {
       let receipt;
 
-      if (isMetamask) {
+      if (isConnectedWallet) {
         const txResponse = await signer.sendTransaction({ ...tx, gasLimit: 210000 });
         receipt = await txResponse.wait();
       } else {
@@ -219,7 +218,7 @@ class IContract {
 
         const transactionHash = await this.waitForTransactionHashToBeGenerated(userOpHash, networkConfig);
 
-        const web3Provider = new ethers.providers.Web3Provider(socialLogin?.provider)
+        const web3Provider = new ethers.providers.Web3Provider(smartAccount?.provider)
 
         receipt = await web3Provider.waitForTransaction(transactionHash);
       }
@@ -465,9 +464,8 @@ class IContract {
    */
   async getMyAccount() {
     if (this.params.isSocialLogin) {
-      const PolkamarketsSocialLogin = require("./PolkamarketsSocialLogin");
-      const socialLogin = PolkamarketsSocialLogin.singleton.getInstance();
-      return await socialLogin.getAddress();
+      const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
+      return await smartAccount.getAddress();
     }
 
     if (this.acc) {
