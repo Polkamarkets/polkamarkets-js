@@ -13,6 +13,8 @@ const ethers = require('ethers').ethers;
  * @param {Account} acc ? (opt)
  */
 
+const ENTRYPOINT_ADDRESS_V06 = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789';
+
 class IContract {
   constructor({
     web3,
@@ -123,11 +125,60 @@ class IContract {
     };
   }
 
+  getUserOpHash(chainId, userOp, entryPoint) {
+    const abiCoder = new ethers.utils.AbiCoder();
+
+    const userOpHash = ethers.utils.keccak256(this.packUserOp(userOp, true));
+    const enc = abiCoder.encode(['bytes32', 'address', 'uint256'], [userOpHash, entryPoint, chainId]);
+    return ethers.utils.keccak256(enc);
+  }
+
+  packUserOp(userOp, forSignature = true) {
+    const abiCoder = new ethers.utils.AbiCoder();
+    if (forSignature) {
+      return abiCoder.encode(
+        ['address', 'uint256', 'bytes32', 'bytes32', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'bytes32'],
+        [
+          userOp.sender,
+          userOp.nonce,
+          ethers.utils.keccak256(userOp.initCode),
+          ethers.utils.keccak256(userOp.callData),
+          userOp.callGasLimit,
+          userOp.verificationGasLimit,
+          userOp.preVerificationGas,
+          userOp.maxFeePerGas,
+          userOp.maxPriorityFeePerGas,
+          ethers.utils.keccak256(userOp.paymasterAndData),
+        ],
+      );
+    } else {
+      // for the purpose of calculating gas cost encode also signature (and no keccak of bytes)
+      return abiCoder.encode(
+        ['address', 'uint256', 'bytes', 'bytes', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'bytes', 'bytes'],
+        [
+          userOp.sender,
+          userOp.nonce,
+          userOp.initCode,
+          userOp.callData,
+          userOp.callGasLimit,
+          userOp.verificationGasLimit,
+          userOp.preVerificationGas,
+          userOp.maxFeePerGas,
+          userOp.maxPriorityFeePerGas,
+          userOp.paymasterAndData,
+          userOp.signature,
+        ],
+      );
+    }
+  }
+
   async sendGaslessTransactions(f) {
     const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
     const networkConfig = smartAccount.networkConfig;
 
     const { isConnectedWallet, signer } = await smartAccount.providerIsConnectedWallet();
+
+    const senderAddress = await smartAccount.getAddress();
 
     const methodName = f._method.name;
 
@@ -165,12 +216,46 @@ class IContract {
           }
         }
 
-        const userOp = feeQuotesResult.verifyingPaymasterGasless?.userOp;
-        const userOpHash = feeQuotesResult.verifyingPaymasterGasless?.userOpHash;
+        let userOp = feeQuotesResult.verifyingPaymasterGasless?.userOp;
+        let userOpHash = feeQuotesResult.verifyingPaymasterGasless?.userOpHash;
 
-        // TODO: remove console.log
-        console.log(userOp);
-        console.log(userOpHash);
+        // Get random key
+        const key = BigInt(Math.floor(Math.random() * 6277101735386680763835789423207666416102355444464034512895));
+
+        const entrypointAbi = [
+          "function getNonce(address sender, uint192 key) view returns (uint256)",
+        ];
+
+        const ethersProvider = new ethers.providers.JsonRpcProvider(this.params.web3.currentProvider.host);
+
+        const entrypointContract = new ethers.Contract(ENTRYPOINT_ADDRESS_V06, entrypointAbi, ethersProvider);
+
+        const nonce = await entrypointContract.getNonce(senderAddress, key);
+
+        userOp.nonce = nonce.toHexString();
+
+
+        const paymasterSponsorData = await axios.post(`https://paymaster.particle.network`,
+        {
+
+          "method": "pm_sponsorUserOperation",
+          "params": [
+            userOp,
+            ENTRYPOINT_ADDRESS_V06,
+          ]
+        }, {
+          params: {
+            chainId: networkConfig.chainId,
+            projectUuid: networkConfig.particleProjectId,
+            projectKey: networkConfig.particleClientKey,
+          }
+        }
+        );
+
+
+        userOp.paymasterAndData = paymasterSponsorData?.data.result.paymasterAndData;
+
+        userOpHash = this.getUserOpHash(networkConfig.chainId, userOp, ENTRYPOINT_ADDRESS_V06);
 
         const signedUserOp = await smartAccount.signUserOperation({ userOpHash, userOp });
 
@@ -195,7 +280,7 @@ class IContract {
                   "method": "eth_sendUserOperation",
                   "params": [
                     signedUserOp,
-                    "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+                    ENTRYPOINT_ADDRESS_V06
                   ]
                 }
               );
@@ -221,6 +306,8 @@ class IContract {
         const web3Provider = new ethers.providers.Web3Provider(smartAccount?.provider)
 
         receipt = await web3Provider.waitForTransaction(transactionHash);
+
+        console.log('receipt:', receipt.status, receipt.transactionHash);
       }
 
       if (receipt.logs) {
