@@ -76,7 +76,7 @@ class Application {
    */
   async login(provider = null, isConnectedWallet = null) {
     if (this.isSocialLogin) {
-      if (!this.smartAccount) {
+      if (!this.smartAccount || !this.smartAccount.provider) {
         const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
         this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig, isConnectedWallet);
       }
@@ -104,7 +104,7 @@ class Application {
    */
   async isLoggedIn() {
     if (this.isSocialLogin) {
-      return !!this.smartAccount;
+      return !!(this.smartAccount && this.smartAccount.provider);
     } else {
       try {
         if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
@@ -391,7 +391,7 @@ class Application {
    */
   async getAddress() {
     if (this.isSocialLogin) {
-      if (this.smartAccount) {
+      if (this.smartAccount && this.smartAccount.provider) {
         return await this.smartAccount.getAddress();
       }
       return '';
