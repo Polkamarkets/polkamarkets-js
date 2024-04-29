@@ -76,9 +76,11 @@ class Application {
    */
   async login(provider = null, isConnectedWallet = null) {
     if (this.isSocialLogin) {
+      console.log('!this.smartAccount || !this.smartAccount.provider:', !this.smartAccount || !this.smartAccount.provider);
       if (!this.smartAccount || !this.smartAccount.provider) {
         const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
         this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig, isConnectedWallet);
+        console.log('this.smartAccount:', this.smartAccount);
       }
 
       return true;
