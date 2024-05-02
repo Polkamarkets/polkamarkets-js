@@ -36,6 +36,7 @@ class PolkamarketsSmartAccount extends SmartAccount {
         }
         return smartAccount;
       },
+      getInstanceIfExists: () => smartAccount,
       clearInstance: () => {
         smartAccount = null;
       }

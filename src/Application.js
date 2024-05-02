@@ -76,7 +76,11 @@ class Application {
    */
   async login(provider = null, isConnectedWallet = null) {
     if (this.isSocialLogin) {
-      if (!this.smartAccount || !this.smartAccount.provider) {
+      if (!this.provider) {
+        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstanceIfExists()
+      }
+
+      if ((!this.smartAccount || !this.smartAccount.provider) && provider) {
         PolkamarketsSmartAccount.singleton.clearInstance();
         this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig, isConnectedWallet);
       }
