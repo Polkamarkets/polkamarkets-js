@@ -1,5 +1,4 @@
 const Web3 = require("web3");
-require('dotenv').config();
 
 const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
 
@@ -44,9 +43,7 @@ class Application {
     this.isSocialLogin = isSocialLogin;
 
     if (this.isSocialLogin) {
-      const PolkamarketsSocialLogin = require("./models/PolkamarketsSocialLogin");
       this.socialLoginParams = socialLoginParams;
-      this.socialLogin = PolkamarketsSocialLogin.singleton.getInstance(this.socialLoginParams, this.web3Provider);
     }
 
     // IMPORTANT: this parameter should only be used for testing purposes
@@ -77,9 +74,18 @@ class Application {
    * @name login
    * @description Login with Metamask or a web3 provider
    */
-  async login() {
+  async login(provider = null, isConnectedWallet = null) {
     if (this.isSocialLogin) {
-      return this.socialLogin.login();
+      if (!this.provider) {
+        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstanceIfExists()
+      }
+
+      if ((!this.smartAccount || !this.smartAccount.provider) && provider) {
+        PolkamarketsSmartAccount.singleton.clearInstance();
+        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig, isConnectedWallet);
+      }
+
+      return true;
     } else {
       try {
         if (typeof window === "undefined") { return false; }
@@ -102,7 +108,7 @@ class Application {
    */
   async isLoggedIn() {
     if (this.isSocialLogin) {
-      return await this.socialLogin?.isLoggedIn();
+      return !!(this.smartAccount && this.smartAccount.provider);
     } else {
       try {
         if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
@@ -389,7 +395,10 @@ class Application {
    */
   async getAddress() {
     if (this.isSocialLogin) {
-      return await this.socialLogin.getAddress();
+      if (this.smartAccount && this.smartAccount.provider) {
+        return await this.smartAccount.getAddress();
+      }
+      return '';
     } else {
       const accounts = await this.web3.eth.getAccounts();
       return accounts[0];
@@ -407,44 +416,14 @@ class Application {
     return this.web3.utils.fromWei(wei, "ether");
   };
 
-  async socialLoginGoogle() {
-    return await this.socialLogin.directLogin('google');
-  }
-
-  async socialLoginFacebook() {
-    return await this.socialLogin.directLogin('facebook');
-  }
-
-  async socialLoginTwitter() {
-    return await this.socialLogin.directLogin('twitter');
-  }
-
-  async socialLoginGithub() {
-    return await this.socialLogin.directLogin('github');
-  }
-
-  async socialLoginDiscord() {
-    return await this.socialLogin.directLogin('discord');
-  }
-
-  async socialLoginEmail(email) {
-    return await this.socialLogin.directLogin('email', email);
-  }
-
-  async socialLoginMetamask() {
-    return await this.socialLogin.directLogin('metamask');
+  async socialLoginWithJWT(id, jwtToken) {
+    throw new Error("Not implemented");
   }
 
   async socialLoginLogout() {
-    if (this.socialLogin?.provider) {
-      this.socialLogin.logout();
+    if (this.smartAccount) {
       PolkamarketsSmartAccount.singleton.clearInstance();
-    }
-  }
-
-  async getSocialLoginUserInfo() {
-    if (this.socialLogin?.provider) {
-      return await this.socialLogin.getUserInfo();
+      this.smartAccount = null;
     }
   }
 }
