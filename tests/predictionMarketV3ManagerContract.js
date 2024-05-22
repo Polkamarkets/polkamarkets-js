@@ -64,7 +64,9 @@ context('Prediction Market Contract V3 Manager', async () => {
           predictionMarketContractAddress,
           pmmTokenContractAddress,
           (LOCK_AMOUNT * 10**18).toString(), // TODO: improve this
-          realitioContractAddress
+          (LOCK_AMOUNT * 10**18).toString(), // TODO: improve this
+          realitioContractAddress,
+          '0x0000000000000000000000000000000000000000'
         ]
       });
       const predictionMarketManagerContractAddress = predictionMarketManagerContract.getAddress();
@@ -96,7 +98,8 @@ context('Prediction Market Contract V3 Manager', async () => {
           name: 'Token',
           symbol: 'TOKEN',
           tokenAmountToClaim: TOKEN_AMOUNT_TO_CLAIM,
-          tokenToAnswer: '0x0000000000000000000000000000000000000000'
+          tokenToAnswer: '0x0000000000000000000000000000000000000000',
+          isIsland: false
         });
         const land = await predictionMarketManagerContract.getLandById({ id: currentLandIndex });
         const newLandIndex = await predictionMarketManagerContract.getLandTokensLength();
@@ -331,35 +334,37 @@ context('Prediction Market Contract V3 Manager', async () => {
       }));
 
       it('should be able to update lock amount if not the contract owner', mochaAsync(async () => {
-        const currentLockAmount = await predictionMarketManagerContract.lockAmount();
+        const currentLockAmount = await predictionMarketManagerContract.lockAmountLand();
         expect(currentLockAmount).to.equal(LOCK_AMOUNT);
 
         try {
           await user1PredictionMarketManagerContract.updateLockAmount({
-            amount: NEW_LOCK_AMOUNT
+            amountLand: NEW_LOCK_AMOUNT,
+            amountIsland: NEW_LOCK_AMOUNT,
           });
         } catch(e) {
           // not logging error, as tx is expected to fail
         }
 
-        const newLockAmount = await predictionMarketManagerContract.lockAmount();
+        const newLockAmount = await predictionMarketManagerContract.lockAmountLand();
         expect(newLockAmount).to.equal(LOCK_AMOUNT);
       }));
 
       it('should be able to update lock amount', mochaAsync(async () => {
-        const currentLockAmount = await predictionMarketManagerContract.lockAmount();
+        const currentLockAmount = await predictionMarketManagerContract.lockAmountLand();
         expect(currentLockAmount).to.equal(LOCK_AMOUNT);
 
         await predictionMarketManagerContract.updateLockAmount({
-          amount: NEW_LOCK_AMOUNT
+          amountLand: NEW_LOCK_AMOUNT,
+          amountIsland: NEW_LOCK_AMOUNT,
         });
 
-        const newLockAmount = await predictionMarketManagerContract.lockAmount();
+        const newLockAmount = await predictionMarketManagerContract.lockAmountLand();
         expect(newLockAmount).to.equal(NEW_LOCK_AMOUNT);
       }));
 
       it('should not be able to unlock offset from land if not an admin', mochaAsync(async () => {
-        const currentLockAmount = await predictionMarketManagerContract.lockAmount();
+        const currentLockAmount = await predictionMarketManagerContract.lockAmountLand();
         expect(currentLockAmount).to.equal(NEW_LOCK_AMOUNT);
         const currentPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
 
@@ -379,7 +384,7 @@ context('Prediction Market Contract V3 Manager', async () => {
       }));
 
       it('should be able to unlock offset from land', mochaAsync(async () => {
-        const currentLockAmount = await predictionMarketManagerContract.lockAmount();
+        const currentLockAmount = await predictionMarketManagerContract.lockAmountLand();
         expect(currentLockAmount).to.equal(NEW_LOCK_AMOUNT);
         const currentPmmTokenBalance = await pmmTokenContract.balanceOf({ address: accountAddress });
 
