@@ -103,8 +103,8 @@ contract PredictionMarketFactory is Ownable, ReentrancyGuard {
   function disablePMManager(PredictionMarketV3Manager managerAddress) external returns (uint256) {
     Manager storage manager = managers[address(managerAddress)];
 
-    require(manager.active, "Land is not active");
-    require(manager.admins[msg.sender], "Not admin of the land");
+    require(manager.active, "Manager is not active");
+    require(manager.admins[msg.sender], "Not admin of the manager");
 
     uint256 amountToUnlock = manager.lockAmount;
 
@@ -146,8 +146,8 @@ contract PredictionMarketFactory is Ownable, ReentrancyGuard {
   function unlockOffsetFromPMManager(PredictionMarketV3Manager managerAddress) external returns (uint256) {
     Manager storage manager = managers[address(managerAddress)];
 
-    require(manager.active, "Land does not exist");
-    require(manager.admins[msg.sender], "Not admin of the land");
+    require(manager.active, "Manager does not exist");
+    require(manager.admins[msg.sender], "Not admin of the manager");
 
     uint256 amountToUnlock = manager.lockAmount > lockAmount ? manager.lockAmount - lockAmount : 0;
 
@@ -165,8 +165,8 @@ contract PredictionMarketFactory is Ownable, ReentrancyGuard {
   function addAdminToPMManager(PredictionMarketV3Manager managerAddress, address admin) external {
     Manager storage manager = managers[address(managerAddress)];
 
-    require(manager.active, "Land does not exist");
-    require(manager.admins[msg.sender], "Not admin of the land");
+    require(manager.active, "Manager does not exist");
+    require(manager.admins[msg.sender], "Not admin of the manager");
 
     manager.admins[admin] = true;
 
@@ -177,8 +177,8 @@ contract PredictionMarketFactory is Ownable, ReentrancyGuard {
   function removeAdminFromPMManager(PredictionMarketV3Manager managerAddress, address admin) external {
     Manager storage manager = managers[address(managerAddress)];
 
-    require(manager.active, "Land does not exist");
-    require(manager.admins[msg.sender], "Not admin of the land");
+    require(manager.active, "Manager does not exist");
+    require(manager.admins[msg.sender], "Not admin of the manager");
 
     manager.admins[admin] = false;
 
