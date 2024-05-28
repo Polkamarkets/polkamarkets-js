@@ -72,7 +72,7 @@ class PredictionMarketV3ManagerContract extends IContract {
         name,
         symbol,
         Numbers.toSmartContractDecimals(tokenAmountToClaim, 18),
-        tokenToAnswer,
+        tokenToAnswer
       )
     );
   };
