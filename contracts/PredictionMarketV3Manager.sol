@@ -12,7 +12,6 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
   address public immutable PMV3; // PredictionMarketV3 contract
   IERC20 public immutable token; // Governance IERC20
   uint256 public lockAmount; // amount necessary to lock to create a land
-
   RealityETH_ERC20_Factory public immutable realitioFactory;
 
   event LandCreated(address indexed user, address indexed token, address indexed tokenToAnswer, uint256 amountLocked);

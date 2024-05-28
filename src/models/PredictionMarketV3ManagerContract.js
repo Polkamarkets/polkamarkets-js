@@ -52,7 +52,7 @@ class PredictionMarketV3ManagerContract extends IContract {
 
   async lockAmount() {
     const amount = await this.params.contract.getContract().methods.lockAmount().call();
-
+    // TODO: fetch ERC20 decimals
     return Numbers.fromDecimalsNumber(amount, 18);
   }
 
