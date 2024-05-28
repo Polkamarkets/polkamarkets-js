@@ -25,7 +25,6 @@ class PredictionMarketV3ManagerContract extends IContract {
       lockAmount: Numbers.fromDecimalsNumber(res.lockAmount, 18),
       lockUser: res.lockUser,
       realitio: res.realitio,
-      isIsland: res.isIsland,
     }
   }
 
@@ -51,15 +50,9 @@ class PredictionMarketV3ManagerContract extends IContract {
     return await this.params.contract.getContract().methods.isLandAdmin(token, user).call();
   }
 
-  async lockAmountLand() {
-    const amount = await this.params.contract.getContract().methods.lockAmountLand().call();
-    // TODO: fetch ERC20 decimals
-    return Numbers.fromDecimalsNumber(amount, 18);
-  }
+  async lockAmount() {
+    const amount = await this.params.contract.getContract().methods.lockAmount().call();
 
-  async lockAmountIsland() {
-    const amount = await this.params.contract.getContract().methods.lockAmountIsland().call();
-    // TODO: fetch ERC20 decimals
     return Numbers.fromDecimalsNumber(amount, 18);
   }
 
@@ -67,21 +60,19 @@ class PredictionMarketV3ManagerContract extends IContract {
     return await this.params.contract.getContract().methods.token().call();
   }
 
-  async updateLockAmount({ amountLand, amountIsland }) {
+  async updateLockAmount({ amount }) {
     return await this.__sendTx(
-      this.getContract().methods.updateLockAmount(Numbers.toSmartContractDecimals(amountLand, 18),
-      Numbers.toSmartContractDecimals(amountIsland, 18))
+      this.getContract().methods.updateLockAmount(Numbers.toSmartContractDecimals(amount, 18))
     );
   }
 
-  async createLand({ name, symbol, tokenAmountToClaim, tokenToAnswer, isIsland }) {
+  async createLand({ name, symbol, tokenAmountToClaim, tokenToAnswer }) {
     return await this.__sendTx(
       this.getContract().methods.createLand(
         name,
         symbol,
         Numbers.toSmartContractDecimals(tokenAmountToClaim, 18),
         tokenToAnswer,
-        isIsland
       )
     );
   };
