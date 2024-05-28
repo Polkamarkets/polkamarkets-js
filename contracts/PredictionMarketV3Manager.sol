@@ -83,7 +83,7 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
 
     bool isAdmin = false;
     if (address(PMFactory) != address(0)) {
-      PredictionMarketFactory predictionMarketFactory = PredictionMarketFactory(PMFactory);
+      PredictionMarketFactory predictionMarketFactory = PredictionMarketFactory(PMFactory); // FIXME change to interface
       isAdmin = predictionMarketFactory.isPMManagerAdmin(this, msg.sender);
     }
 

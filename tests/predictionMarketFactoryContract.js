@@ -23,6 +23,7 @@ context('Prediction Market Factory Contract', async () => {
   let predictionMarketContract;
   let pmmTokenContract;
   let pmfTokenContract;
+  let realitioERC20Contract;
 
   context('Contract Deployment', async () => {
     it('should start the Application', mochaAsync(async () => {
@@ -40,7 +41,9 @@ context('Prediction Market Factory Contract', async () => {
       predictionMarketContract = app.getPredictionMarketV3Contract({});
       pmmTokenContract = app.getERC20Contract({});
       pmfTokenContract = app.getERC20Contract({});
+      realitioERC20Contract = app.getRealitioERC20Contract({});
 
+      await realitioERC20Contract.deploy({});
 
       // Deploy
       await pmfTokenContract.deploy({ params: ['Polkamarkets', 'POLK'] });
@@ -92,7 +95,7 @@ context('Prediction Market Factory Contract', async () => {
           lockAmountIsland: LOCK_AMOUNT*2,
           PMV3: predictionMarketContract.getAddress(),
           WETH: '0x0000000000000000000000000000000000000000',
-          realitioLibraryAddress: '0x0000000000000000000000000000000000000001',
+          realitioLibraryAddress: realitioERC20Contract.getAddress(),
           lockableToken: pmmTokenContract.getAddress()
         });
 
@@ -130,7 +133,7 @@ context('Prediction Market Factory Contract', async () => {
           lockAmountIsland: LOCK_AMOUNT * 4,
           PMV3: predictionMarketContract.getAddress(),
           WETH: '0x0000000000000000000000000000000000000000',
-          realitioLibraryAddress: '0x0000000000000000000000000000000000000001',
+          realitioLibraryAddress: realitioERC20Contract.getAddress(),
           lockableToken: pmmTokenContract.getAddress()
         });
 
@@ -267,7 +270,7 @@ context('Prediction Market Factory Contract', async () => {
           name: 'Token',
           symbol: 'TOKEN',
           tokenAmountToClaim: TOKEN_AMOUNT_TO_CLAIM,
-          tokenToAnswer: '0x0000000000000000000000000000000000000001',
+          tokenToAnswer: pmmTokenContract.getAddress(),
           isIsland: false,
         });
 
@@ -282,7 +285,7 @@ context('Prediction Market Factory Contract', async () => {
         expect(land.active).to.equal(true);
         expect(land.lockAmount).to.equal(0);
         expect(land.lockUser).to.equal(accountAddress);
-        // expect(land.realitio).to.not.equal('0x0000000000000000000000000000000000000000');
+        expect(land.realitio).to.not.equal('0x0000000000000000000000000000000000000000');
       }));
 
       it('should not be able to create a land without locking tokens if not admin of a manager', mochaAsync(async () => {
@@ -301,8 +304,6 @@ context('Prediction Market Factory Contract', async () => {
 
         const currentIsAdmin = await predictionMarketFactoryContract.isPMManagerAdmin({ managerAddress, user: user1 });
         const currentPmmTokenBalance = await pmmTokenContract.balanceOf({ address: user1 });
-        console.log('currentPmmTokenBalance:', currentPmmTokenBalance);
-
 
 
         const currentLandIndex = await predictionMarketManagerContract.getLandTokensLength();
@@ -311,7 +312,7 @@ context('Prediction Market Factory Contract', async () => {
           name: 'Token',
           symbol: 'TOKEN',
           tokenAmountToClaim: TOKEN_AMOUNT_TO_CLAIM,
-          tokenToAnswer: '0x0000000000000000000000000000000000000001',
+          tokenToAnswer: pmmTokenContract.getAddress(),
           isIsland: false,
         });
 
@@ -326,7 +327,7 @@ context('Prediction Market Factory Contract', async () => {
         expect(land.active).to.equal(true);
         expect(land.lockAmount).to.equal(LOCK_AMOUNT);
         expect(land.lockUser).to.equal(user1);
-        // expect(land.realitio).to.not.equal('0x0000000000000000000000000000000000000000');
+        expect(land.realitio).to.not.equal('0x0000000000000000000000000000000000000000');
       }));
     });
 

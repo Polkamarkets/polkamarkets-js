@@ -61,14 +61,14 @@ contract PredictionMarketFactory is Ownable, ReentrancyGuard {
     uint256 lockAmountIsland,
     address PMV3,
     IWETH _WETH,
-    address _realitioLibraryAddress, // FIXME what's this?
+    address _realitioLibraryAddress,
     IERC20 lockableToken
   ) external returns (PredictionMarketV3Manager) {
     require(token.balanceOf(msg.sender) >= lockAmount, "Not enough tokens to lock");
 
     if (PMV3 == address(0)) {
       // deploy new PredictionMarket contract
-      PMV3 = address(new PredictionMarketV3(_WETH));
+      // PMV3 = address(new PredictionMarketManager(_WETH));
     }
 
     // deploy prediction market manager contract
@@ -179,6 +179,7 @@ contract PredictionMarketFactory is Ownable, ReentrancyGuard {
 
     require(manager.active, "Manager does not exist");
     require(manager.admins[msg.sender], "Not admin of the manager");
+    require(manager.lockUser != admin, "Can not remove from admin the lockUser");
 
     manager.admins[admin] = false;
 
