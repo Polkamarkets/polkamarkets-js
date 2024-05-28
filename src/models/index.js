@@ -3,7 +3,8 @@ const PredictionMarketContract = require('./PredictionMarketContract');
 const PredictionMarketV2Contract = require('./PredictionMarketV2Contract');
 const PredictionMarketV3Contract = require('./PredictionMarketV3Contract');
 const PredictionMarketV3ManagerContract = require('./PredictionMarketV3ManagerContract');
-const PredictionMarketFactoryContract = require('./PredictionMarketFactoryContract');
+const PredictionMarketV3ControllerContract = require('./PredictionMarketV3ControllerContract');
+const PredictionMarketV3FactoryContract = require('./PredictionMarketV3FactoryContract');
 const AchievementsContract = require('./AchievementsContract');
 const RealitioERC20Contract = require('./RealitioERC20Contract');
 const VotingContract = require('./VotingContract');
@@ -25,5 +26,6 @@ module.exports = {
   WETH9Contract,
   ArbitrationContract,
   ArbitrationProxyContract,
-  PredictionMarketFactoryContract
+  PredictionMarketV3FactoryContract,
+  PredictionMarketV3ControllerContract
 }

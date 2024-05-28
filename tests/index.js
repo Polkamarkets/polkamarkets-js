@@ -3,7 +3,7 @@ context('Unit Tests', () => {
   require('./predictionMarketV2Contract');
   require('./predictionMarketV3Contract');
   require('./predictionMarketV3ManagerContract');
-  require('./predictionMarketFactoryContract');
+  require('./predictionMarketV3FactoryContract');
   require('./fantasyERC20Contract');
   require('./votingContract');
 });
