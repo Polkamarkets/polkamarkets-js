@@ -15,13 +15,11 @@ context('Prediction Market Factory V3 Contract', async () => {
   const USER1_ADDRESS = process.env.TEST_USER1_ADDRESS;
   const USER1_PRIVATE_KEY = process.env.TEST_USER1_PRIVATE_KEY;
   const USER2_ADDRESS = process.env.TEST_USER2_ADDRESS;
-  const USER2_PRIVATE_KEY = process.env.TEST_USER2_PRIVATE_KEY;
 
   let app;
   let accountAddress;
   let predictionMarketFactoryContract;
   let predictionMarketContract;
-  let controllerTokenContract;
   let pmfTokenContract;
   let realitioERC20Contract;
 
@@ -39,7 +37,6 @@ context('Prediction Market Factory V3 Contract', async () => {
 
       // Create Contract
       predictionMarketContract = app.getPredictionMarketV3Contract({});
-      controllerTokenContract = app.getERC20Contract({});
       pmfTokenContract = app.getERC20Contract({});
       realitioERC20Contract = app.getRealitioERC20Contract({});
 
@@ -48,10 +45,6 @@ context('Prediction Market Factory V3 Contract', async () => {
       // Deploy
       await pmfTokenContract.deploy({ params: ['Polkamarkets', 'POLK'] });
       const pmfTokenContractAddress = pmfTokenContract.getAddress();
-
-      await controllerTokenContract.deploy({ params: ['ControllerToken', 'CTLT'] });
-      const controllerTokenContractAddress = controllerTokenContract.getAddress();
-
 
       predictionMarketFactoryContract = app.getPredictionMarketV3FactoryContract({});
       // Deploy
@@ -79,7 +72,6 @@ context('Prediction Market Factory V3 Contract', async () => {
       });
 
       expect(predictionMarketContractAddress).to.not.equal(null);
-      expect(controllerTokenContractAddress).to.not.equal(null);
       expect(pmfTokenContractAddress).to.not.equal(null);
     }));
   });
@@ -94,7 +86,6 @@ context('Prediction Market Factory V3 Contract', async () => {
           PMV3: predictionMarketContract.getAddress(),
           WETH: '0x0000000000000000000000000000000000000000',
           realitioLibraryAddress: realitioERC20Contract.getAddress(),
-          lockableToken: controllerTokenContract.getAddress()
         });
 
         const pmController = await predictionMarketFactoryContract.getPMControllerById({ id: currentControllerIndex });
@@ -103,7 +94,6 @@ context('Prediction Market Factory V3 Contract', async () => {
 
         expect(newPmfTokenBalance).to.equal(currentPmfTokenBalance - LOCK_AMOUNT);
         expect(newControllerIndex).to.equal(currentControllerIndex + 1);
-        expect(pmController.token).to.equal(controllerTokenContract.getAddress());
         expect(pmController.active).to.equal(true);
         expect(pmController.lockAmount).to.equal(LOCK_AMOUNT);
         expect(pmController.lockUser).to.equal(accountAddress);
@@ -126,7 +116,6 @@ context('Prediction Market Factory V3 Contract', async () => {
           PMV3: predictionMarketContract.getAddress(),
           WETH: '0x0000000000000000000000000000000000000000',
           realitioLibraryAddress: realitioERC20Contract.getAddress(),
-          lockableToken: controllerTokenContract.getAddress()
         });
 
         const pmController = await predictionMarketFactoryContract.getPMControllerById({ id: currentControllerIndex });
@@ -135,7 +124,6 @@ context('Prediction Market Factory V3 Contract', async () => {
 
         expect(newPmfTokenBalance).to.equal(currentPmfTokenBalance - LOCK_AMOUNT);
         expect(newControllerIndex).to.equal(currentControllerIndex + 1);
-        expect(pmController.token).to.equal(controllerTokenContract.getAddress());
         expect(pmController.active).to.equal(true);
         expect(pmController.lockAmount).to.equal(LOCK_AMOUNT);
         expect(pmController.lockUser).to.equal(accountAddress);
@@ -150,6 +138,7 @@ context('Prediction Market Factory V3 Contract', async () => {
         expect(landTokensLenght).to.equal(0);
       }));
     });
+
     context('Controller Admins', async () => {
       let controllerId = 0;
       let controllerAddress;
@@ -266,7 +255,6 @@ context('Prediction Market Factory V3 Contract', async () => {
 
       it('should be able to create a land if admin of a Controller', mochaAsync(async () => {
         const currentIsAdmin = await predictionMarketFactoryContract.isPMControllerAdmin({ controllerAddress, user: accountAddress });
-        const currentPmmTokenBalance = await controllerTokenContract.balanceOf({ address: accountAddress });
 
         const predictionMarketControllerContract = app.getPredictionMarketV3ControllerContract({ contractAddress: controllerAddress });
 
@@ -276,15 +264,14 @@ context('Prediction Market Factory V3 Contract', async () => {
           name: 'Token',
           symbol: 'TOKEN',
           tokenAmountToClaim: TOKEN_AMOUNT_TO_CLAIM,
-          tokenToAnswer: controllerTokenContract.getAddress(),
+          tokenToAnswer: pmfTokenContract.getAddress(),
+          everyoneCanCreateMarkets: false,
         });
 
         const land = await predictionMarketControllerContract.getLandById({ id: currentLandIndex });
         const newLandIndex = await predictionMarketControllerContract.getLandTokensLength();
-        const newPmmTokenBalance = await controllerTokenContract.balanceOf({ address: accountAddress });
 
         expect(currentIsAdmin).to.equal(true);
-        expect(newPmmTokenBalance).to.equal(currentPmmTokenBalance);
         expect(newLandIndex).to.equal(currentLandIndex + 1);
         expect(land.token).to.not.equal('0x0000000000000000000000000000000000000000');
         expect(land.active).to.equal(true);
@@ -293,39 +280,25 @@ context('Prediction Market Factory V3 Contract', async () => {
 
       it('should not be able to create a land if not admin of a Controller', mochaAsync(async () => {
         const predictionMarketControllerContract = user1App.getPredictionMarketV3ControllerContract({ contractAddress: controllerAddress });
-
-        await controllerTokenContract.mint({
-          address: user1,
-          amount: '1000'
-        });
-
-        const user1pmmTokenContract = user1App.getERC20Contract({ contractAddress: controllerTokenContract.getAddress() });
-        await user1pmmTokenContract.approve({
-          address: predictionMarketControllerContract.getAddress(),
-          amount: '1000000'
-        });
-
         const currentIsAdmin = await predictionMarketFactoryContract.isPMControllerAdmin({ controllerAddress, user: user1 });
-        const currentPmmTokenBalance = await controllerTokenContract.balanceOf({ address: user1 });
 
 
         const currentLandIndex = await predictionMarketControllerContract.getLandTokensLength();
 
-      try {
-        await predictionMarketControllerContract.createLand({
-          name: 'Token',
-          symbol: 'TOKEN',
-          tokenAmountToClaim: TOKEN_AMOUNT_TO_CLAIM,
-          tokenToAnswer: controllerTokenContract.getAddress(),
-        });
-      } catch (e) {
-        // not logging error, as tx is expected to fail
-      }
+        try {
+          await predictionMarketControllerContract.createLand({
+            name: 'Token',
+            symbol: 'TOKEN',
+            tokenAmountToClaim: TOKEN_AMOUNT_TO_CLAIM,
+            tokenToAnswer: pmfTokenContract.getAddress(),
+            everyoneCanCreateMarkets: false,
+          });
+        } catch (e) {
+          // not logging error, as tx is expected to fail
+        }
         const newLandIndex = await predictionMarketControllerContract.getLandTokensLength();
-        const newPmmTokenBalance = await controllerTokenContract.balanceOf({ address: user1 });
 
         expect(currentIsAdmin).to.equal(false);
-        expect(newPmmTokenBalance).to.equal(currentPmmTokenBalance);
         expect(newLandIndex).to.equal(currentLandIndex);
       }));
     });

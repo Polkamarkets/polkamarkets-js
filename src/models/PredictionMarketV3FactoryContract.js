@@ -24,7 +24,6 @@ class PredictionMarketV3FactoryContract extends IContract {
     const res = await this.getContract().methods.controllers(controllerAddress).call();
 
     return {
-      token: res.token,
       active: res.active,
       lockAmount: Numbers.fromDecimalsNumber(res.lockAmount, 18),
       lockUser: res.lockUser,
@@ -56,14 +55,13 @@ class PredictionMarketV3FactoryContract extends IContract {
   async createPMController({
     PMV3,
     WETH,
-    realitioLibraryAddress,
-    lockableToken }) {
+    realitioLibraryAddress
+  }) {
     return await this.__sendTx(
       this.getContract().methods.createPMController(
         PMV3,
         WETH,
         realitioLibraryAddress,
-        lockableToken
       )
     );
   };

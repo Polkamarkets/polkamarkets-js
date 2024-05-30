@@ -14,20 +14,19 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
   IERC20 public immutable token; // Governance IERC20
   uint256 public lockAmount; // amount necessary to lock to create a land
 
-  event ControllerCreated(address indexed user, address indexed controller, address indexed token, uint256 amountLocked);
+  event ControllerCreated(address indexed user, address indexed controller, uint256 amountLocked);
 
   event ControllerDisabled(address indexed user, address indexed controller, uint256 amountUnlocked);
 
   event ControllerEnabled(address indexed user, address indexed controller, uint256 amountUnlocked);
 
-  event ControllerOffsetUnlocked(address indexed user, address indexed token, uint256 amountUnlocked);
+  event ControllerOffsetUnlocked(address indexed user, address indexed controller, uint256 amountUnlocked);
 
-  event ControllerAdminAdded(address indexed user, address indexed token, address indexed admin);
+  event ControllerAdminAdded(address indexed user, address indexed controller, address indexed admin);
 
-  event ControllerAdminRemoved(address indexed user, address indexed token, address indexed admin);
+  event ControllerAdminRemoved(address indexed user, address indexed controller, address indexed admin);
 
   struct Controller {
-    IERC20 token;
     bool active;
     mapping(address => bool) admins;
     uint256 lockAmount;
@@ -59,8 +58,7 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
   function createPMController(
     address PMV3,
     IWETH _WETH,
-    address _realitioLibraryAddress,
-    IERC20 lockableToken
+    address _realitioLibraryAddress
   ) external returns (PredictionMarketV3Controller) {
     require(token.balanceOf(msg.sender) >= lockAmount, "Not enough tokens to lock");
 
@@ -76,9 +74,8 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
       address(this)
     );
 
-    // store the new token in the contract
+    // store the new controller in the contract
     Controller storage controller = controllers[address(PMV3Controller)];
-    controller.token = lockableToken;
     controller.active = true;
     controller.admins[msg.sender] = true;
     controller.lockAmount = lockAmount;
@@ -90,7 +87,7 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
     token.transferFrom(msg.sender, address(this), lockAmount);
 
     // ControllerCreated event
-    emit ControllerCreated(msg.sender, address(PMV3Controller), address(lockableToken), lockAmount);
+    emit ControllerCreated(msg.sender, address(PMV3Controller), lockAmount);
 
     return PMV3Controller;
   }

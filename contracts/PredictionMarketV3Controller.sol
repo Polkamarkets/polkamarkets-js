@@ -31,6 +31,7 @@ contract PredictionMarketV3Controller is Ownable, ReentrancyGuard {
     FantasyERC20 token;
     bool active;
     mapping(address => bool) admins;
+    bool everyoneCanCreateMarkets;
     IRealityETH_IERC20 realitio;
   }
 
@@ -57,7 +58,8 @@ contract PredictionMarketV3Controller is Ownable, ReentrancyGuard {
     string memory name,
     string memory symbol,
     uint256 tokenAmountToClaim,
-    IERC20 tokenToAnswer
+    IERC20 tokenToAnswer,
+    bool everyoneCanCreateMarkets
   ) external returns (FantasyERC20) {
 
     require(address(tokenToAnswer) != address(0), "Token to answer cannot be 0 address");
@@ -78,6 +80,7 @@ contract PredictionMarketV3Controller is Ownable, ReentrancyGuard {
     land.token = landToken;
     land.active = true;
     land.admins[msg.sender] = true;
+    land.everyoneCanCreateMarkets = everyoneCanCreateMarkets;
     landTokens.push(address(landToken));
     landTokensLength++;
 
@@ -153,7 +156,7 @@ contract PredictionMarketV3Controller is Ownable, ReentrancyGuard {
   function isAllowedToCreateMarket(IERC20 marketToken, address user) public view returns (bool) {
     Land storage land = lands[address(marketToken)];
 
-    return land.active && land.admins[user];
+    return land.active && (land.everyoneCanCreateMarkets || land.admins[user]);
   }
 
   function isAllowedToResolveMarket(IERC20 marketToken, address user) external view returns (bool) {

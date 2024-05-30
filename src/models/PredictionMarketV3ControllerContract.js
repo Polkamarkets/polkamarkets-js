@@ -23,6 +23,7 @@ class PredictionMarketV3ControllerContract extends IContract {
       token: res.token,
       active: res.active,
       realitio: res.realitio,
+      everyoneCanCreateMarkets: res.everyoneCanCreateMarkets,
     }
   }
 
@@ -48,13 +49,14 @@ class PredictionMarketV3ControllerContract extends IContract {
     return await this.params.contract.getContract().methods.isLandAdmin(token, user).call();
   }
 
-  async createLand({ name, symbol, tokenAmountToClaim, tokenToAnswer }) {
+  async createLand({ name, symbol, tokenAmountToClaim, tokenToAnswer, everyoneCanCreateMarkets }) {
     return await this.__sendTx(
       this.getContract().methods.createLand(
         name,
         symbol,
         Numbers.toSmartContractDecimals(tokenAmountToClaim, 18),
-        tokenToAnswer
+        tokenToAnswer,
+        everyoneCanCreateMarkets
       )
     );
   };
