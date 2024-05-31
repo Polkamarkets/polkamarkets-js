@@ -1,0 +1,228 @@
+{
+  "contractName": "IPredictionMarketV3Factory",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "controllerAddress",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "isPMControllerAdmin",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "metadata": "{\"compiler\":{\"version\":\"0.8.18+commit.87f61d96\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"controllerAddress\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"isPMControllerAdmin\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"project:/contracts/IPredictionMarketV3Factory.sol\":\"IPredictionMarketV3Factory\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"@openzeppelin/contracts/token/ERC20/IERC20.sol\":{\"keccak256\":\"0x9750c6b834f7b43000631af5cc30001c5f547b3ceb3635488f140f60e897ea6b\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://5a7d5b1ef5d8d5889ad2ed89d8619c09383b80b72ab226e0fe7bde1636481e34\",\"dweb:/ipfs/QmebXWgtEfumQGBdVeM6c71McLixYXQP5Bk6kKXuoY4Bmr\"]},\"project:/contracts/IPredictionMarketV3Factory.sol\":{\"keccak256\":\"0x1b852906408915a95d227109dc09e2ae142fb6d05c6aa564d6168329d3c4ddbb\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://f7c65817531c053d72a82e03943d484927d196d4c2e0788d860b944c503ee2d4\",\"dweb:/ipfs/QmPCu7xnDn9vig7aJ1WDmXKdFdjCB2TL6KQb5km6zYg7jH\"]}},\"version\":1}",
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "immutableReferences": {},
+  "generatedSources": [],
+  "deployedGeneratedSources": [],
+  "sourceMap": "",
+  "deployedSourceMap": "",
+  "source": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.18;\n\nimport \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\n\ninterface IPredictionMarketV3Factory {\n  function isPMControllerAdmin(address controllerAddress, address user) external view returns (bool);\n}\n",
+  "sourcePath": "/Users/andregoncalves/sideprojects/polkamarkets/polkamarkets-js/contracts/IPredictionMarketV3Factory.sol",
+  "ast": {
+    "absolutePath": "project:/contracts/IPredictionMarketV3Factory.sol",
+    "exportedSymbols": {
+      "IERC20": [
+        1478
+      ],
+      "IPredictionMarketV3Factory": [
+        4275
+      ]
+    },
+    "id": 4276,
+    "license": "MIT",
+    "nodeType": "SourceUnit",
+    "nodes": [
+      {
+        "id": 4264,
+        "literals": [
+          "solidity",
+          "^",
+          "0.8",
+          ".18"
+        ],
+        "nodeType": "PragmaDirective",
+        "src": "32:24:24"
+      },
+      {
+        "absolutePath": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
+        "file": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
+        "id": 4265,
+        "nameLocation": "-1:-1:-1",
+        "nodeType": "ImportDirective",
+        "scope": 4276,
+        "sourceUnit": 1479,
+        "src": "58:56:24",
+        "symbolAliases": [],
+        "unitAlias": ""
+      },
+      {
+        "abstract": false,
+        "baseContracts": [],
+        "canonicalName": "IPredictionMarketV3Factory",
+        "contractDependencies": [],
+        "contractKind": "interface",
+        "fullyImplemented": false,
+        "id": 4275,
+        "linearizedBaseContracts": [
+          4275
+        ],
+        "name": "IPredictionMarketV3Factory",
+        "nameLocation": "126:26:24",
+        "nodeType": "ContractDefinition",
+        "nodes": [
+          {
+            "functionSelector": "da490a39",
+            "id": 4274,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "isPMControllerAdmin",
+            "nameLocation": "166:19:24",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 4270,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 4267,
+                  "mutability": "mutable",
+                  "name": "controllerAddress",
+                  "nameLocation": "194:17:24",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4274,
+                  "src": "186:25:24",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 4266,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "186:7:24",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                },
+                {
+                  "constant": false,
+                  "id": 4269,
+                  "mutability": "mutable",
+                  "name": "user",
+                  "nameLocation": "221:4:24",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4274,
+                  "src": "213:12:24",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 4268,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "213:7:24",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "185:41:24"
+            },
+            "returnParameters": {
+              "id": 4273,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 4272,
+                  "mutability": "mutable",
+                  "name": "",
+                  "nameLocation": "-1:-1:-1",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 4274,
+                  "src": "250:4:24",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_bool",
+                    "typeString": "bool"
+                  },
+                  "typeName": {
+                    "id": 4271,
+                    "name": "bool",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "250:4:24",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_bool",
+                      "typeString": "bool"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "249:6:24"
+            },
+            "scope": 4275,
+            "src": "157:99:24",
+            "stateMutability": "view",
+            "virtual": false,
+            "visibility": "external"
+          }
+        ],
+        "scope": 4276,
+        "src": "116:142:24",
+        "usedErrors": []
+      }
+    ],
+    "src": "32:227:24"
+  },
+  "compiler": {
+    "name": "solc",
+    "version": "0.8.18+commit.87f61d96.Emscripten.clang"
+  },
+  "networks": {},
+  "schemaVersion": "3.4.14",
+  "updatedAt": "2024-05-31T09:23:13.349Z",
+  "devdoc": {
+    "kind": "dev",
+    "methods": {},
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {},
+    "version": 1
+  }
+}

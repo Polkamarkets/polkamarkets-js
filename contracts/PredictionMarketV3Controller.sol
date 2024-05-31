@@ -3,7 +3,7 @@ pragma solidity ^0.8.18;
 
 import "./FantasyERC20.sol";
 import "./RealityETH_ERC20_Factory.sol";
-import "./PredictionMarketV3Factory.sol";
+import "./IPredictionMarketV3Factory.sol";
 
 // openzeppelin ownable contract import
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -64,8 +64,8 @@ contract PredictionMarketV3Controller is Ownable, ReentrancyGuard {
 
     require(address(tokenToAnswer) != address(0), "Token to answer cannot be 0 address");
 
-    PredictionMarketV3Factory predictionMarketFactory = PredictionMarketV3Factory(PMV3Factory); // FIXME change to interface
-    require(predictionMarketFactory.isPMControllerAdmin(this, msg.sender));
+    IPredictionMarketV3Factory predictionMarketFactory = IPredictionMarketV3Factory(PMV3Factory); // FIXME change to interface
+    require(predictionMarketFactory.isPMControllerAdmin(address(this), msg.sender));
 
     // create a new fantasyERC20 token
     FantasyERC20 landToken = new FantasyERC20(name, symbol, tokenAmountToClaim, address(PMV3));
