@@ -311,7 +311,7 @@ context('Prediction Market Factory V3 Contract', async () => {
       let user1App;
       let user1PredictionMarketFactoryContract;
 
-      // let landTokenContract;
+      let landTokenContract;
 
       before(mochaAsync(async () => {
         controllerAddress = await predictionMarketFactoryContract.getPMControllerAddressById({ id: controllerId });
@@ -324,6 +324,11 @@ context('Prediction Market Factory V3 Contract', async () => {
         user1PredictionMarketFactoryContract = user1App.getPredictionMarketV3FactoryContract({
           contractAddress: predictionMarketFactoryContract.getAddress()
         });
+
+        const pmControllerAddress = await predictionMarketFactoryContract.getPMControllerAddressById({ id: controllerId });
+        const predictionMarketControllerContract = app.getPredictionMarketV3ControllerContract({ contractAddress: pmControllerAddress });
+        const land = await predictionMarketControllerContract.getLandById({ id: 0 });
+        landTokenContract = app.getFantasyERC20Contract({ contractAddress: land.token });
       }));
 
       it('should not be able to disable a Controller if not an admin making the call', mochaAsync(async () => {
@@ -343,18 +348,18 @@ context('Prediction Market Factory V3 Contract', async () => {
 
       it('should disable a Controller', mochaAsync(async () => {
         const currentPmfTokenBalance = await pmfTokenContract.balanceOf({ address: accountAddress });
-        // const currentPaused = await landTokenContract.paused(); // FIXME when I update the fantasy token to take into account PMF
+        const currentPaused = await landTokenContract.paused();
         await predictionMarketFactoryContract.disablePMController({
           controllerAddress
         });
 
         const refreshedController = await user1PredictionMarketFactoryContract.getPMControllerByAddress({ controllerAddress });
         const newPmfTokenBalance = await pmfTokenContract.balanceOf({ address: accountAddress });
-        // const newPaused = await landTokenContract.paused();
+        const newPaused = await landTokenContract.paused();
 
         expect(controller.active).to.equal(true);
-        // expect(currentPaused).to.equal(false);
-        // expect(newPaused).to.equal(true);
+        expect(currentPaused).to.equal(false);
+        expect(newPaused).to.equal(true);
         expect(newPmfTokenBalance).to.equal(currentPmfTokenBalance + LOCK_AMOUNT);
         expect(refreshedController.token).to.equal(controller.token);
         expect(refreshedController.active).to.equal(false);
@@ -381,17 +386,17 @@ context('Prediction Market Factory V3 Contract', async () => {
 
       it('should enable a Controller', mochaAsync(async () => {
         const currentPmfTokenBalance = await pmfTokenContract.balanceOf({ address: accountAddress });
-        // const currentPaused = await landTokenContract.paused(); // FIXME when I update the fantasy token to take into account PMF
+        const currentPaused = await landTokenContract.paused();
         await predictionMarketFactoryContract.enablePMController({
           controllerAddress
         });
 
         const refreshedController = await user1PredictionMarketFactoryContract.getPMControllerByAddress({ controllerAddress });
         const newPmfTokenBalance = await pmfTokenContract.balanceOf({ address: accountAddress });
-        // const newPaused = await landTokenContract.paused();
+        const newPaused = await landTokenContract.paused();
 
-        // expect(currentPaused).to.equal(true);
-        // expect(newPaused).to.equal(false);
+        expect(currentPaused).to.equal(true);
+        expect(newPaused).to.equal(false);
         expect(newPmfTokenBalance).to.equal(currentPmfTokenBalance - LOCK_AMOUNT);
         expect(refreshedController.token).to.equal(controller.token);
         expect(refreshedController.active).to.equal(true);

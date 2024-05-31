@@ -71,7 +71,7 @@ contract PredictionMarketV3Manager is Ownable, ReentrancyGuard {
     require(address(tokenToAnswer) != address(0), "Token to answer cannot be 0 address");
 
     // create a new fantasyERC20 token
-    FantasyERC20 landToken = new FantasyERC20(name, symbol, tokenAmountToClaim, address(PMV3));
+    FantasyERC20 landToken = new FantasyERC20(name, symbol, tokenAmountToClaim, address(PMV3), address(0), address(0));
 
     // adding minting privileges to the PMV3 contract
     landToken.grantRole(keccak256("MINTER_ROLE"), address(PMV3));

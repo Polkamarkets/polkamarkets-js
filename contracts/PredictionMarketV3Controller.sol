@@ -64,11 +64,11 @@ contract PredictionMarketV3Controller is Ownable, ReentrancyGuard {
 
     require(address(tokenToAnswer) != address(0), "Token to answer cannot be 0 address");
 
-    IPredictionMarketV3Factory predictionMarketFactory = IPredictionMarketV3Factory(PMV3Factory); // FIXME change to interface
+    IPredictionMarketV3Factory predictionMarketFactory = IPredictionMarketV3Factory(PMV3Factory);
     require(predictionMarketFactory.isPMControllerAdmin(address(this), msg.sender));
 
     // create a new fantasyERC20 token
-    FantasyERC20 landToken = new FantasyERC20(name, symbol, tokenAmountToClaim, address(PMV3));
+    FantasyERC20 landToken = new FantasyERC20(name, symbol, tokenAmountToClaim, address(PMV3), PMV3Factory, address(this));
 
     // adding minting privileges to the PMV3 contract
     landToken.grantRole(keccak256("MINTER_ROLE"), address(PMV3));
