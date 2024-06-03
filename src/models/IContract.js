@@ -7,7 +7,7 @@ const ethers = require('ethers').ethers;
 const { ENTRYPOINT_ADDRESS_V06, bundlerActions } = require('permissionless');
 const { pimlicoBundlerActions } = require('permissionless/actions/pimlico');
 const { celoAlfajores } = require('viem/chains');
-const { createClient, http } = require('viem');
+const { createClient, createPublicClient, http } = require('viem');
 
 /**
  * Contract Object Interface
