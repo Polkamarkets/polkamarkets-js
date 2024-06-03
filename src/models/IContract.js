@@ -4,10 +4,11 @@ const axios = require('axios');
 const PolkamarketsSmartAccount = require('./PolkamarketsSmartAccount');
 const ethers = require('ethers').ethers;
 
-const { ENTRYPOINT_ADDRESS_V06, bundlerActions } = require('permissionless');
-const { pimlicoBundlerActions } = require('permissionless/actions/pimlico');
+const { ENTRYPOINT_ADDRESS_V06, bundlerActions, providerToSmartAccountSigner, getAccountNonce } = require('permissionless');
+const { pimlicoBundlerActions, pimlicoPaymasterActions } = require('permissionless/actions/pimlico');
 const { celoAlfajores } = require('viem/chains');
 const { createClient, createPublicClient, http } = require('viem');
+const { signerToSimpleSmartAccount } = require('permissionless/accounts');
 
 /**
  * Contract Object Interface
@@ -177,6 +178,7 @@ class IContract {
 
   async sendGaslessTransactions(f) {
     const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
+    const provider = smartAccount.provider;
     const networkConfig = smartAccount.networkConfig;
 
     const { isConnectedWallet, signer } = await smartAccount.providerIsConnectedWallet();
@@ -250,7 +252,7 @@ class IContract {
         }).extend(pimlicoPaymasterActions(ENTRYPOINT_ADDRESS_V06))
 
         // console.log('socialLogin.provider:', socialLogin.provider);
-        const smartAccountSigner = await providerToSmartAccountSigner(socialLogin.provider);
+        const smartAccountSigner = await providerToSmartAccountSigner(provider);
 
         const smartAccount = await signerToSimpleSmartAccount(publicClient, {
           signer: smartAccountSigner,
@@ -275,14 +277,14 @@ class IContract {
           key // optional
         })
 
-        const feequotes = await smartAccount.getFeeQuotes(tx);
+        // const feequotes = await smartAccount.getFeeQuotes(tx);
         const userOperation = {
           sender: senderAddress,
           nonce,
           initCode: initCode,
           callData: callData,
-          maxFeePerGas: feequotes.verifyingPaymasterGasless.userOp.maxFeePerGas,
-          maxPriorityFeePerGas: feequotes.verifyingPaymasterGasless.userOp.maxPriorityFeePerGas,
+          maxFeePerGas: gasPrice.fast.maxFeePerGasfeequotes,
+          maxPriorityFeePerGas: gasPrice.fast.maxPriorityFeePerGas,
           signature: await smartAccount.getDummySignature(),
         }
 
@@ -299,7 +301,7 @@ class IContract {
 
         const signature = await smartAccount.signUserOperation(sponsoredUserOperation);
 
-        sponsoredUserOperation.signature = signature
+        sponsoredUserOperation.signature = signature;
         const userOpHash = await bundlerClient.sendUserOperation({
           userOperation: sponsoredUserOperation,
         })
