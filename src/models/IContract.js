@@ -4,7 +4,6 @@ const axios = require('axios');
 const PolkamarketsSmartAccount = require('./PolkamarketsSmartAccount');
 const ethers = require('ethers').ethers;
 
-const { pimlicoBundlerActions } = require('permissionless/actions/pimlico');
 const { ENTRYPOINT_ADDRESS_V06, bundlerActions } = require('permissionless');
 const { pimlicoBundlerActions } = require('permissionless/actions/pimlico');
 const { celoAlfajores } = require('viem/chains');
