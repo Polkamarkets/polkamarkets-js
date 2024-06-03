@@ -4,6 +4,12 @@ const axios = require('axios');
 const PolkamarketsSmartAccount = require('./PolkamarketsSmartAccount');
 const ethers = require('ethers').ethers;
 
+const { pimlicoBundlerActions } = require('permissionless/actions/pimlico');
+const { ENTRYPOINT_ADDRESS_V06, bundlerActions } = require('permissionless');
+const { pimlicoBundlerActions } = require('permissionless/actions/pimlico');
+const { celoAlfajores } = require('viem/chains');
+const { createClient, http } = require('viem');
+
 /**
  * Contract Object Interface
  * @constructor IContract
@@ -198,114 +204,235 @@ class IContract {
         receipt = await txResponse.wait();
       } else {
         // trying operation 3 times
-        const retries = 3;
-        let feeQuotesResult;
-        for (let i = 0; i < retries; i++) {
-          try {
-            feeQuotesResult = await smartAccount.getFeeQuotes(tx);
-            break;
-          } catch (error) {
-            await new Promise((resolve) => setTimeout(resolve, 5000));
+        // const retries = 3;
+        // let feeQuotesResult;
+        // for (let i = 0; i < retries; i++) {
+        //   try {
+        //     feeQuotesResult = await smartAccount.getFeeQuotes(tx);
+        //     break;
+        //   } catch (error) {
+        //     await new Promise((resolve) => setTimeout(resolve, 5000));
 
-            if (i === retries - 1) {
-              throw error;
-            } else {
-              // 1s interval between retries
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-            }
-          }
+        //     if (i === retries - 1) {
+        //       throw error;
+        //     } else {
+        //       // 1s interval between retries
+        //       await new Promise((resolve) => setTimeout(resolve, 1000));
+        //     }
+        //   }
+        // }
+
+        // let userOp = feeQuotesResult.verifyingPaymasterGasless?.userOp;
+        // let userOpHash = feeQuotesResult.verifyingPaymasterGasless?.userOpHash;
+
+        // ############################ END PIMLICO ############################
+        const accountABI = ["function execute(address to, uint256 value, bytes data)"];
+        const account = new ethers.utils.Interface(accountABI);
+        const callData = account.encodeFunctionData("execute", [
+          tx.to,
+          ethers.constants.Zero,
+          methodCallData,
+        ]);
+
+        const publicClient = createPublicClient({
+          chain: celoAlfajores,
+          transport: http('https://alfajores-forno.celo-testnet.org')
+        });
+
+        const bundlerClient = createClient({
+          transport: http('https://api.pimlico.io/v2/44787/rpc?apikey=810dd385-819a-4c79-96a1-6019b51c8381'),
+          chain: celoAlfajores,
+        })
+          .extend(bundlerActions(ENTRYPOINT_ADDRESS_V06))
+          .extend(pimlicoBundlerActions(ENTRYPOINT_ADDRESS_V06))
+
+
+        const paymasterClient = createClient({
+          transport: http('https://api.pimlico.io/v2/44787/rpc?apikey=810dd385-819a-4c79-96a1-6019b51c8381'),
+          chain: celoAlfajores,
+        }).extend(pimlicoPaymasterActions(ENTRYPOINT_ADDRESS_V06))
+
+        // console.log('socialLogin.provider:', socialLogin.provider);
+        const smartAccountSigner = await providerToSmartAccountSigner(socialLogin.provider);
+
+        const smartAccount = await signerToSimpleSmartAccount(publicClient, {
+          signer: smartAccountSigner,
+          factoryAddress: "0x9406Cc6185a346906296840746125a0E44976454",
+          entryPoint: ENTRYPOINT_ADDRESS_V06,
+        })
+
+        const initCode = await smartAccount.getInitCode();
+        const senderAddress = smartAccount.address;
+        console.log('senderAddress:', senderAddress);
+
+
+        const gasPrice = await bundlerClient.getUserOperationGasPrice()
+        console.log('gasPrice:', gasPrice);
+
+        const key = BigInt(Math.floor(Math.random() * 6277101735386680763835789423207666416102355444464034512895));
+        // const key = 1n;
+
+        const nonce = await getAccountNonce(publicClient, {
+          sender: senderAddress,
+          entryPoint: ENTRYPOINT_ADDRESS_V06,
+          key // optional
+        })
+
+        const feequotes = await smartAccount.getFeeQuotes(tx);
+        const userOperation = {
+          sender: senderAddress,
+          nonce,
+          initCode: initCode,
+          callData: callData,
+          maxFeePerGas: feequotes.verifyingPaymasterGasless.userOp.maxFeePerGas,
+          maxPriorityFeePerGas: feequotes.verifyingPaymasterGasless.userOp.maxPriorityFeePerGas,
+          signature: await smartAccount.getDummySignature(),
         }
 
-        let userOp = feeQuotesResult.verifyingPaymasterGasless?.userOp;
-        let userOpHash = feeQuotesResult.verifyingPaymasterGasless?.userOpHash;
+
+        // console.log('userOperation:', userOperation);
+        const sponsorUserOperationResult = await paymasterClient.sponsorUserOperation({
+          userOperation,
+        })
+
+        const sponsoredUserOperation = {
+          ...userOperation,
+          ...sponsorUserOperationResult,
+        }
+
+        const signature = await smartAccount.signUserOperation(sponsoredUserOperation);
+
+        sponsoredUserOperation.signature = signature
+        const userOpHash = await bundlerClient.sendUserOperation({
+          userOperation: sponsoredUserOperation,
+        })
+
+        // sponsoredUserOperation.nonce = ethers.BigNumber.from(sponsoredUserOperation.nonce).toHexString();
+        // sponsoredUserOperation.maxFeePerGas = ethers.BigNumber.from(sponsoredUserOperation.maxFeePerGas).toHexString();
+        // sponsoredUserOperation.maxPriorityFeePerGas = ethers.BigNumber.from(sponsoredUserOperation.maxPriorityFeePerGas).toHexString();
+        // sponsoredUserOperation.preVerificationGas = ethers.BigNumber.from(sponsoredUserOperation.preVerificationGas).toHexString();
+        // sponsoredUserOperation.verificationGasLimit = ethers.BigNumber.from(sponsoredUserOperation.verificationGasLimit).toHexString();
+        // sponsoredUserOperation.callGasLimit = ethers.BigNumber.from(sponsoredUserOperation.callGasLimit).toHexString();
+
+        // let txResponse = await axios.post(`${networkConfig.bundlerRPC}/rpc?chainId=100`,
+        // {
+
+        //   "method": "eth_sendUserOperation",
+        //   "params": [
+        //     sponsoredUserOperation,
+        //     "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+        //   ]
+        // }
+        // );
+        // const userOpHash = txResponse.data.result;
+
+        // let txResponse = await axios.post(`https://api.pimlico.io/v1/100/rpc?apikey=810dd385-819a-4c79-96a1-6019b51c8381`,
+        // {
+        //   jsonrpc: "2.0",
+        //   method: "eth_sendUserOperation",
+        //   params: [
+        //     sponsoredUserOperation,
+        //     "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+        //   ],
+        //   id: 1,
+        //   }
+        // );
+        // console.log('userOperationHash:', userOpHash);
+
+        receipt = await bundlerClient.waitForUserOperationReceipt({
+          hash: userOpHash,
+        });
+
+        // ############################ END PIMLICO ############################
+
 
         // Get random key
-        const key = BigInt(Math.floor(Math.random() * 6277101735386680763835789423207666416102355444464034512895));
+        // const key = BigInt(Math.floor(Math.random() * 6277101735386680763835789423207666416102355444464034512895));
 
-        const entrypointAbi = [
-          "function getNonce(address sender, uint192 key) view returns (uint256)",
-        ];
+        // const entrypointAbi = [
+        //   "function getNonce(address sender, uint192 key) view returns (uint256)",
+        // ];
 
-        const ethersProvider = new ethers.providers.JsonRpcProvider(this.params.web3.currentProvider.host);
+        // const ethersProvider = new ethers.providers.JsonRpcProvider(this.params.web3.currentProvider.host);
 
-        const entrypointContract = new ethers.Contract(ENTRYPOINT_ADDRESS_V06, entrypointAbi, ethersProvider);
+        // const entrypointContract = new ethers.Contract(ENTRYPOINT_ADDRESS_V06, entrypointAbi, ethersProvider);
 
-        const nonce = await entrypointContract.getNonce(senderAddress, key);
+        // const nonce = await entrypointContract.getNonce(senderAddress, key);
 
-        userOp.nonce = nonce.toHexString();
-
-
-        const paymasterSponsorData = await axios.post(`https://paymaster.particle.network`,
-        {
-
-          "method": "pm_sponsorUserOperation",
-          "params": [
-            userOp,
-            ENTRYPOINT_ADDRESS_V06,
-          ]
-        }, {
-          params: {
-            chainId: networkConfig.chainId,
-            projectUuid: networkConfig.particleProjectId,
-            projectKey: networkConfig.particleClientKey,
-          }
-        }
-        );
+        // userOp.nonce = nonce.toHexString();
 
 
-        userOp.paymasterAndData = paymasterSponsorData?.data.result.paymasterAndData;
+        // const paymasterSponsorData = await axios.post(`https://paymaster.particle.network`,
+        // {
 
-        userOpHash = this.getUserOpHash(networkConfig.chainId, userOp, ENTRYPOINT_ADDRESS_V06);
+        //   "method": "pm_sponsorUserOperation",
+        //   "params": [
+        //     userOp,
+        //     ENTRYPOINT_ADDRESS_V06,
+        //   ]
+        // }, {
+        //   params: {
+        //     chainId: networkConfig.chainId,
+        //     projectUuid: networkConfig.particleProjectId,
+        //     projectKey: networkConfig.particleClientKey,
+        //   }
+        // }
+        // );
 
-        const signedUserOp = await smartAccount.signUserOperation({ userOpHash, userOp });
 
-        let txResponse;
-        for (let i = 0; i < retries; i++) {
-          try {
-            if (networkConfig.bundlerAPI) {
-              txResponse = await axios.post(`${networkConfig.bundlerAPI}/user_operations`,
-                {
-                  user_operation: {
-                    user_operation: signedUserOp,
-                    user_operation_hash: userOpHash,
-                    user_operation_data: [this.operationDataFromCall(f)],
-                    network_id: networkConfig.chainId,
-                  }
-                }
-              );
-            } else {
-              txResponse = await axios.post(`${networkConfig.bundlerRPC}/rpc?chainId=${networkConfig.chainId}`,
-                {
+        // userOp.paymasterAndData = paymasterSponsorData?.data.result.paymasterAndData;
 
-                  "method": "eth_sendUserOperation",
-                  "params": [
-                    signedUserOp,
-                    ENTRYPOINT_ADDRESS_V06
-                  ]
-                }
-              );
-            }
+        // userOpHash = this.getUserOpHash(networkConfig.chainId, userOp, ENTRYPOINT_ADDRESS_V06);
 
-            if (!txResponse.data.error) break;
-          } catch (error) {
-            if (i === retries - 1) {
-              throw error;
-            } else {
-              // 1s interval between retries
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-            }
-          }
-        }
+        // const signedUserOp = await smartAccount.signUserOperation({ userOpHash, userOp });
 
-        if (txResponse.data.error) {
-          throw new Error(txResponse.data.error.message);
-        }
+        // let txResponse;
+        // for (let i = 0; i < retries; i++) {
+        //   try {
+        //     if (networkConfig.bundlerAPI) {
+        //       txResponse = await axios.post(`${networkConfig.bundlerAPI}/user_operations`,
+        //         {
+        //           user_operation: {
+        //             user_operation: signedUserOp,
+        //             user_operation_hash: userOpHash,
+        //             user_operation_data: [this.operationDataFromCall(f)],
+        //             network_id: networkConfig.chainId,
+        //           }
+        //         }
+        //       );
+        //     } else {
+        //       txResponse = await axios.post(`${networkConfig.bundlerRPC}/rpc?chainId=${networkConfig.chainId}`,
+        //         {
 
-        const transactionHash = await this.waitForTransactionHashToBeGenerated(userOpHash, networkConfig);
+        //           "method": "eth_sendUserOperation",
+        //           "params": [
+        //             signedUserOp,
+        //             ENTRYPOINT_ADDRESS_V06
+        //           ]
+        //         }
+        //       );
+        //     }
 
-        const web3Provider = new ethers.providers.Web3Provider(smartAccount?.provider)
+        //     if (!txResponse.data.error) break;
+        //   } catch (error) {
+        //     if (i === retries - 1) {
+        //       throw error;
+        //     } else {
+        //       // 1s interval between retries
+        //       await new Promise((resolve) => setTimeout(resolve, 1000));
+        //     }
+        //   }
+        // }
 
-        receipt = await web3Provider.waitForTransaction(transactionHash);
+        // if (txResponse.data.error) {
+        //   throw new Error(txResponse.data.error.message);
+        // }
+
+        // const transactionHash = await this.waitForTransactionHashToBeGenerated(userOpHash, networkConfig);
+
+        // const web3Provider = new ethers.providers.Web3Provider(smartAccount?.provider)
+
+        // receipt = await web3Provider.waitForTransaction(transactionHash);
 
         console.log('receipt:', receipt.status, receipt.transactionHash);
       }
