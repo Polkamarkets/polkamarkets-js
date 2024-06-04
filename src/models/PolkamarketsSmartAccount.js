@@ -55,6 +55,8 @@ class PolkamarketsSmartAccount extends SmartAccount {
     if (!usePimlico) {
       super(provider, options);
     }
+
+    return this;
   }
 
   async providerIsConnectedWallet() {
