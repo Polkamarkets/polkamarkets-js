@@ -5,7 +5,7 @@ const { ENTRYPOINT_ADDRESS_V06, providerToSmartAccountSigner } = require('permis
 const { createPublicClient, http } = require('viem');
 const { signerToSimpleSmartAccount } = require('permissionless/accounts');
 
-class PolkamarketsSmartAccount extends SmartAccount {
+class PolkamarketsSmartAccount {
 
   static PIMLICO_FACTORY_ADDRESS = '0x9406Cc6185a346906296840746125a0E44976454';
 
@@ -27,12 +27,13 @@ class PolkamarketsSmartAccount extends SmartAccount {
         },
       };
 
-      const instance = new PolkamarketsSmartAccount(provider, options, networkConfig.usePimlico);
+      const instance = new PolkamarketsSmartAccount();
       instance.networkConfig = networkConfig;
       instance.provider = provider
       instance.isConnectedWallet = isConnectedWallet
       if (!networkConfig.usePimlico) {
-        instance.setSmartAccountContract({ name: 'SIMPLE', version: '1.0.0' })
+        instance.smartAccount = new SmartAccount(provider, options);
+        instance.smartAccount.setSmartAccountContract({ name: 'SIMPLE', version: '1.0.0' })
       }
       return instance;
     }
@@ -50,14 +51,6 @@ class PolkamarketsSmartAccount extends SmartAccount {
       }
     };
   })();
-
-  constructor(provider, options, usePimlico = false) {
-    if (!usePimlico) {
-      super(provider, options);
-    }
-
-    return this;
-  }
 
   async providerIsConnectedWallet() {
     if (this.isConnectedWallet) {
@@ -93,7 +86,7 @@ class PolkamarketsSmartAccount extends SmartAccount {
 
       return smartAccount.address;
     }
-    return super.getAddress();
+    return this.smartAccount.getAddress();
   }
 }
 
