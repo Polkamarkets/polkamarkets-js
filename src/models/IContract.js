@@ -229,7 +229,7 @@ class IContract {
       nonce,
       initCode: initCode,
       callData: callData,
-      maxFeePerGas: Number(gasPrice.fast.maxFeePerGasfeequotes),
+      maxFeePerGas: Number(gasPrice.fast.maxFeePerGas),
       maxPriorityFeePerGas: Number(gasPrice.fast.maxPriorityFeePerGas),
       signature: await smartAccount.getDummySignature(),
     }
