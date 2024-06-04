@@ -80,7 +80,7 @@ class PolkamarketsSmartAccount {
 
       const smartAccount = await signerToSimpleSmartAccount(publicClient, {
         signer: smartAccountSigner,
-        factoryAddress: PIMLICO_FACTORY_ADDRESS,
+        factoryAddress: PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
         entryPoint: ENTRYPOINT_ADDRESS_V06,
       })
 
