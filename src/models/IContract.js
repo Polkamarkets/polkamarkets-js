@@ -257,7 +257,7 @@ class IContract {
       sponsoredUserOperation.verificationGasLimit = ethers.BigNumber.from(sponsoredUserOperation.verificationGasLimit).toHexString();
       sponsoredUserOperation.callGasLimit = ethers.BigNumber.from(sponsoredUserOperation.callGasLimit).toHexString();
 
-      txResponse = await axios.post(`${networkConfig.bundlerAPI}/user_operations`,
+      const txResponse = await axios.post(`${networkConfig.bundlerAPI}/user_operations`,
         {
           user_operation: {
             user_operation: sponsoredUserOperation,
@@ -284,37 +284,6 @@ class IContract {
 
     return receipt;
 
-    // sponsoredUserOperation.nonce = ethers.BigNumber.from(sponsoredUserOperation.nonce).toHexString();
-    // sponsoredUserOperation.maxFeePerGas = ethers.BigNumber.from(sponsoredUserOperation.maxFeePerGas).toHexString();
-    // sponsoredUserOperation.maxPriorityFeePerGas = ethers.BigNumber.from(sponsoredUserOperation.maxPriorityFeePerGas).toHexString();
-    // sponsoredUserOperation.preVerificationGas = ethers.BigNumber.from(sponsoredUserOperation.preVerificationGas).toHexString();
-    // sponsoredUserOperation.verificationGasLimit = ethers.BigNumber.from(sponsoredUserOperation.verificationGasLimit).toHexString();
-    // sponsoredUserOperation.callGasLimit = ethers.BigNumber.from(sponsoredUserOperation.callGasLimit).toHexString();
-
-    // let txResponse = await axios.post(`${networkConfig.bundlerRPC}/rpc?chainId=100`,
-    // {
-
-    //   "method": "eth_sendUserOperation",
-    //   "params": [
-    //     sponsoredUserOperation,
-    //     "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
-    //   ]
-    // }
-    // );
-    // const userOpHash = txResponse.data.result;
-
-    // let txResponse = await axios.post(`https://api.pimlico.io/v1/100/rpc?apikey=810dd385-819a-4c79-96a1-6019b51c8381`,
-    // {
-    //   jsonrpc: "2.0",
-    //   method: "eth_sendUserOperation",
-    //   params: [
-    //     sponsoredUserOperation,
-    //     "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
-    //   ],
-    //   id: 1,
-    //   }
-    // );
-    // console.log('userOperationHash:', userOpHash);
   }
 
   async sendGaslessTransactions(f) {
