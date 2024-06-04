@@ -176,7 +176,7 @@ class IContract {
     }
   }
 
-  async usePimlicoForGaslessTransactions(tx, methodCallData, networkConfig, provider) {
+  async usePimlicoForGaslessTransactions(f, tx, methodCallData, networkConfig, provider) {
     const accountABI = ["function execute(address to, uint256 value, bytes data)"];
     const account = new ethers.utils.Interface(accountABI);
     const callData = account.encodeFunctionData("execute", [
@@ -247,11 +247,36 @@ class IContract {
 
     sponsoredUserOperation.signature = signature;
 
-    console.log('sponsoredUserOperation:', sponsoredUserOperation); // TODO can i send this to the api?
+    let userOpHash = this.getUserOpHash(networkConfig.chainId, sponsoredUserOperation, ENTRYPOINT_ADDRESS_V06);
 
-    const userOpHash = await bundlerClient.sendUserOperation({
-      userOperation: sponsoredUserOperation,
-    })
+    if (networkConfig.bundlerAPI) {
+      sponsoredUserOperation.nonce = ethers.BigNumber.from(sponsoredUserOperation.nonce).toHexString();
+      sponsoredUserOperation.maxFeePerGas = ethers.BigNumber.from(sponsoredUserOperation.maxFeePerGas).toHexString();
+      sponsoredUserOperation.maxPriorityFeePerGas = ethers.BigNumber.from(sponsoredUserOperation.maxPriorityFeePerGas).toHexString();
+      sponsoredUserOperation.preVerificationGas = ethers.BigNumber.from(sponsoredUserOperation.preVerificationGas).toHexString();
+      sponsoredUserOperation.verificationGasLimit = ethers.BigNumber.from(sponsoredUserOperation.verificationGasLimit).toHexString();
+      sponsoredUserOperation.callGasLimit = ethers.BigNumber.from(sponsoredUserOperation.callGasLimit).toHexString();
+
+      txResponse = await axios.post(`${networkConfig.bundlerAPI}/user_operations`,
+        {
+          user_operation: {
+            user_operation: sponsoredUserOperation,
+            user_operation_hash: userOpHash,
+            user_operation_data: [this.operationDataFromCall(f)],
+            network_id: networkConfig.chainId,
+          }
+        }
+      );
+
+      if (txResponse.data.error) {
+        throw new Error(txResponse.data.error.message);
+      }
+    } else {
+      userOpHash = await bundlerClient.sendUserOperation({
+        userOperation: sponsoredUserOperation,
+      })
+    }
+
 
     const receipt = await bundlerClient.waitForUserOperationReceipt({
       hash: userOpHash,
@@ -319,7 +344,7 @@ class IContract {
       } else {
 
         if (networkConfig.usePimlico) {
-          receipt = await this.usePimlicoForGaslessTransactions(tx, methodCallData, networkConfig, smartAccount.provider);
+          receipt = await this.usePimlicoForGaslessTransactions(f, tx, methodCallData, networkConfig, smartAccount.provider);
         } else {
           // trying operation 3 times
           const retries = 3;
