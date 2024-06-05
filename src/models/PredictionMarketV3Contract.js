@@ -210,7 +210,7 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
     }, {});
 
     // calculationg voidedWinningsClaimed, if there's any voidedWinningsToClaim
-    Object.keys(portfolio).forEach(marketId => {
+    Object.keys(portfolio).map(Number).forEach(marketId => {
       const item = portfolio[marketId];
       if (item.claimStatus.voidedWinningsToClaim) {
         item.claimStatus.voidedWinningsClaimed =
