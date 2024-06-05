@@ -11,8 +11,8 @@ contract PredictionMarketV3Querier {
   struct UserMarketData {
     uint256 liquidityShares;
     uint256[] outcomeShares;
-    bool winnigsToClaim;
-    bool winnigsClaimed;
+    bool winningsToClaim;
+    bool winningsClaimed;
     bool liquidityToClaim;
     bool liquidityClaimed;
     bool voidedSharesToClaim;
@@ -43,8 +43,8 @@ contract PredictionMarketV3Querier {
     return UserMarketData({
       liquidityShares: liquidityShares,
       outcomeShares: outcomeShares,
-      winnigsToClaim: winningsToClaim,
-      winnigsClaimed: winningsClaimed,
+      winningsToClaim: winningsToClaim,
+      winningsClaimed: winningsClaimed,
       liquidityToClaim: liquidityToClaim,
       liquidityClaimed: liquidityClaimed,
       voidedSharesToClaim: voidedSharesToClaim
