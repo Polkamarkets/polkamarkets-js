@@ -172,11 +172,12 @@ class Application {
    * @param {Address} ContractAddress (Opt) If it is deployed
    * @description Create a PredictionMarketV3 Contract
    */
-  getPredictionMarketV3Contract({ contractAddress = null } = {}) {
+  getPredictionMarketV3Contract({ contractAddress = null, querierContractAddress = null } = {}) {
     try {
       return new PredictionMarketV3Contract({
         web3: this.web3,
         contractAddress,
+        querierContractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,

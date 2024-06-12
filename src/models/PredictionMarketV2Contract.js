@@ -289,6 +289,25 @@ class PredictionMarketV2Contract extends IContract {
       userMarketIds = allMarketIds;
     }
 
+    let voidedMarketIds = [];
+    // fetching voided markets
+    try {
+      // TODO: improve this
+      const marketsCreated = await this.getEvents('MarketCreated');
+      const marketsResolved = await this.getEvents('MarketResolved');
+
+      voidedMarketIds = marketsResolved.filter((event) => {
+        const resolvedOutcomeId = parseInt(event.returnValues.outcomeId);
+        const outcomeCount = marketsCreated.find((market) =>  {
+          return market.returnValues.marketId === event.returnValues.marketId
+        }).returnValues.outcomes;
+
+        return resolvedOutcomeId >= outcomeCount;
+      }).map((event) => parseInt(event.returnValues.marketId));
+    } catch (err) {
+      // skipping voided markets if query fails
+    }
+
     return await allMarketIds.reduce(async (obj, marketId) => {
       let portfolio;
       if (!userMarketIds.includes(marketId)) {
@@ -304,6 +323,8 @@ class PredictionMarketV2Contract extends IContract {
             winningsClaimed: false,
             liquidityToClaim: false,
             liquidityClaimed: false,
+            voidedWinningsToClaim: false,
+            voidedWinningsClaimed: false,
             liquidityFees: 0
           }
         };
@@ -322,6 +343,9 @@ class PredictionMarketV2Contract extends IContract {
           ];
         }));
 
+        const voidedWinningsToClaim = voidedMarketIds.includes(marketId) && marketShares[1].some(item => item > 0);
+        const voidedWinningsClaimed = voidedWinningsToClaim && events.some(event => event.action === 'Claim Voided' && event.marketId === marketId);
+
         portfolio = {
           liquidity: {
             shares: Numbers.fromDecimalsNumber(marketShares[0], decimals),
@@ -333,6 +357,8 @@ class PredictionMarketV2Contract extends IContract {
             winningsClaimed: claimStatus[1],
             liquidityToClaim: claimStatus[2],
             liquidityClaimed: claimStatus[3],
+            voidedWinningsToClaim,
+            voidedWinningsClaimed,
             liquidityFees: Numbers.fromDecimalsNumber(claimStatus[4], decimals)
           }
         };
