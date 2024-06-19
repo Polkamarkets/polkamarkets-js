@@ -320,7 +320,7 @@ class IContract {
           let feeQuotesResult;
           for (let i = 0; i < retries; i++) {
             try {
-              feeQuotesResult = await smartAccount.getFeeQuotes(tx);
+              feeQuotesResult = await smartAccount.smartAccount.getFeeQuotes(tx);
               break;
             } catch (error) {
               await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -375,7 +375,7 @@ class IContract {
 
           userOpHash = this.getUserOpHash(networkConfig.chainId, userOp, ENTRYPOINT_ADDRESS_V06);
 
-          const signedUserOp = await smartAccount.signUserOperation({ userOpHash, userOp });
+          const signedUserOp = await smartAccount.smartAccount.signUserOperation({ userOpHash, userOp });
 
           let txResponse;
           for (let i = 0; i < retries; i++) {
