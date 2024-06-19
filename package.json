@@ -50,7 +50,9 @@
         "mocha": "^5.1.1",
         "moment": "^2.21.0",
         "node-gyp": "^9.4.0",
+        "permissionless": "^0.1.30",
         "superstruct": "^1.0.3",
+        "viem": "^2.13.3",
         "web3": "1.9.0"
     },
     "devDependencies": {
