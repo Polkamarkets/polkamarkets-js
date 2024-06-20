@@ -96,7 +96,7 @@ context('Prediction Market Contract V3 Manager', async () => {
           name: 'Token',
           symbol: 'TOKEN',
           tokenAmountToClaim: TOKEN_AMOUNT_TO_CLAIM,
-          tokenToAnswer: '0x0000000000000000000000000000000000000000'
+          tokenToAnswer: pmmTokenContract.getAddress(),
         });
         const land = await predictionMarketManagerContract.getLandById({ id: currentLandIndex });
         const newLandIndex = await predictionMarketManagerContract.getLandTokensLength();
@@ -119,7 +119,7 @@ context('Prediction Market Contract V3 Manager', async () => {
           name: 'Token 2',
           symbol: 'TOKEN2',
           tokenAmountToClaim: TOKEN_AMOUNT_TO_CLAIM,
-          tokenToAnswer: '0x0000000000000000000000000000000000000000'
+          tokenToAnswer: pmmTokenContract.getAddress(),
         });
         const land = await predictionMarketManagerContract.getLandById({ id: currentLandIndex });
         const newLandIndex = await predictionMarketManagerContract.getLandTokensLength();

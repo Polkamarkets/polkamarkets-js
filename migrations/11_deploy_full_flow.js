@@ -91,7 +91,7 @@ module.exports = async function(deployer) {
       fee: 0,
       treasuryFee: 0,
       treasury: '0x000000000000000000000000000000000000dead',
-      landRealitio,
+      realitio: landRealitio,
       realitioTimeout: 300,
       manager: PM3_MANAGER_ADDRESS,
     }
