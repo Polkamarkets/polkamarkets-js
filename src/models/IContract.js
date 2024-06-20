@@ -112,7 +112,7 @@ class IContract {
             // fetch should be non-blocking
           }
 
-          if (userOperationData?.data?.status === 'failed') {
+          if (userOperationData && userOperationData.data && userOperationData.data.status === 'failed') {
             clearInterval(interval);
             reject(new Error('User operation failed'));
           }
@@ -320,7 +320,7 @@ class IContract {
           let feeQuotesResult;
           for (let i = 0; i < retries; i++) {
             try {
-              feeQuotesResult = await smartAccount.getFeeQuotes(tx);
+              feeQuotesResult = await smartAccount.smartAccount.getFeeQuotes(tx);
               break;
             } catch (error) {
               await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -334,8 +334,8 @@ class IContract {
             }
           }
 
-          let userOp = feeQuotesResult.verifyingPaymasterGasless?.userOp;
-          let userOpHash = feeQuotesResult.verifyingPaymasterGasless?.userOpHash;
+          let userOp = feeQuotesResult.verifyingPaymasterGasless.userOp;
+          let userOpHash = feeQuotesResult.verifyingPaymasterGasless.userOpHash;
 
           // Get random key
           const key = BigInt(Math.floor(Math.random() * 6277101735386680763835789423207666416102355444464034512895));
@@ -371,11 +371,11 @@ class IContract {
           );
 
 
-          userOp.paymasterAndData = paymasterSponsorData?.data.result.paymasterAndData;
+          userOp.paymasterAndData = paymasterSponsorData.data.result.paymasterAndData;
 
           userOpHash = this.getUserOpHash(networkConfig.chainId, userOp, ENTRYPOINT_ADDRESS_V06);
 
-          const signedUserOp = await smartAccount.signUserOperation({ userOpHash, userOp });
+          const signedUserOp = await smartAccount.smartAccount.signUserOperation({ userOpHash, userOp });
 
           let txResponse;
           for (let i = 0; i < retries; i++) {
@@ -421,7 +421,7 @@ class IContract {
 
           const transactionHash = await this.waitForTransactionHashToBeGenerated(userOpHash, networkConfig);
 
-          const web3Provider = new ethers.providers.Web3Provider(smartAccount?.provider)
+          const web3Provider = new ethers.providers.Web3Provider(smartAccount.provider)
 
           receipt = await web3Provider.waitForTransaction(transactionHash);
         }
