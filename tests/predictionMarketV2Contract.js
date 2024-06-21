@@ -98,7 +98,7 @@ context('Prediction Market Contract V2', async () => {
           image: 'foo-bar',
           category: 'Foo;Bar',
           oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-          duration: moment('2024-05-01').unix(),
+          duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
           outcomes: ['Yes', 'No'],
           token: tokenERC20Contract.getAddress(),
         });
@@ -119,7 +119,7 @@ context('Prediction Market Contract V2', async () => {
         image: 'foo-bar',
         category: 'Foo;Bar',
         oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-        duration: moment('2024-05-01').unix(),
+        duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
         outcomes: ['Yes', 'No'],
         value: 0.001,
         token: tokenERC20Contract.getAddress(),
@@ -136,7 +136,7 @@ context('Prediction Market Contract V2', async () => {
     it('should get Market data', mochaAsync(async () => {
       const res = await predictionMarketContract.getMarketData({marketId});
       expect(res).to.eql({
-        closeDateTime: '2024-05-01 00:00',
+        closeDateTime: moment().add(1, 'month').format('YYYY-MM-DD 00:00'),
         state: 0,
         oracleAddress: '0x0000000000000000000000000000000000000000',
         liquidity: 0.01,
@@ -190,7 +190,7 @@ context('Prediction Market Contract V2', async () => {
           image: 'foo-bar',
           category: 'Foo;Bar',
           oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-          duration: moment('2024-05-01').unix(),
+          duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
           outcomes: ['A', 'B']
         });
         expect(res.status).to.equal(true);
@@ -617,7 +617,7 @@ context('Prediction Market Contract V2', async () => {
             image: 'foo-bar',
             category: 'Foo;Bar',
             oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-            duration: moment('2024-05-01').unix(),
+            duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
             outcomes: ['A', 'B', 'C'],
             token: tokenERC20Contract.getAddress(),
           });
@@ -647,7 +647,7 @@ context('Prediction Market Contract V2', async () => {
             image: 'foo-bar',
             category: 'Foo;Bar',
             oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-            duration: moment('2024-05-01').unix(),
+            duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
             outcomes,
             token: tokenERC20Contract.getAddress(),
           });
@@ -675,7 +675,7 @@ context('Prediction Market Contract V2', async () => {
             image: 'foo-bar',
             category: 'Foo;Bar',
             oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-            duration: moment('2024-05-01').unix(),
+            duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
             outcomes,
             token: tokenERC20Contract.getAddress(),
           });
@@ -703,7 +703,7 @@ context('Prediction Market Contract V2', async () => {
             image: 'foo-bar',
             category: 'Foo;Bar',
             oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-            duration: moment('2024-05-01').unix(),
+            duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
             outcomes: ['D', 'E', 'F'],
             token: tokenERC20Contract.getAddress(),
           });
@@ -958,23 +958,23 @@ context('Prediction Market Contract V2', async () => {
       const initialOdds = [
         [
           [50, 50],
-          [50000000, 50000000]
+          ['50000000', '50000000']
         ],
         [
           [40, 60],
-          [60000000, 40000000]
+          ['60000000', '40000000']
         ],
         [
           [15, 20, 65],
-          [1300000000, 975000000, 300000000]
+          ['1300000000', '975000000', '300000000']
         ],
         [
           [65, 15, 20],
-          [300000000, 1300000000, 975000000]
+          ['300000000', '1300000000', '975000000']
         ],
         [
           [10, 20, 30, 40],
-          [24000000000, 12000000000, 8000000000, 6000000000]
+          ['24000000000', '12000000000', '8000000000', '6000000000']
         ]
       ];
 
@@ -992,7 +992,7 @@ context('Prediction Market Contract V2', async () => {
                 image: 'foo-bar',
                 category: 'Foo;Bar',
                 oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-                duration: moment('2024-05-01').unix(),
+                duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
                 outcomes: ['A', 'B', 'C', 'D', 'E'].slice(0, odds.length),
                 token: tokenERC20Contract.getAddress(),
                 odds,
