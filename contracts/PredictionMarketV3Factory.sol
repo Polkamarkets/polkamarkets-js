@@ -9,10 +9,13 @@ import "./PredictionMarketV3Controller.sol";
 // openzeppelin ownable contract import
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
 
 contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
   IERC20 public immutable token; // Governance IERC20
   uint256 public lockAmount; // amount necessary to lock to create a land
+  address public PMV3LibraryAddress; // PredictionMarketV3 library address
+  address public realitioLibraryAddress; // PredictionMarketV3 contract
 
   event ControllerCreated(address indexed user, address indexed controller, uint256 amountLocked);
 
@@ -39,10 +42,14 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
 
   constructor(
     IERC20 _token,
-    uint256 _lockAmount
+    uint256 _lockAmount,
+    address _PMV3LibraryAddress,
+    address _realitioLibraryAddress
   ) {
     token = _token;
     lockAmount = _lockAmount;
+    PMV3LibraryAddress = _PMV3LibraryAddress;
+    realitioLibraryAddress = _realitioLibraryAddress;
   }
 
   function updateLockAmount(uint256 newLockAmount) external onlyOwner {
@@ -52,25 +59,36 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
     lockAmount = newLockAmount;
   }
 
+  function updatePMV3LibraryAddress(address _PMV3LibraryAddress) external onlyOwner {
+    require(_PMV3LibraryAddress != address(0), "PMV3LibraryAddress address cannot be 0 address");
+
+    PMV3LibraryAddress = _PMV3LibraryAddress;
+  }
+
+  function updateRealitioLibraryAddress(address _realitioLibraryAddress) external onlyOwner {
+    require(_realitioLibraryAddress != address(0), "RealitioLibraryAddress address cannot be 0 address");
+
+    realitioLibraryAddress = _realitioLibraryAddress;
+  }
+
   // lockAmount is the amount of tokens that the user needs to lock to create a land
   // by locking the amount the factory will create a PredicitonMarketController contract and store it in the contract
   // the user will be the admin of the PredicitonMarketController contract
   function createPMController(
-    address PMV3,
-    IWETH _WETH,
-    address _realitioLibraryAddress
+    address _PMV3
   ) external returns (PredictionMarketV3Controller) {
     require(token.balanceOf(msg.sender) >= lockAmount, "Not enough tokens to lock");
 
-    if (PMV3 == address(0)) {
+    // a PMV3 address can be provided, if not, the factory will deploy a new one
+    if (_PMV3 == address(0)) {
       // deploy new PredictionMarketV3 contract
-      // PMV3 = address(new PredictionMarketV3(_WETH));
+      _PMV3 = Clones.clone(PMV3LibraryAddress);
     }
 
     // deploy prediction market controller contract
     PredictionMarketV3Controller PMV3Controller = new PredictionMarketV3Controller(
-      PMV3,
-      _realitioLibraryAddress,
+      _PMV3,
+      realitioLibraryAddress,
       address(this)
     );
 
