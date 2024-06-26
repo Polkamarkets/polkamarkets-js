@@ -82,7 +82,7 @@ context('Prediction Market Contract V3', async () => {
         name: 'Token',
         symbol: 'TOKEN',
         tokenAmountToClaim: '1000',
-        tokenToAnswer: '0x0000000000000000000000000000000000000000'
+        tokenToAnswer: requiredBalanceERC20ContractAddress,
       });
       const land = await predictionMarketManagerContract.getLandById({ id: 0 });
       // switching realitioERC20 contract addresses
@@ -114,7 +114,7 @@ context('Prediction Market Contract V3', async () => {
           image: 'foo-bar',
           category: 'Foo;Bar',
           oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-          duration: moment('2024-05-01').unix(),
+          duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
           outcomes: ['Yes', 'No'],
           token: tokenERC20Contract.getAddress(),
           realitioAddress: realitioERC20Contract.getAddress(),
@@ -138,7 +138,7 @@ context('Prediction Market Contract V3', async () => {
         image: 'foo-bar',
         category: 'Foo;Bar',
         oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-        duration: moment('2024-05-01').unix(),
+        duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
         outcomes: ['Yes', 'No'],
         value: 0.001,
         token: tokenERC20Contract.getAddress(),
@@ -158,7 +158,7 @@ context('Prediction Market Contract V3', async () => {
     it('should get Market data', mochaAsync(async () => {
       const res = await predictionMarketContract.getMarketData({marketId});
       expect(res).to.eql({
-        closeDateTime: '2024-05-01 00:00',
+        closeDateTime: moment().add(1, 'month').format('YYYY-MM-DD 00:00'),
         state: 0,
         oracleAddress: '0x0000000000000000000000000000000000000000',
         liquidity: 0.01,
@@ -639,7 +639,7 @@ context('Prediction Market Contract V3', async () => {
             image: 'foo-bar',
             category: 'Foo;Bar',
             oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-            duration: moment('2024-05-01').unix(),
+            duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
             outcomes: ['A', 'B', 'C'],
             token: tokenERC20Contract.getAddress(),
             realitioAddress: realitioERC20Contract.getAddress(),
@@ -672,7 +672,7 @@ context('Prediction Market Contract V3', async () => {
             image: 'foo-bar',
             category: 'Foo;Bar',
             oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-            duration: moment('2024-05-01').unix(),
+            duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
             outcomes,
             token: tokenERC20Contract.getAddress(),
             realitioAddress: realitioERC20Contract.getAddress(),
@@ -703,7 +703,7 @@ context('Prediction Market Contract V3', async () => {
             image: 'foo-bar',
             category: 'Foo;Bar',
             oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-            duration: moment('2024-05-01').unix(),
+            duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
             outcomes,
             token: tokenERC20Contract.getAddress(),
             realitioAddress: realitioERC20Contract.getAddress(),
@@ -734,7 +734,7 @@ context('Prediction Market Contract V3', async () => {
             image: 'foo-bar',
             category: 'Foo;Bar',
             oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-            duration: moment('2024-05-01').unix(),
+            duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
             outcomes: ['D', 'E', 'F'],
             token: tokenERC20Contract.getAddress(),
             realitioAddress: realitioERC20Contract.getAddress(),
@@ -1026,7 +1026,7 @@ context('Prediction Market Contract V3', async () => {
                 image: 'foo-bar',
                 category: 'Foo;Bar',
                 oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
-                duration: moment('2024-05-01').unix(),
+                duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
                 outcomes: ['A', 'B', 'C', 'D', 'E'].slice(0, odds.length),
                 token: tokenERC20Contract.getAddress(),
                 odds,

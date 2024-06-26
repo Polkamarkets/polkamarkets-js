@@ -1,7 +1,13 @@
 const { SmartAccount } = require('@particle-network/aa');
 const ethers = require('ethers').ethers;
 
-class PolkamarketsSmartAccount extends SmartAccount {
+const { ENTRYPOINT_ADDRESS_V06, providerToSmartAccountSigner } = require('permissionless');
+const { createPublicClient, http } = require('viem');
+const { signerToSimpleSmartAccount } = require('permissionless/accounts');
+
+class PolkamarketsSmartAccount {
+
+  static PIMLICO_FACTORY_ADDRESS = '0x9406Cc6185a346906296840746125a0E44976454';
 
   static singleton = (() => {
     let smartAccount;
@@ -21,11 +27,14 @@ class PolkamarketsSmartAccount extends SmartAccount {
         },
       };
 
-      const instance = new PolkamarketsSmartAccount(provider, options);
+      const instance = new PolkamarketsSmartAccount();
       instance.networkConfig = networkConfig;
       instance.provider = provider
       instance.isConnectedWallet = isConnectedWallet
-      instance.setSmartAccountContract({ name: 'SIMPLE', version: '1.0.0' })
+      if (!networkConfig.usePimlico) {
+        instance.smartAccount = new SmartAccount(provider, options);
+        instance.smartAccount.setSmartAccountContract({ name: 'SIMPLE', version: '1.0.0' })
+      }
       return instance;
     }
 
@@ -61,7 +70,23 @@ class PolkamarketsSmartAccount extends SmartAccount {
       return address;
     }
 
-    return super.getAddress();
+    if (this.networkConfig.usePimlico) {
+      const publicClient = createPublicClient({
+        chain: this.networkConfig.viemChain,
+        transport: http(this.networkConfig.rpcUrl)
+      });
+
+      const smartAccountSigner = await providerToSmartAccountSigner(this.provider);
+
+      const smartAccount = await signerToSimpleSmartAccount(publicClient, {
+        signer: smartAccountSigner,
+        factoryAddress: PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
+        entryPoint: ENTRYPOINT_ADDRESS_V06,
+      })
+
+      return smartAccount.address;
+    }
+    return this.smartAccount.getAddress();
   }
 }
 
