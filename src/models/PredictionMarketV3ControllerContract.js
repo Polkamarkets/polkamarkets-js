@@ -18,12 +18,13 @@ class PredictionMarketV3ControllerContract extends IContract {
 
   async getLandByAddress({ token }) {
     const res = await this.getContract().methods.lands(token).call();
+    const landPermissions = await this.getContract().methods.landPermissions(token).call();
 
     return {
       token: res.token,
       active: res.active,
       realitio: res.realitio,
-      everyoneCanCreateMarkets: res.everyoneCanCreateMarkets,
+      everyoneCanCreateMarkets: landPermissions.openMarketCreation
     }
   }
 

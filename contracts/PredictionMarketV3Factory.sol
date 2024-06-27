@@ -72,11 +72,9 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
   }
 
   // lockAmount is the amount of tokens that the user needs to lock to create a land
-  // by locking the amount the factory will create a PredicitonMarketController contract and store it in the contract
-  // the user will be the admin of the PredicitonMarketController contract
-  function createPMController(
-    address _PMV3
-  ) external returns (PredictionMarketV3Controller) {
+  // by locking the amount the factory will create a PredictionMarketController contract and store it in the contract
+  // the user will be the admin of the PredictionMarketController contract
+  function createPMController(address _PMV3) external returns (PredictionMarketV3Controller) {
     require(token.balanceOf(msg.sender) >= lockAmount, "Not enough tokens to lock");
 
     // a PMV3 address can be provided, if not, the factory will deploy a new one
@@ -203,7 +201,11 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
     return controller.active;
   }
 
-  function isPMControllerAdmin(PredictionMarketV3Controller controllerAddress, address user) external view returns (bool) {
+  function isPMControllerAdmin(PredictionMarketV3Controller controllerAddress, address user)
+    external
+    view
+    returns (bool)
+  {
     Controller storage controller = controllers[address(controllerAddress)];
 
     return controller.admins[user];

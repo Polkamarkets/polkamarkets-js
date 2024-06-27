@@ -49,21 +49,23 @@ context('Prediction Market Contract V3 Controller', async () => {
 
       predictionMarketFactoryContract = app.getPredictionMarketV3FactoryContract({});
       // Deploy
-      await predictionMarketFactoryContract.deploy({
-        params:
-          [
-            pmfTokenContractAddress,
-            (LOCK_AMOUNT * 10 ** 18).toString(), // TODO: improve this
-          ]
-      });
-      const predictionMarketFactoryContractAddress = predictionMarketFactoryContract.getAddress();
-
       await predictionMarketContract.deploy({
         params: [
           '0x0000000000000000000000000000000000000000'
         ]
       });
       const predictionMarketContractAddress = predictionMarketContract.getAddress();
+
+      await predictionMarketFactoryContract.deploy({
+        params:
+          [
+            pmfTokenContractAddress,
+            (LOCK_AMOUNT * 10 ** 18).toString(), // TODO: improve this
+            predictionMarketContractAddress,
+            realitioERC20Contract.getAddress()
+          ]
+      });
+      const predictionMarketFactoryContractAddress = predictionMarketFactoryContract.getAddress();
 
       await pmfTokenContract.mint({
         address: accountAddress,

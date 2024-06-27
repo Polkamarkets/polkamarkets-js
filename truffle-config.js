@@ -66,12 +66,8 @@ module.exports = {
       provider: new HDWalletProvider(mnemonic, "https://rpc.api.moonbeam.network"),
       network_id: 1284
     },
-    goerli: {
-      provider: new HDWalletProvider(mnemonic, "https://goerli.infura.io/v3/" + INFURA_API_KEY),
-      network_id: 5
-    },
     polygon: {
-      provider: new HDWalletProvider(mnemonic, "https://rpc-mainnet.maticvigil.com"),
+      provider: new HDWalletProvider(mnemonic, "https://polygon-rpc.com"),
       network_id: "137",
       gasPrice: 200000000000,
       skipDryRun: true,

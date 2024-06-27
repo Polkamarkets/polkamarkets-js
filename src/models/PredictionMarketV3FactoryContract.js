@@ -54,14 +54,10 @@ class PredictionMarketV3FactoryContract extends IContract {
 
   async createPMController({
     PMV3,
-    WETH,
-    realitioLibraryAddress
   }) {
     return await this.__sendTx(
       this.getContract().methods.createPMController(
         PMV3,
-        WETH,
-        realitioLibraryAddress,
       )
     );
   };

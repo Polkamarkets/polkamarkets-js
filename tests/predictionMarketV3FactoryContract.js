@@ -48,19 +48,21 @@ context('Prediction Market Factory V3 Contract', async () => {
 
       predictionMarketFactoryContract = app.getPredictionMarketV3FactoryContract({});
       // Deploy
-      await predictionMarketFactoryContract.deploy({params:
-      [
-        pmfTokenContractAddress,
-        (LOCK_AMOUNT * 10**18).toString(), // TODO: improve this
-      ]});
-      const predictionMarketFactoryContractAddress = predictionMarketFactoryContract.getAddress();
-
       await predictionMarketContract.deploy({
         params: [
           '0x0000000000000000000000000000000000000000'
         ]
       });
       const predictionMarketContractAddress = predictionMarketContract.getAddress();
+
+      await predictionMarketFactoryContract.deploy({params:
+        [
+          pmfTokenContractAddress,
+          (LOCK_AMOUNT * 10**18).toString(), // TODO: improve this
+          predictionMarketContractAddress,
+          realitioERC20Contract.getAddress()
+        ]});
+      const predictionMarketFactoryContractAddress = predictionMarketFactoryContract.getAddress();
 
       await pmfTokenContract.mint({
         address: accountAddress,
@@ -78,14 +80,12 @@ context('Prediction Market Factory V3 Contract', async () => {
 
   context('Prediction Controller Management', async () => {
     context('Create Controller', async () => {
-      it('should create a Prediciton Controller', mochaAsync(async () => {
+      it('should create a Prediction Controller', mochaAsync(async () => {
         const currentControllerIndex = await predictionMarketFactoryContract.getControllersLength();
         const currentPmfTokenBalance = await pmfTokenContract.balanceOf({ address: accountAddress });
 
         await predictionMarketFactoryContract.createPMController({
-          PMV3: predictionMarketContract.getAddress(),
-          WETH: '0x0000000000000000000000000000000000000000',
-          realitioLibraryAddress: realitioERC20Contract.getAddress(),
+          PMV3: '0x0000000000000000000000000000000000000000',
         });
 
         const pmController = await predictionMarketFactoryContract.getPMControllerById({ id: currentControllerIndex });
@@ -113,9 +113,7 @@ context('Prediction Market Factory V3 Contract', async () => {
         const currentPmfTokenBalance = await pmfTokenContract.balanceOf({ address: accountAddress });
 
         await predictionMarketFactoryContract.createPMController({
-          PMV3: predictionMarketContract.getAddress(),
-          WETH: '0x0000000000000000000000000000000000000000',
-          realitioLibraryAddress: realitioERC20Contract.getAddress(),
+          PMV3: '0x0000000000000000000000000000000000000000',
         });
 
         const pmController = await predictionMarketFactoryContract.getPMControllerById({ id: currentControllerIndex });
@@ -290,8 +288,7 @@ context('Prediction Market Factory V3 Contract', async () => {
             name: 'Token',
             symbol: 'TOKEN',
             tokenAmountToClaim: TOKEN_AMOUNT_TO_CLAIM,
-            tokenToAnswer: pmfTokenContract.getAddress(),
-            everyoneCanCreateMarkets: false,
+            tokenToAnswer: pmfTokenContract.getAddress()
           });
         } catch (e) {
           // not logging error, as tx is expected to fail
