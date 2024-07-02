@@ -7,6 +7,8 @@ const PredictionMarketContract = require("./models/index").PredictionMarketContr
 const PredictionMarketV2Contract = require("./models/index").PredictionMarketV2Contract;
 const PredictionMarketV3Contract = require("./models/index").PredictionMarketV3Contract;
 const PredictionMarketV3ManagerContract = require("./models/index").PredictionMarketV3ManagerContract;
+const PredictionMarketV3ControllerContract = require("./models/index").PredictionMarketV3ControllerContract;
+const PredictionMarketV3FactoryContract = require("./models/index").PredictionMarketV3FactoryContract;
 const AchievementsContract = require("./models/index").AchievementsContract;
 const RealitioERC20Contract = require("./models/index").RealitioERC20Contract;
 const VotingContract = require("./models/index").VotingContract;
@@ -176,6 +178,46 @@ class Application {
         web3: this.web3,
         contractAddress,
         querierContractAddress,
+        acc: this.account,
+        web3EventsProvider: this.web3EventsProvider,
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
+      });
+    } catch (err) {
+      throw err;
+    }
+
+  };
+  /**
+   * @name getPredictionMarketV3FactoryContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PredictionMarketV3Factory Contract
+   */
+  getPredictionMarketV3FactoryContract({ contractAddress = null } = {}) {
+    try {
+      return new PredictionMarketV3FactoryContract({
+        web3: this.web3,
+        contractAddress,
+        acc: this.account,
+        web3EventsProvider: this.web3EventsProvider,
+        gasPrice: this.gasPrice,
+        isSocialLogin: this.isSocialLogin,
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name PredictionMarketV3ControllerContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PredictionMarketV3ControllerContract Contract
+   */
+  getPredictionMarketV3ControllerContract({ contractAddress = null } = {}) {
+    try {
+      return new PredictionMarketV3ControllerContract({
+        web3: this.web3,
+        contractAddress,
         acc: this.account,
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,

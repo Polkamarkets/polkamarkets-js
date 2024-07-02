@@ -40,15 +40,16 @@ contract PredictionMarketV3Querier {
       }
     }
 
-    return UserMarketData({
-      liquidityShares: liquidityShares,
-      outcomeShares: outcomeShares,
-      winningsToClaim: winningsToClaim,
-      winningsClaimed: winningsClaimed,
-      liquidityToClaim: liquidityToClaim,
-      liquidityClaimed: liquidityClaimed,
-      voidedSharesToClaim: voidedSharesToClaim
-    });
+    return
+      UserMarketData({
+        liquidityShares: liquidityShares,
+        outcomeShares: outcomeShares,
+        winningsToClaim: winningsToClaim,
+        winningsClaimed: winningsClaimed,
+        liquidityToClaim: liquidityToClaim,
+        liquidityClaimed: liquidityClaimed,
+        voidedSharesToClaim: voidedSharesToClaim
+      });
   }
 
   function getUserMarketsData(uint256[] calldata marketIds, address user)

@@ -3,6 +3,8 @@ const HDWalletProvider = require("@truffle/hdwallet-provider");
 const mnemonic = process.env.TRUFFLE_MNEMONIC;
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 const POLYGONSCAN_API_KEY = process.env.POLYGONSCAN_API_KEY;
+const GNOSIS_API_KEY = process.env.GNOSIS_API_KEY;
+const CELO_API_KEY = process.env.CELO_API_KEY;
 const INFURA_API_KEY = process.env.INFURA_API_KEY;
 
 module.exports = {
@@ -22,13 +24,39 @@ module.exports = {
     },
     chiado: {
       provider: function () {
-        return new HDWalletProvider(
-          mnemonic,
-          "https://rpc.chiadochain.net")
+        return new HDWalletProvider(mnemonic, "https://rpc.chiadochain.net")
       },
       network_id: 10200,
       gas: 5000000,
       gasPrice: 10000000
+    },
+    gnosis: {
+      provider: function () {
+        return new HDWalletProvider(mnemonic, "https://rpc.gnosischain.com")
+      },
+      network_id: 100,
+      gas: 5000000,
+      gasPrice: 10000000000
+    },
+    alfajores: {
+      provider: function () {
+        return new HDWalletProvider(
+          mnemonic,
+          "https://alfajores-forno.celo-testnet.org/")
+      },
+      network_id: 44787,
+      gas: 5000000,
+      gasPrice: 10000000000
+    },
+    celo: {
+      provider: function () {
+        return new HDWalletProvider(
+          mnemonic,
+          "https://forno.celo.org")
+      },
+      network_id: 42220,
+      gas: 5000000,
+      gasPrice: 10000000000
     },
     moonriver: {
       provider: new HDWalletProvider(mnemonic, "https://rpc.api.moonriver.moonbeam.network/"),
@@ -38,17 +66,8 @@ module.exports = {
       provider: new HDWalletProvider(mnemonic, "https://rpc.api.moonbeam.network"),
       network_id: 1284
     },
-    goerli: {
-      provider: new HDWalletProvider(mnemonic, "https://goerli.infura.io/v3/" + INFURA_API_KEY),
-      network_id: 5
-    },
-    leprichain: {
-      provider: new HDWalletProvider(mnemonic, "https://node.leprichain.blockwell.ai"),
-      network_id: 49777,
-      gasPrice: 0
-    },
     polygon: {
-      provider: new HDWalletProvider(mnemonic, "https://rpc-mainnet.maticvigil.com"),
+      provider: new HDWalletProvider(mnemonic, "https://polygon-rpc.com"),
       network_id: "137",
       gasPrice: 200000000000,
       skipDryRun: true,
@@ -56,18 +75,6 @@ module.exports = {
       timeoutBlocks: 200,
       gas: 25000000,
     },
-    mumbai: {
-      provider: new HDWalletProvider(mnemonic, "https://rpc-mumbai.maticvigil.com"),
-      network_id: 80001,
-    },
-    polygon_zkevm: {
-      provider: new HDWalletProvider(mnemonic, "https://zkevm-rpc.com"),
-      network_id: 1101,
-    },
-    polygon_zkevm_testnet: {
-      provider: new HDWalletProvider(mnemonic, "https://rpc.public.zkevm-test.net"),
-      network_id: 1442,
-    }
   },
   // Configure your compilers
   compilers: {
@@ -96,5 +103,7 @@ module.exports = {
   api_keys: {
     etherscan: ETHERSCAN_API_KEY,
     polygonscan: POLYGONSCAN_API_KEY,
+    gnosisscan: GNOSIS_API_KEY,
+    celoscan: CELO_API_KEY
   }
 };
