@@ -51,15 +51,28 @@ class PredictionMarketV3ControllerContract extends IContract {
   }
 
   async createLand({ name, symbol, tokenAmountToClaim, tokenToAnswer, everyoneCanCreateMarkets }) {
-    return await this.__sendTx(
+    // fetching current index
+    const index = await this.getLandTokensLength();
+
+    await this.__sendTx(
       this.getContract().methods.createLand(
         name,
         symbol,
         Numbers.toSmartContractDecimals(tokenAmountToClaim, 18),
-        tokenToAnswer,
-        everyoneCanCreateMarkets
+        tokenToAnswer
       )
     );
+
+    // fetching land on index
+    const land = await this.getLandById({ id: index });
+
+    if (everyoneCanCreateMarkets) {
+      await this.__sendTx(
+        this.getContract().methods.setLandEveryoneCanCreateMarkets(land.token, everyoneCanCreateMarkets)
+      );
+    }
+
+    return land;
   };
 
   async disableLand({ token }) {
