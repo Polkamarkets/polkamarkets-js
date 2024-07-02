@@ -46,29 +46,10 @@ contract PredictionMarketV3Controller is LandFactory {
     uint256 tokenAmountToClaim,
     IERC20 tokenToAnswer
   ) external override returns (FantasyERC20) {
-    IPredictionMarketV3Factory predictionMarketFactory = IPredictionMarketV3Factory(PMV3Factory);
-    require(predictionMarketFactory.isPMControllerAdmin(address(this), msg.sender), "Not allowed to create land");
+    require(IPredictionMarketV3Factory(PMV3Factory).isPMControllerAdmin(address(this), msg.sender), "Not allowed to create land");
 
     // create a new fantasyERC20 token
     return _createLand(name, symbol, tokenAmountToClaim, tokenToAnswer, PMV3Factory, address(this));
-  }
-
-  function createLand(
-    string memory name,
-    string memory symbol,
-    uint256 tokenAmountToClaim,
-    IERC20 tokenToAnswer,
-    bool canCreate
-  ) external returns (FantasyERC20) {
-    IPredictionMarketV3Factory predictionMarketFactory = IPredictionMarketV3Factory(PMV3Factory);
-    require(predictionMarketFactory.isPMControllerAdmin(address(this), msg.sender), "Not allowed to create land");
-
-    // create a new fantasyERC20 token
-    FantasyERC20 landToken = _createLand(name, symbol, tokenAmountToClaim, tokenToAnswer, PMV3Factory, address(this));
-
-    landPermissions[address(landToken)].openMarketCreation = canCreate;
-
-    return landToken;
   }
 
   function setLandEveryoneCanCreateMarkets(IERC20 landToken, bool canCreate) external {

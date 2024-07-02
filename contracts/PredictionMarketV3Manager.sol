@@ -31,13 +31,6 @@ contract PredictionMarketV3Manager is LandFactory {
     realitioFactory = new RealityETH_ERC20_Factory(_realitioLibraryAddress);
   }
 
-  function updateLockAmount(uint256 newLockAmount) external onlyOwner {
-    require(newLockAmount > 0, "Lock amount must be greater than 0");
-    require(newLockAmount != lockAmount, "Lock amount is the same");
-
-    lockAmount = newLockAmount;
-  }
-
   // lockAmount is the amount of tokens that the user needs to lock to create a land
   // by locking the amount the factory will create a fantasyERC20 token and store it in the contract
   // the user will be the admin of the land

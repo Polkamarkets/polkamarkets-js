@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-// import "./FantasyERC20.sol";
-// import "./RealityETH_ERC20_Factory.sol";
-import "./PredictionMarketV3.sol";
 import "./PredictionMarketV3Controller.sol";
 
 // openzeppelin ownable contract import
@@ -108,7 +105,7 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
     return PMV3Controller;
   }
 
-  function disablePMController(PredictionMarketV3Controller controllerAddress) external returns (uint256) {
+  function disablePMController(address controllerAddress) external returns (uint256) {
     Controller storage controller = controllers[address(controllerAddress)];
 
     require(controller.active, "Controller is not active");
@@ -129,7 +126,7 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
     return amountToUnlock;
   }
 
-  function enablePMController(PredictionMarketV3Controller controllerAddress) external returns (uint256) {
+  function enablePMController(address controllerAddress) external returns (uint256) {
     Controller storage controller = controllers[address(controllerAddress)];
 
     require(!controller.active, "Controller is already active");
@@ -151,7 +148,7 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
     return amountToLock;
   }
 
-  function unlockOffsetFromPMController(PredictionMarketV3Controller controllerAddress) external returns (uint256) {
+  function unlockOffsetFromPMController(address controllerAddress) external returns (uint256) {
     Controller storage controller = controllers[address(controllerAddress)];
 
     require(controller.active, "controller does not exist");
@@ -170,7 +167,7 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
     return amountToUnlock;
   }
 
-  function addAdminToPMController(PredictionMarketV3Controller controllerAddress, address admin) external {
+  function addAdminToPMController(address controllerAddress, address admin) external {
     Controller storage controller = controllers[address(controllerAddress)];
 
     require(controller.active, "Controller does not exist");
@@ -182,7 +179,7 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
     emit ControllerAdminAdded(msg.sender, address(controllerAddress), admin);
   }
 
-  function removeAdminFromPMController(PredictionMarketV3Controller controllerAddress, address admin) external {
+  function removeAdminFromPMController(address controllerAddress, address admin) external {
     Controller storage controller = controllers[address(controllerAddress)];
 
     require(controller.active, "Controller does not exist");
@@ -195,13 +192,13 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
     emit ControllerAdminRemoved(msg.sender, address(controllerAddress), admin);
   }
 
-  function isPMControllerActive(PredictionMarketV3Controller controllerAddress) external view returns (bool) {
+  function isPMControllerActive(address controllerAddress) external view returns (bool) {
     Controller storage controller = controllers[address(controllerAddress)];
 
     return controller.active;
   }
 
-  function isPMControllerAdmin(PredictionMarketV3Controller controllerAddress, address user)
+  function isPMControllerAdmin(address controllerAddress, address user)
     external
     view
     returns (bool)

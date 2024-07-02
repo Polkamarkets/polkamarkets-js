@@ -47,7 +47,16 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     string memory symbol,
     uint256 tokenAmountToClaim,
     IERC20 tokenToAnswer
-  ) external virtual returns (FantasyERC20) {}
+  ) external virtual returns (FantasyERC20) {
+    return _createLand(name, symbol, tokenAmountToClaim, tokenToAnswer, address(0), address(0));
+  }
+
+  function createLand(
+    FantasyERC20 landToken,
+    IERC20 tokenToAnswer
+  ) external virtual returns (FantasyERC20) {
+    return _createLand(landToken, tokenToAnswer);
+  }
 
   function _createLand(
     string memory name,
@@ -57,11 +66,6 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     address PMV3Factory,
     address PMV3Controller
   ) internal returns (FantasyERC20) {
-    if (lockAmount > 0) {
-      require(token.balanceOf(msg.sender) >= lockAmount, "Not enough tokens to lock");
-    }
-    require(address(tokenToAnswer) != address(0), "Token to answer cannot be 0 address");
-
     // create a new fantasyERC20 token
     FantasyERC20 landToken = new FantasyERC20(
       name,
@@ -76,6 +80,23 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     landToken.grantRole(keccak256("MINTER_ROLE"), address(PMV3));
     // adding minting privileges to the msg.sender
     landToken.grantRole(keccak256("MINTER_ROLE"), msg.sender);
+
+    return _createLand(landToken, tokenToAnswer);
+  }
+
+  function _createLand(
+    FantasyERC20 landToken,
+    IERC20 tokenToAnswer
+  ) internal returns (FantasyERC20) {
+    // ensuring LandFactory has pausing privileges
+    require(landToken.hasRole(keccak256("PAUSER_ROLE"), address(this)), "LandFactory does not have pausing privileges");
+
+    if (lockAmount > 0) {
+      // transfer the lockAmount to the contract
+      require(token.balanceOf(msg.sender) >= lockAmount, "Not enough tokens to lock");
+      token.transferFrom(msg.sender, address(this), lockAmount);
+    }
+    require(address(tokenToAnswer) != address(0), "Token to answer cannot be 0 address");
 
     // store the new token in the contract
     Land storage land = lands[address(landToken)];
@@ -92,11 +113,6 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
       realitioFactory.createInstance(address(tokenToAnswer));
     }
     land.realitio = IRealityETH_IERC20(realitioFactory.deployments(address(tokenToAnswer)));
-
-    // transfer the lockAmount to the contract
-    if (lockAmount > 0) {
-      token.transferFrom(msg.sender, address(this), lockAmount);
-    }
 
     emit LandCreated(msg.sender, address(landToken), address(tokenToAnswer), lockAmount);
 
@@ -164,6 +180,13 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     }
 
     emit LandOffsetUnlocked(msg.sender, address(landToken), amountToUnlock);
+  }
+
+  function updateLockAmount(uint256 newLockAmount) external onlyOwner {
+    require(newLockAmount > 0, "Lock amount must be greater than 0");
+    require(newLockAmount != lockAmount, "Lock amount is the same");
+
+    lockAmount = newLockAmount;
   }
 
   function addAdminToLand(IERC20 landToken, address admin) external virtual {
