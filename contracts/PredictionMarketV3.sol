@@ -115,6 +115,7 @@ contract PredictionMarketV3 is ReentrancyGuard {
     mapping(uint256 => MarketOutcome) outcomes;
     IERC20 token; // ERC20 token market will use for trading
     IPredictionMarketV3Manager manager; // manager contract
+    address creator; // market creator
   }
 
   struct MarketFees {
@@ -265,6 +266,7 @@ contract PredictionMarketV3 is ReentrancyGuard {
     market.resolution.realitio = desc.realitio;
     market.resolution.realitioTimeout = desc.realitioTimeout;
     market.manager = desc.manager;
+    market.creator = msg.sender;
 
     _addLiquidity(marketId, desc.value, desc.distribution);
 
@@ -1184,6 +1186,12 @@ contract PredictionMarketV3 is ReentrancyGuard {
       market.resolution.realitioTimeout,
       market.manager
     );
+  }
+
+  function getMarketCreator(uint256 marketId) external view returns (address) {
+    Market storage market = markets[marketId];
+
+    return market.creator;
   }
 
   function getMarketQuestion(uint256 marketId) external view returns (bytes32) {
