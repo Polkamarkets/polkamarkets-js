@@ -41,9 +41,9 @@ class PolkamarketsSmartAccount {
     return {
       getInstance: (provider, networkConfig, isConnectedWallet) => {
         if (!smartAccounts || !smartAccounts[networkConfig.chainId]) {
-          smartAccounts[chainId] = createInstance(provider, networkConfig, isConnectedWallet);
+          smartAccounts[networkConfig.chainId] = createInstance(provider, networkConfig, isConnectedWallet);
         }
-        return smartAccounts[chainId];
+        return smartAccounts[networkConfig.chainId];
       },
       getInstanceIfExists: (chainId) => smartAccounts[chainId],
       clearInstance: (chainId) => {
