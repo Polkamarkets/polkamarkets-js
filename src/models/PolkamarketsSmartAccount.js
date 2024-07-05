@@ -10,7 +10,7 @@ class PolkamarketsSmartAccount {
   static PIMLICO_FACTORY_ADDRESS = '0x9406Cc6185a346906296840746125a0E44976454';
 
   static singleton = (() => {
-    let smartAccount;
+    let smartAccounts = {};
 
     function createInstance(provider, networkConfig, isConnectedWallet) {
       const options = {
@@ -40,14 +40,14 @@ class PolkamarketsSmartAccount {
 
     return {
       getInstance: (provider, networkConfig, isConnectedWallet) => {
-        if (!smartAccount) {
-          smartAccount = createInstance(provider, networkConfig, isConnectedWallet);
+        if (!smartAccounts || !smartAccounts[networkConfig.chainId]) {
+          smartAccounts[chainId] = createInstance(provider, networkConfig, isConnectedWallet);
         }
-        return smartAccount;
+        return smartAccount[chainId];
       },
-      getInstanceIfExists: () => smartAccount,
-      clearInstance: () => {
-        smartAccount = null;
+      getInstanceIfExists: (chainId) => smartAccounts[chainId],
+      clearInstance: (chainId) => {
+        smartAccounts[chainId] = {};
       }
     };
   })();

@@ -79,11 +79,11 @@ class Application {
   async login(provider = null, isConnectedWallet = null) {
     if (this.isSocialLogin) {
       if (!this.provider) {
-        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstanceIfExists()
+        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstanceIfExists(this.socialLoginParams.networkConfig.chainId);
       }
 
       if ((!this.smartAccount || !this.smartAccount.provider) && provider) {
-        PolkamarketsSmartAccount.singleton.clearInstance();
+        PolkamarketsSmartAccount.singleton.clearInstance(this.socialLoginParams.networkConfig.chainId);
         this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig, isConnectedWallet);
       }
 
@@ -465,7 +465,7 @@ class Application {
 
   async socialLoginLogout() {
     if (this.smartAccount) {
-      PolkamarketsSmartAccount.singleton.clearInstance();
+      PolkamarketsSmartAccount.singleton.clearInstance(this.socialLoginParams.networkConfig.chainId);
       this.smartAccount = null;
     }
   }
