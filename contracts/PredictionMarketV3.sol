@@ -1,8 +1,14 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
 // openzeppelin imports
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+// local imports
+import "./IFantasyERC20.sol";
+import "./IRealityETH_ERC20.sol";
+import "./IPredictionMarketV3Manager.sol";
 
 library CeilDiv {
   // calculates ceil(x/y)
@@ -10,67 +16,6 @@ library CeilDiv {
     if (x > 0) return ((x - 1) / y) + 1;
     return x / y;
   }
-}
-
-interface IRealityETH_ERC20 {
-  function askQuestionERC20(
-    uint256 template_id,
-    string calldata question,
-    address arbitrator,
-    uint32 timeout,
-    uint32 opening_ts,
-    uint256 nonce,
-    uint256 tokens
-  ) external returns (bytes32);
-
-  function claimMultipleAndWithdrawBalance(
-    bytes32[] calldata question_ids,
-    uint256[] calldata lengths,
-    bytes32[] calldata hist_hashes,
-    address[] calldata addrs,
-    uint256[] calldata bonds,
-    bytes32[] calldata answers
-  ) external;
-
-  function claimWinnings(
-    bytes32 question_id,
-    bytes32[] calldata history_hashes,
-    address[] calldata addrs,
-    uint256[] calldata bonds,
-    bytes32[] calldata answers
-  ) external;
-
-  function notifyOfArbitrationRequest(
-    bytes32 question_id,
-    address requester,
-    uint256 max_previous
-  ) external;
-
-  function submitAnswerERC20(
-    bytes32 question_id,
-    bytes32 answer,
-    uint256 max_previous,
-    uint256 tokens
-  ) external;
-
-  function questions(bytes32)
-    external
-    view
-    returns (
-      bytes32 content_hash,
-      address arbitrator,
-      uint32 opening_ts,
-      uint32 timeout,
-      uint32 finalize_ts,
-      bool is_pending_arbitration,
-      uint256 bounty,
-      bytes32 best_answer,
-      bytes32 history_hash,
-      uint256 bond,
-      uint256 min_bond
-    );
-
-  function resultFor(bytes32 question_id) external view returns (bytes32);
 }
 
 interface IWETH {
@@ -84,7 +29,7 @@ interface IWETH {
 }
 
 /// @title Market Contract Factory
-contract PredictionMarketV2 is ReentrancyGuard {
+contract PredictionMarketV3 is ReentrancyGuard {
   using SafeERC20 for IERC20;
   using CeilDiv for uint256;
 
@@ -120,7 +65,13 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 timestamp
   );
 
-  event MarketResolved(address indexed user, uint256 indexed marketId, uint256 outcomeId, uint256 timestamp);
+  event MarketResolved(
+    address indexed user,
+    uint256 indexed marketId,
+    uint256 outcomeId,
+    uint256 timestamp,
+    bool admin
+  );
 
   // ------ Events End ------
 
@@ -163,6 +114,8 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 outcomeCount;
     mapping(uint256 => MarketOutcome) outcomes;
     IERC20 token; // ERC20 token market will use for trading
+    IPredictionMarketV3Manager manager; // manager contract
+    address creator; // market creator
   }
 
   struct MarketFees {
@@ -177,6 +130,9 @@ contract PredictionMarketV2 is ReentrancyGuard {
     bool resolved;
     uint256 outcomeId;
     bytes32 questionId; // realitio questionId
+    // realitio
+    IRealityETH_ERC20 realitio;
+    uint256 realitioTimeout;
   }
 
   struct MarketOutcome {
@@ -205,18 +161,15 @@ contract PredictionMarketV2 is ReentrancyGuard {
     uint256 fee;
     uint256 treasuryFee;
     address treasury;
+    IRealityETH_ERC20 realitio;
+    uint256 realitioTimeout;
+    IPredictionMarketV3Manager manager;
   }
 
   uint256[] marketIds;
   mapping(uint256 => Market) markets;
   uint256 public marketIndex;
 
-  // realitio configs
-  address public immutable realitioAddress;
-  uint256 public immutable realitioTimeout;
-  // market creation
-  IERC20 public immutable requiredBalanceToken; // token used for rewards / market creation
-  uint256 public immutable requiredBalance; // required balance for market creation
   // weth configs
   IWETH public immutable WETH;
 
@@ -249,12 +202,9 @@ contract PredictionMarketV2 is ReentrancyGuard {
     nextState(marketId);
   }
 
-  modifier mustHoldRequiredBalance() {
-    require(
-      requiredBalance == 0 || requiredBalanceToken.balanceOf(msg.sender) >= requiredBalance,
-      "minimum erc20 balance not held"
-    );
+  modifier transitionLast(uint256 marketId) {
     _;
+    lastState(marketId);
   }
 
   modifier isWETHMarket(uint256 marketId) {
@@ -266,20 +216,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
   // ------ Modifiers End ------
 
   /// @dev protocol is immutable and has no ownership
-  constructor(
-    IERC20 _requiredBalanceToken,
-    uint256 _requiredBalance,
-    address _realitioAddress,
-    uint256 _realitioTimeout,
-    IWETH _WETH
-  ) {
-    require(_realitioAddress != address(0), "_realitioAddress is address 0");
-    require(_realitioTimeout > 0, "timeout must be positive");
-
-    requiredBalanceToken = _requiredBalanceToken;
-    requiredBalance = _requiredBalance;
-    realitioAddress = _realitioAddress;
-    realitioTimeout = _realitioTimeout;
+  constructor(IWETH _WETH) {
     WETH = _WETH;
   }
 
@@ -290,7 +227,7 @@ contract PredictionMarketV2 is ReentrancyGuard {
   // ------ Core Functions ------
 
   /// @dev Creates a market, initializes the outcome shares pool and submits a question in Realitio
-  function _createMarket(CreateMarketDescription memory desc) private mustHoldRequiredBalance returns (uint256) {
+  function _createMarket(CreateMarketDescription memory desc) private returns (uint256) {
     uint256 marketId = marketIndex;
     marketIds.push(marketId);
 
@@ -302,6 +239,9 @@ contract PredictionMarketV2 is ReentrancyGuard {
     require(desc.outcomes > 0 && desc.outcomes <= MAX_OUTCOMES, "outcome count not between 1-32");
     require(desc.fee <= MAX_FEE, "fee must be <= 5%");
     require(desc.treasuryFee <= MAX_FEE, "treasury fee must be <= 5%");
+    require(address(desc.realitio) != address(0), "_realitioAddress is address 0");
+    require(desc.realitioTimeout > 0, "timeout must be positive");
+    require(desc.manager.isAllowedToCreateMarket(desc.token, msg.sender), "not allowed to create market");
 
     market.token = desc.token;
     market.closesAtTimestamp = desc.closesAt;
@@ -314,15 +254,19 @@ contract PredictionMarketV2 is ReentrancyGuard {
     market.outcomeCount = desc.outcomes;
 
     // creating question in realitio
-    market.resolution.questionId = IRealityETH_ERC20(realitioAddress).askQuestionERC20(
+    market.resolution.questionId = desc.realitio.askQuestionERC20(
       2,
       desc.question,
       desc.arbitrator,
-      uint32(realitioTimeout),
+      uint32(desc.realitioTimeout),
       uint32(desc.closesAt),
       0,
       0
     );
+    market.resolution.realitio = desc.realitio;
+    market.resolution.realitioTimeout = desc.realitioTimeout;
+    market.manager = desc.manager;
+    market.creator = msg.sender;
 
     _addLiquidity(marketId, desc.value, desc.distribution);
 
@@ -349,7 +293,10 @@ contract PredictionMarketV2 is ReentrancyGuard {
         arbitrator: desc.arbitrator,
         fee: desc.fee,
         treasuryFee: desc.treasuryFee,
-        treasury: desc.treasury
+        treasury: desc.treasury,
+        realitio: desc.realitio,
+        realitioTimeout: desc.realitioTimeout,
+        manager: desc.manager
       })
     );
     // transferring funds
@@ -373,11 +320,25 @@ contract PredictionMarketV2 is ReentrancyGuard {
         arbitrator: desc.arbitrator,
         fee: desc.fee,
         treasuryFee: desc.treasuryFee,
-        treasury: desc.treasury
+        treasury: desc.treasury,
+        realitio: desc.realitio,
+        realitioTimeout: desc.realitioTimeout,
+        manager: desc.manager
       })
     );
     // transferring funds
     IWETH(WETH).deposit{value: msg.value}();
+
+    return marketId;
+  }
+
+  function mintAndCreateMarket(CreateMarketDescription calldata desc) external returns (uint256) {
+    // mint the amount of tokens to the user
+    IFantasyERC20(address(desc.token)).mint(msg.sender, desc.value);
+
+    uint256 marketId = _createMarket(desc);
+    // transferring funds
+    desc.token.safeTransferFrom(msg.sender, address(this), desc.value);
 
     return marketId;
   }
@@ -788,11 +749,30 @@ contract PredictionMarketV2 is ReentrancyGuard {
     Market storage market = markets[marketId];
 
     // will fail if question is not finalized
-    uint256 outcomeId = uint256(IRealityETH_ERC20(realitioAddress).resultFor(market.resolution.questionId));
+    uint256 outcomeId = uint256(market.resolution.realitio.resultFor(market.resolution.questionId));
 
     market.resolution.outcomeId = outcomeId;
 
-    emit MarketResolved(msg.sender, marketId, outcomeId, block.timestamp);
+    emit MarketResolved(msg.sender, marketId, outcomeId, block.timestamp, false);
+    emitMarketActionEvents(marketId);
+
+    return market.resolution.outcomeId;
+  }
+
+  /// @dev overrides market resolution, instead of using realitio
+  function adminResolveMarketOutcome(uint256 marketId, uint256 outcomeId)
+    external
+    notAtState(marketId, MarketState.resolved)
+    transitionLast(marketId)
+    returns (uint256)
+  {
+    Market storage market = markets[marketId];
+
+    require(market.manager.isAllowedToResolveMarket(market.token, msg.sender), "not allowed to resolve market");
+
+    market.resolution.outcomeId = outcomeId;
+
+    emit MarketResolved(msg.sender, marketId, outcomeId, block.timestamp, true);
     emitMarketActionEvents(marketId);
 
     return market.resolution.outcomeId;
@@ -1005,6 +985,12 @@ contract PredictionMarketV2 is ReentrancyGuard {
     market.state = MarketState(uint256(market.state) + 1);
   }
 
+  /// @dev Transitions market to last state
+  function lastState(uint256 marketId) private {
+    Market storage market = markets[marketId];
+    market.state = MarketState.resolved;
+  }
+
   /// @dev Emits a outcome price event for every outcome
   function emitMarketActionEvents(uint256 marketId) private {
     Market storage market = markets[marketId];
@@ -1181,7 +1167,10 @@ contract PredictionMarketV2 is ReentrancyGuard {
       uint256,
       IERC20,
       uint256,
-      address
+      address,
+      IRealityETH_ERC20,
+      uint256,
+      IPredictionMarketV3Manager
     )
   {
     Market storage market = markets[marketId];
@@ -1192,8 +1181,17 @@ contract PredictionMarketV2 is ReentrancyGuard {
       uint256(market.resolution.questionId),
       market.token,
       market.fees.treasuryFee,
-      market.fees.treasury
+      market.fees.treasury,
+      market.resolution.realitio,
+      market.resolution.realitioTimeout,
+      market.manager
     );
+  }
+
+  function getMarketCreator(uint256 marketId) external view returns (address) {
+    Market storage market = markets[marketId];
+
+    return market.creator;
   }
 
   function getMarketQuestion(uint256 marketId) external view returns (bytes32) {

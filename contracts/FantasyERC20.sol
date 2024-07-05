@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
+import "./IPredictionMarketV3Factory.sol";
 
 contract FantasyERC20 is ERC20PresetMinterPauser {
   event TokensClaimed(address indexed user, uint256 amount, uint256 timestamp);
@@ -8,6 +10,8 @@ contract FantasyERC20 is ERC20PresetMinterPauser {
   mapping(address => bool) usersClaimed;
   address public tokenManager;
   uint256 public tokenAmountToClaim;
+  address PMV3Factory;
+  address PMV3Controller;
 
   // ------ Modifiers ------
 
@@ -20,10 +24,14 @@ contract FantasyERC20 is ERC20PresetMinterPauser {
     string memory name,
     string memory symbol,
     uint256 _tokenAmountToClaim,
-    address _tokenManager
+    address _tokenManager,
+    address _PMV3Factory,
+    address _PMV3Controller
   ) ERC20PresetMinterPauser(name, symbol) {
     tokenAmountToClaim = _tokenAmountToClaim;
     tokenManager = _tokenManager;
+    PMV3Factory = _PMV3Factory;
+    PMV3Controller = _PMV3Controller;
   }
 
   /// @dev Validates if the transfer is from or to the tokenManager, blocking it otherwise
@@ -58,5 +66,16 @@ contract FantasyERC20 is ERC20PresetMinterPauser {
   /// @dev Returns if the address has already claimed or not the tokens
   function hasUserClaimedTokens(address user) external view returns (bool) {
     return usersClaimed[user];
+  }
+
+  function paused() public view virtual override returns (bool) {
+    bool pausedSuper = super.paused();
+
+    if (PMV3Factory != address(0) && PMV3Controller != address(0)) {
+      IPredictionMarketV3Factory factory = IPredictionMarketV3Factory(PMV3Factory);
+      pausedSuper = pausedSuper || !factory.isPMControllerActive(PMV3Controller);
+    }
+
+    return pausedSuper;
   }
 }

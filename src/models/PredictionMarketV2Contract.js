@@ -32,7 +32,7 @@ const actions = {
 
 class PredictionMarketV2Contract extends IContract {
   constructor(params) {
-    super({...params, abi: prediction});
+    super({...params, abi: params.abi || prediction});
     this.contractName = 'predictionMarketV2';
   }
 
@@ -278,9 +278,35 @@ class PredictionMarketV2Contract extends IContract {
    * @returns {Array} Outcome Shares
    */
   async getPortfolio({ user }) {
-    const events = await this.getActions({ user });
     const allMarketIds = await this.getMarkets();
-    const userMarketIds = events.map(e => e.marketId).filter((x, i, a) => a.indexOf(x) == i);
+    let userMarketIds;
+    let events = [];
+    try {
+      events = await this.getActions({ user });
+      userMarketIds = events.map(e => e.marketId).filter((x, i, a) => a.indexOf(x) == i);
+    } catch (err) {
+      // defaulting to allMarketIds if query fails
+      userMarketIds = allMarketIds;
+    }
+
+    let voidedMarketIds = [];
+    // fetching voided markets
+    try {
+      // TODO: improve this
+      const marketsCreated = await this.getEvents('MarketCreated');
+      const marketsResolved = await this.getEvents('MarketResolved');
+
+      voidedMarketIds = marketsResolved.filter((event) => {
+        const resolvedOutcomeId = parseInt(event.returnValues.outcomeId);
+        const outcomeCount = marketsCreated.find((market) =>  {
+          return market.returnValues.marketId === event.returnValues.marketId
+        }).returnValues.outcomes;
+
+        return resolvedOutcomeId >= outcomeCount;
+      }).map((event) => parseInt(event.returnValues.marketId));
+    } catch (err) {
+      // skipping voided markets if query fails
+    }
 
     return await allMarketIds.reduce(async (obj, marketId) => {
       let portfolio;
@@ -297,6 +323,8 @@ class PredictionMarketV2Contract extends IContract {
             winningsClaimed: false,
             liquidityToClaim: false,
             liquidityClaimed: false,
+            voidedWinningsToClaim: false,
+            voidedWinningsClaimed: false,
             liquidityFees: 0
           }
         };
@@ -315,6 +343,9 @@ class PredictionMarketV2Contract extends IContract {
           ];
         }));
 
+        const voidedWinningsToClaim = voidedMarketIds.includes(marketId) && marketShares[1].some(item => item > 0);
+        const voidedWinningsClaimed = voidedWinningsToClaim && events.some(event => event.action === 'Claim Voided' && event.marketId === marketId);
+
         portfolio = {
           liquidity: {
             shares: Numbers.fromDecimalsNumber(marketShares[0], decimals),
@@ -326,6 +357,8 @@ class PredictionMarketV2Contract extends IContract {
             winningsClaimed: claimStatus[1],
             liquidityToClaim: claimStatus[2],
             liquidityClaimed: claimStatus[3],
+            voidedWinningsToClaim,
+            voidedWinningsClaimed,
             liquidityFees: Numbers.fromDecimalsNumber(claimStatus[4], decimals)
           }
         };
@@ -461,23 +494,21 @@ class PredictionMarketV2Contract extends IContract {
    * @return {Integer} decimals
    */
   async getMarketDecimals({marketId}) {
+    if (this.marketDecimals) {
+      return this.marketDecimals;
+    }
+
     const marketAltData = await this.params.contract.getContract().methods.getMarketAltData(marketId).call();
     const contractAddress = marketAltData[3];
 
     return await this.getTokenDecimals({ contractAddress });
   }
 
-  /* POST User Functions */
   /**
-   * @function createMarket
-   * @description Create a µarket
-   * @param {Integer} value
-   * @param {String} name
-   * @param {Integer} duration
-   * @param {Address} oracleAddress
-   * @param {Array} outcomes
+   * @function prepareCreateMarketDescription
+   * @description Prepare createMarket function call args
    */
-  async createMarket ({
+  async prepareCreateMarketDescription({
     value,
     name,
     description = '',
@@ -512,21 +543,63 @@ class PredictionMarketV2Contract extends IContract {
       distribution = this.calcDistribution({ odds });
     }
 
-    return await this.__sendTx(
-      this.getContract().methods.createMarket({
-        value: valueToWei,
-        closesAt: duration,
-        outcomes: outcomes.length,
-        token,
-        distribution,
-        question,
-        image,
-        arbitrator: oracleAddress,
-        fee,
-        treasuryFee,
-        treasury,
-      })
-    );
+    return {
+      value: valueToWei,
+      closesAt: duration,
+      outcomes: outcomes.length,
+      token,
+      distribution,
+      question,
+      image,
+      arbitrator: oracleAddress,
+      fee,
+      treasuryFee,
+      treasury,
+    };
+  }
+
+  /* POST User Functions */
+  /**
+   * @function createMarket
+   * @description Create a µarket
+   * @param {Integer} value
+   * @param {String} name
+   * @param {Integer} duration
+   * @param {Address} oracleAddress
+   * @param {Array} outcomes
+   */
+  async createMarket ({
+    value,
+    name,
+    description = '',
+    image,
+    duration,
+    oracleAddress,
+    outcomes,
+    category,
+    token,
+    odds = [],
+    fee = 0,
+    treasuryFee = 0,
+    treasury = '0x0000000000000000000000000000000000000000',
+  }) {
+    const desc = await this.prepareCreateMarketDescription({
+      value,
+      name,
+      description,
+      image,
+      duration,
+      oracleAddress,
+      outcomes,
+      category,
+      token,
+      odds,
+      fee,
+      treasuryFee,
+      treasury,
+    });
+
+    return await this.__sendTx(this.getContract().methods.createMarket(desc));
   };
 
 /**
@@ -553,44 +626,26 @@ class PredictionMarketV2Contract extends IContract {
     treasury = '0x0000000000000000000000000000000000000000',
   }) {
     const token = await this.getWETHAddress();
-    const decimals = await this.getTokenDecimals({ contractAddress: token });
-    const valueToWei = Numbers.toSmartContractDecimals(value, decimals);
-    const title = `${name};${description}`;
-    const question = realitioLib.encodeText('single-select', title, outcomes, category);
-    let distribution = [];
-
-    if (odds.length > 0) {
-      if (odds.length !== outcomes.length) {
-        throw new Error('Odds and outcomes must have the same length');
-      }
-
-      const oddsSum = odds.reduce((a, b) => a + b, 0);
-      // odds must match 100 (0.1 margin)
-      if (oddsSum < 99.9 || oddsSum > 100.1) {
-        throw new Error('Odds must sum 100');
-      }
-
-      distribution = this.calcDistribution({ odds });
-    }
+    const desc = await this.prepareCreateMarketDescription({
+      value,
+      name,
+      description,
+      image,
+      duration,
+      oracleAddress,
+      outcomes,
+      category,
+      token,
+      odds,
+      fee,
+      treasuryFee,
+      treasury,
+    });
 
     return await this.__sendTx(
-      this.getContract().methods.createMarketWithETH(
-        {
-          value: valueToWei,
-          closesAt: duration,
-          outcomes: outcomes.length,
-          token,
-          distribution,
-          question,
-          image,
-          arbitrator: oracleAddress,
-          fee,
-          treasuryFee,
-          treasury,
-        }
-      ),
+      this.getContract().methods.createMarketWithETH(desc),
       false,
-      valueToWei
+      desc.value
     );
   };
 

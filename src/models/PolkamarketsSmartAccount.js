@@ -1,49 +1,93 @@
-const SafeEventEmitter = require('@metamask/safe-event-emitter').default;
+const { SmartAccount } = require('@particle-network/aa');
 const ethers = require('ethers').ethers;
-const SmartAccount = require('@biconomy/smart-account').default;
 
-class PolkamarketsSmartAccount extends SmartAccount {
+const { ENTRYPOINT_ADDRESS_V06, providerToSmartAccountSigner } = require('permissionless');
+const { createPublicClient, http } = require('viem');
+const { signerToSimpleSmartAccount } = require('permissionless/accounts');
 
-  static initSmartAccount = async (smartAccount) => {
-    if (!smartAccount.isInit) {
-      await smartAccount.init();
-      smartAccount.isInit = true;
+class PolkamarketsSmartAccount {
 
-      smartAccount.eventEmitter.emit('init', true);
-    }
-  }
+  static PIMLICO_FACTORY_ADDRESS = '0x9406Cc6185a346906296840746125a0E44976454';
 
   static singleton = (() => {
     let smartAccount;
 
-    function createInstance(provider, networkConfig) {
-      const web3Provider = new ethers.providers.Web3Provider(provider);
-
+    function createInstance(provider, networkConfig, isConnectedWallet) {
       const options = {
-        // debug: true,
-        activeNetworkId: networkConfig.chainId,
-        supportedNetworksIds: [networkConfig.chainId],
-        networkConfig: [networkConfig]
+        projectId: networkConfig.particleProjectId,
+        clientKey: networkConfig.particleClientKey,
+        appId: networkConfig.particleAppId,
+        aaOptions: {
+          accountContracts: {
+            SIMPLE: [{
+              version: '1.0.0',
+              chainIds: [networkConfig.chainId],
+            }],
+          }
+        },
       };
 
-      const instance = new PolkamarketsSmartAccount(web3Provider, options);
-      instance.eventEmitter = new SafeEventEmitter();
+      const instance = new PolkamarketsSmartAccount();
+      instance.networkConfig = networkConfig;
+      instance.provider = provider
+      instance.isConnectedWallet = isConnectedWallet
+      if (!networkConfig.usePimlico) {
+        instance.smartAccount = new SmartAccount(provider, options);
+        instance.smartAccount.setSmartAccountContract({ name: 'SIMPLE', version: '1.0.0' })
+      }
       return instance;
     }
 
     return {
-      getInstance: (provider, networkConfig) => {
+      getInstance: (provider, networkConfig, isConnectedWallet) => {
         if (!smartAccount) {
-          smartAccount = createInstance(provider, networkConfig);
-          this.initSmartAccount(smartAccount);
+          smartAccount = createInstance(provider, networkConfig, isConnectedWallet);
         }
         return smartAccount;
       },
+      getInstanceIfExists: () => smartAccount,
       clearInstance: () => {
         smartAccount = null;
       }
     };
   })();
+
+  async providerIsConnectedWallet() {
+    if (this.isConnectedWallet) {
+      const web3Provider = new ethers.providers.Web3Provider(this.provider)
+      const signer = web3Provider.getSigner()
+      const address = await signer.getAddress();
+
+      return { isConnectedWallet: true, address, signer };
+    }
+
+    return { isConnectedWallet: false, address: null, signer: null };
+  }
+
+  async getAddress() {
+    const { isConnectedWallet, address } = await this.providerIsConnectedWallet();
+    if (isConnectedWallet) {
+      return address;
+    }
+
+    if (this.networkConfig.usePimlico) {
+      const publicClient = createPublicClient({
+        chain: this.networkConfig.viemChain,
+        transport: http(this.networkConfig.rpcUrl)
+      });
+
+      const smartAccountSigner = await providerToSmartAccountSigner(this.provider);
+
+      const smartAccount = await signerToSimpleSmartAccount(publicClient, {
+        signer: smartAccountSigner,
+        factoryAddress: PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
+        entryPoint: ENTRYPOINT_ADDRESS_V06,
+      })
+
+      return smartAccount.address;
+    }
+    return this.smartAccount.getAddress();
+  }
 }
 
 module.exports = PolkamarketsSmartAccount;
