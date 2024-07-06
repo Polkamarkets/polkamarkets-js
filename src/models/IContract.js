@@ -28,6 +28,7 @@ class IContract {
     web3EventsProvider,
     gasPrice,
     isSocialLogin = false,
+    networkConfig = null,
   }) {
     try {
       if (!abi) {
@@ -51,6 +52,7 @@ class IContract {
         gasPrice,
         contract: new Contract(web3, abi, contractAddress),
         isSocialLogin,
+        networkConfig,
       };
     } catch (err) {
       throw err;
@@ -287,8 +289,8 @@ class IContract {
   }
 
   async sendGaslessTransactions(f) {
-    const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
-    const networkConfig = smartAccount.networkConfig;
+    const smartAccount = PolkamarketsSmartAccount.singleton.getInstance(null, this.params.networkConfig);
+    const networkConfig = this.params.networkConfig;
 
     const { isConnectedWallet, signer } = await smartAccount.providerIsConnectedWallet();
 
@@ -670,7 +672,7 @@ class IContract {
    */
   async getMyAccount() {
     if (this.params.isSocialLogin) {
-      const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
+      const smartAccount = PolkamarketsSmartAccount.singleton.getInstance(null, this.params.networkConfig);
       return await smartAccount.getAddress();
     }
 

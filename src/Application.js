@@ -141,6 +141,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -161,6 +162,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -182,6 +184,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -202,6 +205,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -222,6 +226,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -242,6 +247,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -268,6 +274,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -288,6 +295,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -308,6 +316,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -328,6 +337,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -348,6 +358,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -368,6 +379,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -388,6 +400,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -408,6 +421,7 @@ class Application {
         web3EventsProvider: this.web3EventsProvider,
         gasPrice: this.gasPrice,
         isSocialLogin: this.isSocialLogin,
+        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
