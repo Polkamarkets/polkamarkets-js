@@ -47,7 +47,7 @@ class PolkamarketsSmartAccount {
       },
       getInstanceIfExists: (chainId) => smartAccounts[chainId],
       clearInstance: (chainId) => {
-        smartAccounts[chainId] = {};
+        smartAccounts[chainId] = null;
       }
     };
   })();
