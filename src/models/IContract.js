@@ -476,7 +476,11 @@ class IContract {
         returnValues,
       };
 
-      transformedEvents[name] = transformedEvent;
+      if (!transformedEvents[name]) {
+        transformedEvents[name] = [];
+      }
+
+      transformedEvents[name].push(transformedEvent);
     }
 
     return transformedEvents;
