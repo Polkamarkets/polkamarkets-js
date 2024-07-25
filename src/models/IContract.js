@@ -176,6 +176,21 @@ class IContract {
     }
   }
 
+  waitForTransactionHashToBeGeneratedPimlico(userOpHash, pimlicoBundlerClient) {
+    return new Promise((resolve, reject) => {
+      const interval = setInterval(async () => {
+        const getStatusResult = await pimlicoBundlerClient.getUserOperationStatus({
+          hash: userOpHash,
+        })
+
+        if (getStatusResult.transactionHash) {
+          clearInterval(interval);
+          resolve(getStatusResult.transactionHash);
+        }
+      }, 1000);
+    });
+  }
+
   async usePimlicoForGaslessTransactions(f, tx, methodCallData, networkConfig, provider) {
     const accountABI = ["function execute(address to, uint256 value, bytes data)"];
     const account = new ethers.utils.Interface(accountABI);
@@ -277,10 +292,11 @@ class IContract {
       })
     }
 
+    const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
 
-    const receipt = await bundlerClient.waitForUserOperationReceipt({
-      hash: userOpHash,
-    });
+    const receipt = await publicClient.waitForTransactionReceipt(
+      { hash: transactionHash }
+    )
 
     return receipt;
 
@@ -291,8 +307,6 @@ class IContract {
     const networkConfig = smartAccount.networkConfig;
 
     const { isConnectedWallet, signer } = await smartAccount.providerIsConnectedWallet();
-
-    const senderAddress = await smartAccount.getAddress();
 
     const methodName = f._method.name;
 
@@ -347,6 +361,8 @@ class IContract {
           const ethersProvider = new ethers.providers.JsonRpcProvider(this.params.web3.currentProvider.host);
 
           const entrypointContract = new ethers.Contract(ENTRYPOINT_ADDRESS_V06, entrypointAbi, ethersProvider);
+
+          const senderAddress = await smartAccount.getAddress();
 
           const nonce = await entrypointContract.getNonce(senderAddress, key);
 
