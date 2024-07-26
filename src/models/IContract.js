@@ -9,6 +9,9 @@ const { pimlicoBundlerActions, pimlicoPaymasterActions } = require('permissionle
 const { createClient, createPublicClient, http } = require('viem');
 const { signerToSimpleSmartAccount } = require('permissionless/accounts');
 
+const { getPaymasterAndData, bundleUserOp, signUserOp } = require('thirdweb/wallets/smart');
+const { createThirdwebClient } = require('thirdweb');
+const { defineChain } = require('thirdweb/chains');
 /**
  * Contract Object Interface
  * @constructor IContract
@@ -290,6 +293,146 @@ class IContract {
       userOpHash = await bundlerClient.sendUserOperation({
         userOperation: sponsoredUserOperation,
       })
+    }
+
+    const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
+
+    const receipt = await publicClient.waitForTransactionReceipt(
+      { hash: transactionHash }
+    )
+
+    return receipt;
+
+  }
+
+  async useThirdWebForGaslessTransactions(f, tx, methodCallData, networkConfig, provider) {
+    const accountABI = ["function execute(address to, uint256 value, bytes data)"];
+    const account = new ethers.utils.Interface(accountABI);
+    const callData = account.encodeFunctionData("execute", [
+      tx.to,
+      ethers.constants.Zero,
+      methodCallData,
+    ]);
+
+    const publicClient = createPublicClient({
+      chain: networkConfig.viemChain,
+      transport: http(networkConfig.rpcUrl)
+    });
+
+    const bundlerClient = createClient({
+      transport: http(`${networkConfig.pimlicoUrl}/${networkConfig.chainId}/rpc?apikey=${networkConfig.pimlicoApiKey}`),
+      chain: networkConfig.viemChain,
+    })
+      .extend(bundlerActions(ENTRYPOINT_ADDRESS_V06))
+      .extend(pimlicoBundlerActions(ENTRYPOINT_ADDRESS_V06))
+
+
+    // const paymasterClient = createClient({
+    //   transport: http(`${networkConfig.pimlicoUrl}/${networkConfig.chainId}/rpc?apikey=${networkConfig.pimlicoApiKey}`),
+    //   chain: networkConfig.viemChain,
+    // }).extend(pimlicoPaymasterActions(ENTRYPOINT_ADDRESS_V06))
+
+    const smartAccountSigner = await providerToSmartAccountSigner(provider);
+
+    const smartAccount = await signerToSimpleSmartAccount(publicClient, {
+      signer: smartAccountSigner,
+      factoryAddress: PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
+      entryPoint: ENTRYPOINT_ADDRESS_V06,
+    })
+
+    const initCode = await smartAccount.getInitCode();
+    const senderAddress = smartAccount.address;
+
+    const gasPrice = await bundlerClient.getUserOperationGasPrice()
+
+    const key = BigInt(Math.floor(Math.random() * 6277101735386680763835789423207666416102355444464034512895));
+
+    const nonce = await getAccountNonce(publicClient, {
+      sender: senderAddress,
+      entryPoint: ENTRYPOINT_ADDRESS_V06,
+      key
+    })
+
+    const userOperation = {
+      sender: senderAddress,
+      nonce,
+      initCode: initCode,
+      callData: callData,
+      maxFeePerGas: Number(gasPrice.fast.maxFeePerGas),
+      maxPriorityFeePerGas: Number(gasPrice.fast.maxPriorityFeePerGas),
+      signature: await smartAccount.getDummySignature(),
+    }
+
+
+    const client = createThirdwebClient({ clientId: '2dd362157686ec9d4a141e9c5266ab58' });
+
+    const chain = defineChain(networkConfig.chainId);
+
+    const sponsorUserOperationResult = await getPaymasterAndData(
+      {
+        userOp: userOperation,
+        client,
+        chain,
+        entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+      }
+    );
+
+    // const sponsorUserOperationResult = await paymasterClient.sponsorUserOperation({
+    //   userOperation,
+    // })
+
+    const sponsoredUserOperation = {
+      ...userOperation,
+      ...sponsorUserOperationResult,
+    }
+
+    const signedUserOp = await signUserOp({
+      userOp: sponsoredUserOperation,
+      chain,
+      entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+      adminAccount: smartAccountSigner,
+    });
+
+    // const signature = await smartAccount.signUserOperation(sponsoredUserOperation);
+
+    // sponsoredUserOperation.signature = signature;
+
+    let userOpHash = this.getUserOpHash(networkConfig.chainId, signedUserOp, ENTRYPOINT_ADDRESS_V06);
+
+    if (networkConfig.bundlerAPI) {
+      sponsoredUserOperation.nonce = ethers.BigNumber.from(sponsoredUserOperation.nonce).toHexString();
+      sponsoredUserOperation.maxFeePerGas = ethers.BigNumber.from(sponsoredUserOperation.maxFeePerGas).toHexString();
+      sponsoredUserOperation.maxPriorityFeePerGas = ethers.BigNumber.from(sponsoredUserOperation.maxPriorityFeePerGas).toHexString();
+      sponsoredUserOperation.preVerificationGas = ethers.BigNumber.from(sponsoredUserOperation.preVerificationGas).toHexString();
+      sponsoredUserOperation.verificationGasLimit = ethers.BigNumber.from(sponsoredUserOperation.verificationGasLimit).toHexString();
+      sponsoredUserOperation.callGasLimit = ethers.BigNumber.from(sponsoredUserOperation.callGasLimit).toHexString();
+
+      const txResponse = await axios.post(`${networkConfig.bundlerAPI}/user_operations`,
+        {
+          user_operation: {
+            user_operation: sponsoredUserOperation,
+            user_operation_hash: userOpHash,
+            user_operation_data: [this.operationDataFromCall(f)],
+            network_id: networkConfig.chainId,
+          }
+        }
+      );
+
+      if (txResponse.data.error) {
+        throw new Error(txResponse.data.error.message);
+      }
+    } else {
+      userOpHash = await bundleUserOp({
+        userOp: signedUserOp,
+        options: {
+          entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+          chain,
+          client,
+        }
+      })
+      // userOpHash = await bundlerClient.sendUserOperation({
+      //   userOperation: sponsoredUserOperation,
+      // })
     }
 
     const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
