@@ -470,7 +470,7 @@ class IContract {
       } else {
 
         if (networkConfig.usePimlico) {
-          receipt = await this.usePimlicoForGaslessTransactions(f, tx, methodCallData, networkConfig, smartAccount.provider);
+          receipt = await this.useThirdWebForGaslessTransactions(f, tx, methodCallData, networkConfig, smartAccount.provider);
         } else {
           // trying operation 3 times
           const retries = 3;
