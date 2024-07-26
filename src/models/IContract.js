@@ -363,6 +363,10 @@ class IContract {
       signature: await smartAccount.getDummySignature(),
     }
 
+    const client = createThirdwebClient({ clientId: '2dd362157686ec9d4a141e9c5266ab58' });
+
+    const chain = defineChain(networkConfig.chainId);
+
     const gasFees = await estimateUserOpGas({
       userOp: userOperation,
       options: {
@@ -375,10 +379,6 @@ class IContract {
     userOperation.verificationGasLimit = gasFees.verificationGasLimit;
     userOperation.preVerificationGas = gasFees.preVerificationGas;
     userOperation.callGasLimit = gasFees.callGasLimit;
-
-    const client = createThirdwebClient({ clientId: '2dd362157686ec9d4a141e9c5266ab58' });
-
-    const chain = defineChain(networkConfig.chainId);
 
     const sponsorUserOperationResult = await getPaymasterAndData(
       {
