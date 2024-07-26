@@ -367,18 +367,18 @@ class IContract {
 
     const chain = defineChain(networkConfig.chainId);
 
-    const gasFees = await estimateUserOpGas({
-      userOp: userOperation,
-      options: {
-        entrypointAddress: ENTRYPOINT_ADDRESS_V06,
-        chain,
-        client,
-      }
-    })
+    // const gasFees = await estimateUserOpGas({
+    //   userOp: userOperation,
+    //   options: {
+    //     entrypointAddress: ENTRYPOINT_ADDRESS_V07,
+    //     chain,
+    //     client,
+    //   }
+    // })
 
-    userOperation.verificationGasLimit = gasFees.verificationGasLimit;
-    userOperation.preVerificationGas = gasFees.preVerificationGas;
-    userOperation.callGasLimit = gasFees.callGasLimit;
+    userOperation.verificationGasLimit = '0x7f6ba';
+    userOperation.preVerificationGas = '0x1024b';
+    userOperation.callGasLimit = '0x272b8';
 
     const sponsorUserOperationResult = await getPaymasterAndData(
       {
@@ -397,6 +397,10 @@ class IContract {
       ...userOperation,
       ...sponsorUserOperationResult,
     }
+
+    sponsoredUserOperation.verificationGasLimit = '0x7f6ba';
+    sponsoredUserOperation.preVerificationGas = '0x1024b';
+    sponsoredUserOperation.callGasLimit = '0x272b8';
 
     const signedUserOp = await signUserOp({
       userOp: sponsoredUserOperation,
