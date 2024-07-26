@@ -9,7 +9,7 @@ const { pimlicoBundlerActions, pimlicoPaymasterActions } = require('permissionle
 const { createClient, createPublicClient, http } = require('viem');
 const { signerToSimpleSmartAccount } = require('permissionless/accounts');
 
-const { getPaymasterAndData, bundleUserOp, signUserOp } = require('thirdweb/wallets/smart');
+const { getPaymasterAndData, estimateUserOpGas, bundleUserOp, signUserOp } = require('thirdweb/wallets/smart');
 const { createThirdwebClient } = require('thirdweb');
 const { defineChain } = require('thirdweb/chains');
 /**
@@ -363,6 +363,18 @@ class IContract {
       signature: await smartAccount.getDummySignature(),
     }
 
+    const gasFees = await estimateUserOpGas({
+      userOp: userOperation,
+      options: {
+        entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+        chain,
+        client,
+      }
+    })
+
+    userOperation.verificationGasLimit = gasFees.verificationGasLimit;
+    userOperation.preVerificationGas = gasFees.preVerificationGas;
+    userOperation.callGasLimit = gasFees.callGasLimit;
 
     const client = createThirdwebClient({ clientId: '2dd362157686ec9d4a141e9c5266ab58' });
 
