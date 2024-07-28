@@ -326,12 +326,6 @@ class IContract {
       .extend(bundlerActions(ENTRYPOINT_ADDRESS_V06))
       .extend(pimlicoBundlerActions(ENTRYPOINT_ADDRESS_V06))
 
-
-    // const paymasterClient = createClient({
-    //   transport: http(`${networkConfig.pimlicoUrl}/${networkConfig.chainId}/rpc?apikey=${networkConfig.pimlicoApiKey}`),
-    //   chain: networkConfig.viemChain,
-    // }).extend(pimlicoPaymasterActions(ENTRYPOINT_ADDRESS_V06))
-
     const smartAccountSigner = await providerToSmartAccountSigner(provider);
 
     const smartAccount = await signerToSimpleSmartAccount(publicClient, {
@@ -363,18 +357,9 @@ class IContract {
       signature: await smartAccount.getDummySignature(),
     }
 
-    const client = createThirdwebClient({ clientId: '2dd362157686ec9d4a141e9c5266ab58' });
+    const client = createThirdwebClient({ clientId: networkConfig.thirdWebClientId });
 
     const chain = defineChain(networkConfig.chainId);
-
-    // const gasFees = await estimateUserOpGas({
-    //   userOp: userOperation,
-    //   options: {
-    //     entrypointAddress: ENTRYPOINT_ADDRESS_V07,
-    //     chain,
-    //     client,
-    //   }
-    // })
 
     userOperation.verificationGasLimit = '0x7f6ba';
     userOperation.preVerificationGas = '0x1024b';
@@ -389,15 +374,12 @@ class IContract {
       }
     );
 
-    // const sponsorUserOperationResult = await paymasterClient.sponsorUserOperation({
-    //   userOperation,
-    // })
-
     const sponsoredUserOperation = {
       ...userOperation,
       ...sponsorUserOperationResult,
     }
 
+    // TODO: improve this
     sponsoredUserOperation.verificationGasLimit = '0x7f6ba';
     sponsoredUserOperation.preVerificationGas = '0x1024b';
     sponsoredUserOperation.callGasLimit = '0x272b8';
@@ -408,10 +390,6 @@ class IContract {
       entrypointAddress: ENTRYPOINT_ADDRESS_V06,
       adminAccount: smartAccountSigner,
     });
-
-    // const signature = await smartAccount.signUserOperation(sponsoredUserOperation);
-
-    // sponsoredUserOperation.signature = signature;
 
     let userOpHash = this.getUserOpHash(networkConfig.chainId, signedUserOp, ENTRYPOINT_ADDRESS_V06);
 
@@ -446,9 +424,6 @@ class IContract {
           client,
         }
       })
-      // userOpHash = await bundlerClient.sendUserOperation({
-      //   userOperation: sponsoredUserOperation,
-      // })
     }
 
     const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
@@ -486,6 +461,8 @@ class IContract {
       } else {
 
         if (networkConfig.usePimlico) {
+          receipt = await this.usePimlicoForGaslessTransactions(f, tx, methodCallData, networkConfig, smartAccount.provider);
+        } else if (networkConfig.useThirdWeb) {
           receipt = await this.useThirdWebForGaslessTransactions(f, tx, methodCallData, networkConfig, smartAccount.provider);
         } else {
           // trying operation 3 times
