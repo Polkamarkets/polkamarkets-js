@@ -179,7 +179,7 @@ class IContract {
     }
   }
 
-  waitForTransactionHashToBeGeneratedPimlico(userOpHash, pimlicoBundlerClient) {
+  waitForTransactionHashToBeGenerated(userOpHash, pimlicoBundlerClient) {
     return new Promise((resolve, reject) => {
       const interval = setInterval(async () => {
         const getStatusResult = await pimlicoBundlerClient.getUserOperationStatus({
@@ -295,7 +295,7 @@ class IContract {
       })
     }
 
-    const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
+    const transactionHash = await this.waitForTransactionHashToBeGenerated(userOpHash, bundlerClient);
 
     const receipt = await publicClient.waitForTransactionReceipt(
       { hash: transactionHash }
@@ -401,39 +401,36 @@ class IContract {
       sponsoredUserOperation.verificationGasLimit = ethers.BigNumber.from(sponsoredUserOperation.verificationGasLimit).toHexString();
       sponsoredUserOperation.callGasLimit = ethers.BigNumber.from(sponsoredUserOperation.callGasLimit).toHexString();
 
-      const txResponse = await axios.post(`${networkConfig.bundlerAPI}/user_operations`,
+      // currently txs are not bundled in thirdweb
+      axios.post(`${networkConfig.bundlerAPI}/user_operations`,
         {
           user_operation: {
             user_operation: sponsoredUserOperation,
             user_operation_hash: userOpHash,
             user_operation_data: [this.operationDataFromCall(f)],
             network_id: networkConfig.chainId,
-          }
+          },
+          do_not_bundle: true
         }
       );
-
-      if (txResponse.data.error) {
-        throw new Error(txResponse.data.error.message);
-      }
-    } else {
-      userOpHash = await bundleUserOp({
-        userOp: signedUserOp,
-        options: {
-          entrypointAddress: ENTRYPOINT_ADDRESS_V06,
-          chain,
-          client,
-        }
-      })
     }
 
-    const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
+    userOpHash = await bundleUserOp({
+      userOp: signedUserOp,
+      options: {
+        entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+        chain,
+        client,
+      }
+    })
+
+    const transactionHash = await this.waitForTransactionHashToBeGenerated(userOpHash, bundlerClient);
 
     const receipt = await publicClient.waitForTransactionReceipt(
       { hash: transactionHash }
     )
 
     return receipt;
-
   }
 
   async sendGaslessTransactions(f) {
