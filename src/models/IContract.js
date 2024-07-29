@@ -9,7 +9,7 @@ const { pimlicoBundlerActions, pimlicoPaymasterActions } = require('permissionle
 const { createClient, createPublicClient, http } = require('viem');
 const { signerToSimpleSmartAccount } = require('permissionless/accounts');
 
-const { getPaymasterAndData, estimateUserOpGas, bundleUserOp, signUserOp } = require('thirdweb/wallets/smart');
+const { getPaymasterAndData, estimateUserOpGas, bundleUserOp, signUserOp, waitForUserOpReceipt } = require('thirdweb/wallets/smart');
 const { createThirdwebClient } = require('thirdweb');
 const { defineChain } = require('thirdweb/chains');
 /**
@@ -179,7 +179,7 @@ class IContract {
     }
   }
 
-  waitForTransactionHashToBeGenerated(userOpHash, pimlicoBundlerClient) {
+  waitForTransactionHashToBeGeneratedPimlico(userOpHash, pimlicoBundlerClient) {
     return new Promise((resolve, reject) => {
       const interval = setInterval(async () => {
         const getStatusResult = await pimlicoBundlerClient.getUserOperationStatus({
@@ -295,7 +295,7 @@ class IContract {
       })
     }
 
-    const transactionHash = await this.waitForTransactionHashToBeGenerated(userOpHash, bundlerClient);
+    const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
 
     const receipt = await publicClient.waitForTransactionReceipt(
       { hash: transactionHash }
@@ -355,15 +355,25 @@ class IContract {
       maxFeePerGas: Number(gasPrice.fast.maxFeePerGas),
       maxPriorityFeePerGas: Number(gasPrice.fast.maxPriorityFeePerGas),
       signature: await smartAccount.getDummySignature(),
+      paymasterAndData: '0x',
     }
 
     const client = createThirdwebClient({ clientId: networkConfig.thirdWebClientId });
 
     const chain = defineChain(networkConfig.chainId);
 
-    userOperation.verificationGasLimit = '0x7f6ba';
-    userOperation.preVerificationGas = '0x1024b';
-    userOperation.callGasLimit = '0x272b8';
+    const gasFees = await estimateUserOpGas({
+      userOp: userOperation,
+      options: {
+        entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+        chain,
+        client,
+      }
+    })
+
+    userOperation.verificationGasLimit = gasFees.verificationGasLimit;
+    userOperation.preVerificationGas = gasFees.preVerificationGas;
+    userOperation.callGasLimit = gasFees.callGasLimit;
 
     const sponsorUserOperationResult = await getPaymasterAndData(
       {
@@ -374,18 +384,11 @@ class IContract {
       }
     );
 
-    const sponsoredUserOperation = {
-      ...userOperation,
-      ...sponsorUserOperationResult,
-    }
+    userOperation.paymasterAndData = sponsorUserOperationResult.paymasterAndData;
 
-    // TODO: improve this
-    sponsoredUserOperation.verificationGasLimit = '0x7f6ba';
-    sponsoredUserOperation.preVerificationGas = '0x1024b';
-    sponsoredUserOperation.callGasLimit = '0x272b8';
 
     const signedUserOp = await signUserOp({
-      userOp: sponsoredUserOperation,
+      userOp: userOperation,
       chain,
       entrypointAddress: ENTRYPOINT_ADDRESS_V06,
       adminAccount: smartAccountSigner,
@@ -394,18 +397,18 @@ class IContract {
     let userOpHash = this.getUserOpHash(networkConfig.chainId, signedUserOp, ENTRYPOINT_ADDRESS_V06);
 
     if (networkConfig.bundlerAPI) {
-      sponsoredUserOperation.nonce = ethers.BigNumber.from(sponsoredUserOperation.nonce).toHexString();
-      sponsoredUserOperation.maxFeePerGas = ethers.BigNumber.from(sponsoredUserOperation.maxFeePerGas).toHexString();
-      sponsoredUserOperation.maxPriorityFeePerGas = ethers.BigNumber.from(sponsoredUserOperation.maxPriorityFeePerGas).toHexString();
-      sponsoredUserOperation.preVerificationGas = ethers.BigNumber.from(sponsoredUserOperation.preVerificationGas).toHexString();
-      sponsoredUserOperation.verificationGasLimit = ethers.BigNumber.from(sponsoredUserOperation.verificationGasLimit).toHexString();
-      sponsoredUserOperation.callGasLimit = ethers.BigNumber.from(sponsoredUserOperation.callGasLimit).toHexString();
+      userOperation.nonce = ethers.BigNumber.from(userOperation.nonce).toHexString();
+      userOperation.maxFeePerGas = ethers.BigNumber.from(userOperation.maxFeePerGas).toHexString();
+      userOperation.maxPriorityFeePerGas = ethers.BigNumber.from(userOperation.maxPriorityFeePerGas).toHexString();
+      userOperation.preVerificationGas = ethers.BigNumber.from(userOperation.preVerificationGas).toHexString();
+      userOperation.verificationGasLimit = ethers.BigNumber.from(userOperation.verificationGasLimit).toHexString();
+      userOperation.callGasLimit = ethers.BigNumber.from(userOperation.callGasLimit).toHexString();
 
       // currently txs are not bundled in thirdweb
       axios.post(`${networkConfig.bundlerAPI}/user_operations`,
         {
           user_operation: {
-            user_operation: sponsoredUserOperation,
+            user_operation: userOperation,
             user_operation_hash: userOpHash,
             user_operation_data: [this.operationDataFromCall(f)],
             network_id: networkConfig.chainId,
@@ -424,11 +427,11 @@ class IContract {
       }
     })
 
-    const transactionHash = await this.waitForTransactionHashToBeGenerated(userOpHash, bundlerClient);
-
-    const receipt = await publicClient.waitForTransactionReceipt(
-      { hash: transactionHash }
-    )
+    const receipt = await waitForUserOpReceipt({
+      chain,
+      client,
+      userOpHash,
+    });
 
     return receipt;
   }
