@@ -9,7 +9,7 @@ const { pimlicoBundlerActions, pimlicoPaymasterActions } = require('permissionle
 const { createClient, createPublicClient, http } = require('viem');
 const { signerToSimpleSmartAccount } = require('permissionless/accounts');
 
-const { getPaymasterAndData, estimateUserOpGas, bundleUserOp, signUserOp, waitForUserOpReceipt } = require('thirdweb/wallets/smart');
+const { getPaymasterAndData, estimateUserOpGas, bundleUserOp, signUserOp, waitForUserOpReceipt, getUserOpGasFees } = require('thirdweb/wallets/smart');
 const { createThirdwebClient } = require('thirdweb');
 const { defineChain } = require('thirdweb/chains');
 /**
@@ -319,13 +319,6 @@ class IContract {
       transport: http(networkConfig.rpcUrl)
     });
 
-    const bundlerClient = createClient({
-      transport: http(`${networkConfig.pimlicoUrl}/${networkConfig.chainId}/rpc?apikey=${networkConfig.pimlicoApiKey}`),
-      chain: networkConfig.viemChain,
-    })
-      .extend(bundlerActions(ENTRYPOINT_ADDRESS_V06))
-      .extend(pimlicoBundlerActions(ENTRYPOINT_ADDRESS_V06))
-
     const smartAccountSigner = await providerToSmartAccountSigner(provider);
 
     const smartAccount = await signerToSimpleSmartAccount(publicClient, {
@@ -337,7 +330,19 @@ class IContract {
     const initCode = await smartAccount.getInitCode();
     const senderAddress = smartAccount.address;
 
-    const gasPrice = await bundlerClient.getUserOperationGasPrice()
+    const client = createThirdwebClient({ clientId: networkConfig.thirdWebClientId });
+
+    const chain = defineChain(networkConfig.chainId);
+
+    const gasPrice = await getUserOpGasFees(
+      {
+        options: {
+          entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+          chain,
+          client,
+        }
+      }
+    );
 
     const key = BigInt(Math.floor(Math.random() * 6277101735386680763835789423207666416102355444464034512895));
 
@@ -352,15 +357,11 @@ class IContract {
       nonce,
       initCode: initCode,
       callData: callData,
-      maxFeePerGas: Number(gasPrice.fast.maxFeePerGas),
-      maxPriorityFeePerGas: Number(gasPrice.fast.maxPriorityFeePerGas),
+      maxFeePerGas: Number(gasPrice.maxFeePerGas),
+      maxPriorityFeePerGas: Number(gasPrice.maxPriorityFeePerGas),
       signature: await smartAccount.getDummySignature(),
       paymasterAndData: '0x',
     }
-
-    const client = createThirdwebClient({ clientId: networkConfig.thirdWebClientId });
-
-    const chain = defineChain(networkConfig.chainId);
 
     const gasFees = await estimateUserOpGas({
       userOp: userOperation,
@@ -403,6 +404,7 @@ class IContract {
       userOperation.preVerificationGas = ethers.BigNumber.from(userOperation.preVerificationGas).toHexString();
       userOperation.verificationGasLimit = ethers.BigNumber.from(userOperation.verificationGasLimit).toHexString();
       userOperation.callGasLimit = ethers.BigNumber.from(userOperation.callGasLimit).toHexString();
+      userOperation.signature = signedUserOp.signature;
 
       // currently txs are not bundled in thirdweb
       axios.post(`${networkConfig.bundlerAPI}/user_operations`,
