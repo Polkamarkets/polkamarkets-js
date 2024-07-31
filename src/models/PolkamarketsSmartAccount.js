@@ -31,7 +31,7 @@ class PolkamarketsSmartAccount {
       instance.networkConfig = networkConfig;
       instance.provider = provider
       instance.isConnectedWallet = isConnectedWallet
-      if (!networkConfig.usePimlico) {
+      if (!networkConfig.usePimlico && !networkConfig.useThirdWeb) {
         instance.smartAccount = new SmartAccount(provider, options);
         instance.smartAccount.setSmartAccountContract({ name: 'SIMPLE', version: '1.0.0' })
       }
@@ -70,7 +70,7 @@ class PolkamarketsSmartAccount {
       return address;
     }
 
-    if (this.networkConfig.usePimlico) {
+    if (this.networkConfig.usePimlico || this.networkConfig.useThirdWeb) {
       const publicClient = createPublicClient({
         chain: this.networkConfig.viemChain,
         transport: http(this.networkConfig.rpcUrl)

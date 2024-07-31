@@ -9,6 +9,9 @@ const { pimlicoBundlerActions, pimlicoPaymasterActions } = require('permissionle
 const { createClient, createPublicClient, http } = require('viem');
 const { signerToSimpleSmartAccount } = require('permissionless/accounts');
 
+const { getPaymasterAndData, estimateUserOpGas, bundleUserOp, signUserOp, waitForUserOpReceipt, getUserOpGasFees } = require('thirdweb/wallets/smart');
+const { createThirdwebClient } = require('thirdweb');
+const { defineChain } = require('thirdweb/chains');
 /**
  * Contract Object Interface
  * @constructor IContract
@@ -176,6 +179,21 @@ class IContract {
     }
   }
 
+  waitForTransactionHashToBeGeneratedPimlico(userOpHash, pimlicoBundlerClient) {
+    return new Promise((resolve, reject) => {
+      const interval = setInterval(async () => {
+        const getStatusResult = await pimlicoBundlerClient.getUserOperationStatus({
+          hash: userOpHash,
+        })
+
+        if (getStatusResult.transactionHash) {
+          clearInterval(interval);
+          resolve(getStatusResult.transactionHash);
+        }
+      }, 1000);
+    });
+  }
+
   async usePimlicoForGaslessTransactions(f, tx, methodCallData, networkConfig, provider) {
     const accountABI = ["function execute(address to, uint256 value, bytes data)"];
     const account = new ethers.utils.Interface(accountABI);
@@ -277,13 +295,161 @@ class IContract {
       })
     }
 
+    const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
 
-    const receipt = await bundlerClient.waitForUserOperationReceipt({
-      hash: userOpHash,
-    });
+    const receipt = await publicClient.waitForTransactionReceipt(
+      { hash: transactionHash }
+    )
 
     return receipt;
 
+  }
+
+  async useThirdWebForGaslessTransactions(f, tx, methodCallData, networkConfig, provider) {
+    const accountABI = ["function execute(address to, uint256 value, bytes data)"];
+    const account = new ethers.utils.Interface(accountABI);
+    const callData = account.encodeFunctionData("execute", [
+      tx.to,
+      ethers.constants.Zero,
+      methodCallData,
+    ]);
+
+    const publicClient = createPublicClient({
+      chain: networkConfig.viemChain,
+      transport: http(networkConfig.rpcUrl)
+    });
+
+    const smartAccountSigner = await providerToSmartAccountSigner(provider);
+
+    const smartAccount = await signerToSimpleSmartAccount(publicClient, {
+      signer: smartAccountSigner,
+      factoryAddress: PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
+      entryPoint: ENTRYPOINT_ADDRESS_V06,
+    })
+
+    const initCode = await smartAccount.getInitCode();
+    const senderAddress = smartAccount.address;
+
+    const client = createThirdwebClient({ clientId: networkConfig.thirdWebClientId });
+
+    const chain = defineChain(networkConfig.chainId);
+
+    const gasPrice = await getUserOpGasFees(
+      {
+        options: {
+          entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+          chain,
+          client,
+        }
+      }
+    );
+
+    const key = BigInt(Math.floor(Math.random() * 6277101735386680763835789423207666416102355444464034512895));
+
+    const nonce = await getAccountNonce(publicClient, {
+      sender: senderAddress,
+      entryPoint: ENTRYPOINT_ADDRESS_V06,
+      key
+    })
+
+    const userOperation = {
+      sender: senderAddress,
+      nonce,
+      initCode: initCode,
+      callData: callData,
+      maxFeePerGas: Number(gasPrice.maxFeePerGas),
+      maxPriorityFeePerGas: Number(gasPrice.maxPriorityFeePerGas),
+      signature: await smartAccount.getDummySignature(),
+      paymasterAndData: '0x',
+    }
+
+    const gasFees = await estimateUserOpGas({
+      userOp: userOperation,
+      options: {
+        entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+        chain,
+        client,
+      }
+    })
+
+    userOperation.verificationGasLimit = gasFees.verificationGasLimit;
+    userOperation.preVerificationGas = gasFees.preVerificationGas;
+    userOperation.callGasLimit = gasFees.callGasLimit;
+
+    const sponsorUserOperationResult = await getPaymasterAndData(
+      {
+        userOp: userOperation,
+        client,
+        chain,
+        entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+      }
+    );
+
+    userOperation.paymasterAndData = sponsorUserOperationResult.paymasterAndData;
+
+
+    const signedUserOp = await signUserOp({
+      userOp: userOperation,
+      chain,
+      entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+      adminAccount: smartAccountSigner,
+    });
+
+    let userOpHash = this.getUserOpHash(networkConfig.chainId, signedUserOp, ENTRYPOINT_ADDRESS_V06);
+
+    if (networkConfig.bundlerAPI) {
+      userOperation.nonce = ethers.BigNumber.from(userOperation.nonce).toHexString();
+      userOperation.maxFeePerGas = ethers.BigNumber.from(userOperation.maxFeePerGas).toHexString();
+      userOperation.maxPriorityFeePerGas = ethers.BigNumber.from(userOperation.maxPriorityFeePerGas).toHexString();
+      userOperation.preVerificationGas = ethers.BigNumber.from(userOperation.preVerificationGas).toHexString();
+      userOperation.verificationGasLimit = ethers.BigNumber.from(userOperation.verificationGasLimit).toHexString();
+      userOperation.callGasLimit = ethers.BigNumber.from(userOperation.callGasLimit).toHexString();
+      userOperation.signature = signedUserOp.signature;
+
+      // currently txs are not bundled in thirdweb
+      axios.post(`${networkConfig.bundlerAPI}/user_operations`,
+        {
+          user_operation: {
+            user_operation: userOperation,
+            user_operation_hash: userOpHash,
+            user_operation_data: [this.operationDataFromCall(f)],
+            network_id: networkConfig.chainId,
+          },
+          do_not_bundle: true
+        }
+      );
+    }
+
+    userOpHash = await bundleUserOp({
+      userOp: signedUserOp,
+      options: {
+        entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+        chain,
+        client,
+      }
+    })
+
+    // TODO: change back to thirdweb, request currently not reliable, using pimlico for now
+    // const receipt = await waitForUserOpReceipt({
+    //   chain,
+    //   client,
+    //   userOpHash,
+    // });
+
+    const bundlerClient = createClient({
+      transport: http(`${networkConfig.pimlicoUrl}/${networkConfig.chainId}/rpc?apikey=${networkConfig.pimlicoApiKey}`),
+      chain: networkConfig.viemChain,
+    })
+      .extend(bundlerActions(ENTRYPOINT_ADDRESS_V06))
+      .extend(pimlicoBundlerActions(ENTRYPOINT_ADDRESS_V06))
+
+    const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
+
+    const receipt = await publicClient.waitForTransactionReceipt(
+      { hash: transactionHash }
+    )
+
+    return receipt;
   }
 
   async sendGaslessTransactions(f) {
@@ -291,8 +457,6 @@ class IContract {
     const networkConfig = smartAccount.networkConfig;
 
     const { isConnectedWallet, signer } = await smartAccount.providerIsConnectedWallet();
-
-    const senderAddress = await smartAccount.getAddress();
 
     const methodName = f._method.name;
 
@@ -314,6 +478,8 @@ class IContract {
 
         if (networkConfig.usePimlico) {
           receipt = await this.usePimlicoForGaslessTransactions(f, tx, methodCallData, networkConfig, smartAccount.provider);
+        } else if (networkConfig.useThirdWeb) {
+          receipt = await this.useThirdWebForGaslessTransactions(f, tx, methodCallData, networkConfig, smartAccount.provider);
         } else {
           // trying operation 3 times
           const retries = 3;
@@ -347,6 +513,8 @@ class IContract {
           const ethersProvider = new ethers.providers.JsonRpcProvider(this.params.web3.currentProvider.host);
 
           const entrypointContract = new ethers.Contract(ENTRYPOINT_ADDRESS_V06, entrypointAbi, ethersProvider);
+
+          const senderAddress = await smartAccount.getAddress();
 
           const nonce = await entrypointContract.getNonce(senderAddress, key);
 
