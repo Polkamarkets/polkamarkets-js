@@ -70,7 +70,7 @@ class PolkamarketsSmartAccount {
       return address;
     }
 
-    if (this.networkConfig.usePimlico || this.networkConfig.useThirdWeb) {
+    if (this.networkConfig.usePimlico) {
       const publicClient = createPublicClient({
         chain: this.networkConfig.viemChain,
         transport: http(this.networkConfig.rpcUrl)
@@ -86,6 +86,11 @@ class PolkamarketsSmartAccount {
 
       return smartAccount.address;
     }
+
+    if (this.networkConfig.useThirdWeb) {
+      return this.provider.address;
+    }
+
     return this.smartAccount.getAddress();
   }
 }

@@ -10,7 +10,7 @@ const { createClient, createPublicClient, http } = require('viem');
 const { signerToSimpleSmartAccount } = require('permissionless/accounts');
 
 const { getPaymasterAndData, estimateUserOpGas, bundleUserOp, signUserOp, waitForUserOpReceipt, getUserOpGasFees } = require('thirdweb/wallets/smart');
-const { createThirdwebClient } = require('thirdweb');
+const { createThirdwebClient, prepareTransaction, sendTransaction } = require('thirdweb');
 const { defineChain } = require('thirdweb/chains');
 /**
  * Contract Object Interface
@@ -452,6 +452,34 @@ class IContract {
     return receipt;
   }
 
+  async useThirdWebForGaslessTransactions2(f, tx, methodCallData, networkConfig, provider) {
+
+    const client = createThirdwebClient({ clientId: networkConfig.thirdWebClientId });
+
+    const chain = defineChain(networkConfig.chainId);
+
+    const transaction = prepareTransaction({
+      // The account that will be the receiver
+      to: tx.to,
+      // The value is the amount of ether you want to send with the transaction
+      value: tx.value,
+      // The chain to execute the transaction on
+      chain,
+      // Your thirdweb client
+      client,
+    });
+
+    const result = await sendTransaction({
+      transaction,
+      account: provider,
+      gasless: true,
+    });
+
+    console.log('result:', result);
+
+    return result;
+  }
+
   async sendGaslessTransactions(f) {
     const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
     const networkConfig = smartAccount.networkConfig;
@@ -479,7 +507,7 @@ class IContract {
         if (networkConfig.usePimlico) {
           receipt = await this.usePimlicoForGaslessTransactions(f, tx, methodCallData, networkConfig, smartAccount.provider);
         } else if (networkConfig.useThirdWeb) {
-          receipt = await this.useThirdWebForGaslessTransactions(f, tx, methodCallData, networkConfig, smartAccount.provider);
+          receipt = await this.useThirdWebForGaslessTransactions2(f, tx, methodCallData, networkConfig, smartAccount.provider);
         } else {
           // trying operation 3 times
           const retries = 3;
