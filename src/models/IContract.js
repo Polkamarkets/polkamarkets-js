@@ -10,7 +10,7 @@ const { createClient, createPublicClient, http } = require('viem');
 const { signerToSimpleSmartAccount } = require('permissionless/accounts');
 
 const { getPaymasterAndData, estimateUserOpGas, bundleUserOp, signUserOp, waitForUserOpReceipt, getUserOpGasFees, createUnsignedUserOp } = require('thirdweb/wallets/smart');
-const { createThirdwebClient, prepareTransaction, sendTransaction } = require('thirdweb');
+const { createThirdwebClient, prepareTransaction, sendTransaction, getContract } = require('thirdweb');
 const { defineChain } = require('thirdweb/chains');
 /**
  * Contract Object Interface
