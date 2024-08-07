@@ -8,6 +8,7 @@ const { signerToSimpleSmartAccount } = require('permissionless/accounts');
 class PolkamarketsSmartAccount {
 
   static PIMLICO_FACTORY_ADDRESS = '0x9406Cc6185a346906296840746125a0E44976454';
+  static THIRDWEB_FACTORY_ADDRESS = '0x85e23b94e7F5E9cC1fF78BCe78cfb15B81f0DF00';
 
   static singleton = (() => {
     let smartAccount;
@@ -70,7 +71,12 @@ class PolkamarketsSmartAccount {
       return address;
     }
 
-    if (this.networkConfig.usePimlico) {
+    if (this.networkConfig.useThirdWeb && this.provider.adminAccount) {
+      // if exists adminAccount it means it's using thirdwebauth
+      return this.provider.smartAccount.address;
+    }
+
+    if (this.networkConfig.usePimlico || this.networkConfig.useThirdWeb) {
       const publicClient = createPublicClient({
         chain: this.networkConfig.viemChain,
         transport: http(this.networkConfig.rpcUrl)
@@ -85,10 +91,6 @@ class PolkamarketsSmartAccount {
       })
 
       return smartAccount.address;
-    }
-
-    if (this.networkConfig.useThirdWeb) {
-      return this.provider.address;
     }
 
     return this.smartAccount.getAddress();
