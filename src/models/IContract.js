@@ -429,25 +429,28 @@ class IContract {
       }
     })
 
-    // TODO: change back to thirdweb, request currently not reliable, using pimlico for now
-    // const receipt = await waitForUserOpReceipt({
-    //   chain,
-    //   client,
-    //   userOpHash,
-    // });
+    let receipt;
 
-    const bundlerClient = createClient({
-      transport: http(`${networkConfig.pimlicoUrl}/${networkConfig.chainId}/rpc?apikey=${networkConfig.pimlicoApiKey}`),
-      chain: networkConfig.viemChain,
-    })
-      .extend(bundlerActions(ENTRYPOINT_ADDRESS_V06))
-      .extend(pimlicoBundlerActions(ENTRYPOINT_ADDRESS_V06))
+    try {
+      receipt = await waitForUserOpReceipt({
+        chain,
+        client,
+        userOpHash,
+      });
+    } catch (error) {
+      const bundlerClient = createClient({
+        transport: http(`${networkConfig.pimlicoUrl}/${networkConfig.chainId}/rpc?apikey=${networkConfig.pimlicoApiKey}`),
+        chain: networkConfig.viemChain,
+      })
+        .extend(bundlerActions(ENTRYPOINT_ADDRESS_V06))
+        .extend(pimlicoBundlerActions(ENTRYPOINT_ADDRESS_V06))
 
-    const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
+      const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
 
-    const receipt = await publicClient.waitForTransactionReceipt(
-      { hash: transactionHash }
-    )
+      receipt = await publicClient.waitForTransactionReceipt(
+        { hash: transactionHash }
+      )
+    }
 
     return receipt;
   }
@@ -544,9 +547,9 @@ class IContract {
       })
         .extend(bundlerActions(ENTRYPOINT_ADDRESS_V06))
         .extend(pimlicoBundlerActions(ENTRYPOINT_ADDRESS_V06))
-  
+
       const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
-  
+
       receipt = await publicClient.waitForTransactionReceipt(
         { hash: transactionHash }
       )
