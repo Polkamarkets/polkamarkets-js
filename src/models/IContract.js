@@ -429,28 +429,11 @@ class IContract {
       }
     })
 
-    let receipt;
-
-    try {
-      receipt = await waitForUserOpReceipt({
-        chain,
-        client,
-        userOpHash,
-      });
-    } catch (error) {
-      const bundlerClient = createClient({
-        transport: http(`${networkConfig.pimlicoUrl}/${networkConfig.chainId}/rpc?apikey=${networkConfig.pimlicoApiKey}`),
-        chain: networkConfig.viemChain,
-      })
-        .extend(bundlerActions(ENTRYPOINT_ADDRESS_V06))
-        .extend(pimlicoBundlerActions(ENTRYPOINT_ADDRESS_V06))
-
-      const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
-
-      receipt = await publicClient.waitForTransactionReceipt(
-        { hash: transactionHash }
-      )
-    }
+    const receipt = await waitForUserOpReceipt({
+      chain,
+      client,
+      userOpHash,
+    });
 
     return receipt;
   }
@@ -532,28 +515,11 @@ class IContract {
       }
     })
 
-    let receipt;
-
-    try {
-      receipt = await waitForUserOpReceipt({
-        chain,
-        client,
-        userOpHash,
-      });
-    } catch (error) {
-      const bundlerClient = createClient({
-        transport: http(`${networkConfig.pimlicoUrl}/${networkConfig.chainId}/rpc?apikey=${networkConfig.pimlicoApiKey}`),
-        chain: networkConfig.viemChain,
-      })
-        .extend(bundlerActions(ENTRYPOINT_ADDRESS_V06))
-        .extend(pimlicoBundlerActions(ENTRYPOINT_ADDRESS_V06))
-
-      const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
-
-      receipt = await publicClient.waitForTransactionReceipt(
-        { hash: transactionHash }
-      )
-    }
+    const receipt = await waitForUserOpReceipt({
+      chain,
+      client,
+      userOpHash,
+    });
 
     return receipt;
   }
