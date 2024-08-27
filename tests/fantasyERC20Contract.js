@@ -45,7 +45,9 @@ context('FantasyERC20 Contract', async () => {
           'Fantasy',
           'FNTS',
           Numbers.toSmartContractDecimals(TOKEN_AMOUNT_TO_CLAIM, 18),
-          TOKEN_MANAGER_ADDRESS
+          TOKEN_MANAGER_ADDRESS,
+          '0x0000000000000000000000000000000000000000',
+          '0x0000000000000000000000000000000000000000'
         ]
       });
 

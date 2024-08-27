@@ -51,10 +51,7 @@ class PredictionMarketV3ControllerContract extends IContract {
   }
 
   async createLand({ name, symbol, tokenAmountToClaim, tokenToAnswer, everyoneCanCreateMarkets }) {
-    // fetching current index
-    const index = await this.getLandTokensLength();
-
-    await this.__sendTx(
+    const transaction = await this.__sendTx(
       this.getContract().methods.createLand(
         name,
         symbol,
@@ -63,8 +60,10 @@ class PredictionMarketV3ControllerContract extends IContract {
       )
     );
 
+    const token = transaction.events.LandCreated[0].returnValues.token;
+
     // fetching land on index
-    const land = await this.getLandById({ id: index });
+    const land = await this.getLandByAddress({ token });
 
     if (everyoneCanCreateMarkets) {
       await this.__sendTx(
