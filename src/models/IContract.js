@@ -751,6 +751,22 @@ class IContract {
       } else {
         res = await f.call().catch(err => { throw err; });
       }
+
+      if (res.logs) {
+        const contractInterface = new ethers.utils.Interface(this.params.abi.abi);
+
+        const events = res.logs.map(log => {
+          try {
+            const event = contractInterface.parseLog(log);
+            return event;
+          } catch (error) {
+            return null;
+          }
+        });
+
+        res.events = this.convertEtherEventsToWeb3Events(events);
+      }
+
       return res;
     }
   };
