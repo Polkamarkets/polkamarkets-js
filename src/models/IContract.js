@@ -31,6 +31,7 @@ class IContract {
     web3EventsProvider,
     gasPrice,
     isSocialLogin = false,
+    startBlock
   }) {
     try {
       if (!abi) {
@@ -54,6 +55,7 @@ class IContract {
         gasPrice,
         contract: new Contract(web3, abi, contractAddress),
         isSocialLogin,
+        startBlock,
       };
     } catch (err) {
       throw err;
@@ -953,7 +955,11 @@ class IContract {
    * @description Gets contract events
    * @returns {String | undefined} address
    */
-  async getEvents(event, filter, fromBlock = 0, toBlock = 'latest') {
+  async getEvents(event, filter, fromBlock = null, toBlock = 'latest') {
+    if (!fromBlock) {
+      fromBlock = this.params.startBlock || 0;
+    }
+
     if (!this.params.web3EventsProvider) {
       const events = this.getContract().getPastEvents(event, {
         fromBlock,
