@@ -233,6 +233,27 @@ context('Prediction Market Contract V3 Controller', async () => {
           user: user1
         });
       }));
+
+      it ('should be land admin if is a controller admin', mochaAsync(async () => {
+        const currentIsAdmin = await predictionMarketControllerContract.isLandAdmin({ token, user: user1 });
+        expect(currentIsAdmin).to.equal(false);
+
+        await predictionMarketFactoryContract.addAdminToPMController({
+          controllerAddress: predictionMarketControllerContract.getAddress(),
+          user: user1
+        });
+
+        const newIsAdmin = await predictionMarketControllerContract.isLandAdmin({ token, user: user1 });
+        expect(newIsAdmin).to.equal(true);
+
+        await predictionMarketFactoryContract.removeAdminFromPMController({
+          controllerAddress: predictionMarketControllerContract.getAddress(),
+          user: user1
+        });
+
+        const lastNewIsAdmin = await predictionMarketControllerContract.isLandAdmin({ token, user: user1 });
+        expect(lastNewIsAdmin).to.equal(false);
+      }));
     });
 
     context('Land Disabling + Enabling + Offset', async () => {
