@@ -50,7 +50,6 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
   }
 
   function updateLockAmount(uint256 newLockAmount) external onlyOwner {
-    require(newLockAmount > 0, "Lock amount must be greater than 0");
     require(newLockAmount != lockAmount, "Lock amount is the same");
 
     lockAmount = newLockAmount;
