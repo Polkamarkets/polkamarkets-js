@@ -51,10 +51,7 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     return _createLand(name, symbol, tokenAmountToClaim, tokenToAnswer, address(0), address(0));
   }
 
-  function createLand(
-    FantasyERC20 landToken,
-    IERC20 tokenToAnswer
-  ) external virtual returns (FantasyERC20) {
+  function createLand(FantasyERC20 landToken, IERC20 tokenToAnswer) external virtual returns (FantasyERC20) {
     return _createLand(landToken, tokenToAnswer);
   }
 
@@ -79,15 +76,12 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     // adding minting privileges to the PMV3 contract
     landToken.grantRole(keccak256("MINTER_ROLE"), address(PMV3));
     // adding minting privileges to the msg.sender
-    landToken.grantRole(keccak256("MINTER_ROLE"), msg.sender);
+    // landToken.grantRole(keccak256("MINTER_ROLE"), msg.sender);
 
     return _createLand(landToken, tokenToAnswer);
   }
 
-  function _createLand(
-    FantasyERC20 landToken,
-    IERC20 tokenToAnswer
-  ) internal returns (FantasyERC20) {
+  function _createLand(FantasyERC20 landToken, IERC20 tokenToAnswer) internal returns (FantasyERC20) {
     // ensuring LandFactory has pausing privileges
     require(landToken.hasRole(keccak256("PAUSER_ROLE"), address(this)), "LandFactory does not have pausing privileges");
 

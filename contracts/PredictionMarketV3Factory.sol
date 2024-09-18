@@ -197,11 +197,7 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
     return controller.active;
   }
 
-  function isPMControllerAdmin(address controllerAddress, address user)
-    external
-    view
-    returns (bool)
-  {
+  function isPMControllerAdmin(address controllerAddress, address user) external view returns (bool) {
     Controller storage controller = controllers[address(controllerAddress)];
 
     return controller.admins[user];

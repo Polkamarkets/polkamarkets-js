@@ -46,7 +46,10 @@ contract PredictionMarketV3Controller is LandFactory {
     uint256 tokenAmountToClaim,
     IERC20 tokenToAnswer
   ) external override returns (FantasyERC20) {
-    require(IPredictionMarketV3Factory(PMV3Factory).isPMControllerAdmin(address(this), msg.sender), "Not allowed to create land");
+    require(
+      IPredictionMarketV3Factory(PMV3Factory).isPMControllerAdmin(address(this), msg.sender),
+      "Not allowed to create land"
+    );
 
     // create a new fantasyERC20 token
     return _createLand(name, symbol, tokenAmountToClaim, tokenToAnswer, PMV3Factory, address(this));
@@ -64,6 +67,26 @@ contract PredictionMarketV3Controller is LandFactory {
   function isAllowedToCreateMarket(IERC20 marketToken, address user) public view override returns (bool) {
     Land storage land = lands[address(marketToken)];
 
-    return land.active && (land.admins[user] || landPermissions[address(land.token)].openMarketCreation);
+    return
+      land.active &&
+      (land.admins[user] ||
+        landPermissions[address(land.token)].openMarketCreation ||
+        IPredictionMarketV3Factory(PMV3Factory).isPMControllerAdmin(address(this), user));
+  }
+
+  function isAllowedToResolveMarket(IERC20 marketToken, address user) public view override returns (bool) {
+    Land storage land = lands[address(marketToken)];
+
+    return
+      land.active &&
+      (land.admins[user] || IPredictionMarketV3Factory(PMV3Factory).isPMControllerAdmin(address(this), user));
+  }
+
+  function isLandAdmin(IERC20 landToken, address user) public view override returns (bool) {
+    Land storage land = lands[address(landToken)];
+
+    return
+      land.active &&
+      (land.admins[user] || IPredictionMarketV3Factory(PMV3Factory).isPMControllerAdmin(address(this), user));
   }
 }
