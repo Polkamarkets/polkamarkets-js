@@ -26,6 +26,7 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
   mapping(address => Land) public lands;
   address[] public landTokens;
   uint256 public landTokensLength;
+  mapping(address => bool) public fantasyTokens;
 
   event LandCreated(address indexed user, address indexed token, address indexed tokenToAnswer, uint256 amountLocked);
 
@@ -76,7 +77,9 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     // adding minting privileges to the PMV3 contract
     landToken.grantRole(keccak256("MINTER_ROLE"), address(PMV3));
     // adding minting privileges to the msg.sender
-    // landToken.grantRole(keccak256("MINTER_ROLE"), msg.sender);
+    landToken.grantRole(keccak256("MINTER_ROLE"), msg.sender);
+
+    fantasyTokens[address(landToken)] = true;
 
     return _createLand(landToken, tokenToAnswer);
   }
@@ -190,7 +193,9 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     require(land.admins[msg.sender], "Not admin of the land");
 
     // adding minting privileges to the admin
-    land.token.grantRole(keccak256("MINTER_ROLE"), admin);
+    if (fantasyTokens[address(landToken)]) {
+      land.token.grantRole(keccak256("MINTER_ROLE"), admin);
+    }
 
     land.admins[admin] = true;
 
@@ -204,7 +209,9 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     require(land.admins[msg.sender], "Not admin of the land");
 
     // removing minting privileges from the admin
-    land.token.revokeRole(keccak256("MINTER_ROLE"), admin);
+    if (fantasyTokens[address(landToken)]) {
+      land.token.revokeRole(keccak256("MINTER_ROLE"), admin);
+    }
 
     land.admins[admin] = false;
 
