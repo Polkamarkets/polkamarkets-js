@@ -246,6 +246,24 @@ context('Prediction Market Contract V3 Controller', async () => {
         const newIsAdmin = await predictionMarketControllerContract.isLandAdmin({ token, user: user1 });
         expect(newIsAdmin).to.equal(true);
 
+        // new admin should be able to add another admin to a land
+        await user1PredictionMarketControllerContract.addAdminToLand({
+          token,
+          user: user2
+        });
+
+        const user2IsAdmin = await predictionMarketControllerContract.isLandAdmin({ token, user: user2 });
+        expect(user2IsAdmin).to.equal(true);
+
+        // removing user2 as admin
+        await user1PredictionMarketControllerContract.removeAdminFromLand({
+          token,
+          user: user2
+        });
+
+        const user2IsAdminAfter = await predictionMarketControllerContract.isLandAdmin({ token, user: user2 });
+        expect(user2IsAdminAfter).to.equal(false);
+
         await predictionMarketFactoryContract.removeAdminFromPMController({
           controllerAddress: predictionMarketControllerContract.getAddress(),
           user: user1
