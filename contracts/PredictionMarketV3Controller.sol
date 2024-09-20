@@ -65,28 +65,23 @@ contract PredictionMarketV3Controller is LandFactory {
   }
 
   function isAllowedToCreateMarket(IERC20 marketToken, address user) public view override returns (bool) {
-    Land storage land = lands[address(marketToken)];
-
     return
-      land.active &&
-      (land.admins[user] ||
-        landPermissions[address(land.token)].openMarketCreation ||
+      lands[address(marketToken)].active &&
+      (lands[address(marketToken)].admins[user] ||
+        landPermissions[address(lands[address(marketToken)].token)].openMarketCreation ||
         IPredictionMarketV3Factory(PMV3Factory).isPMControllerAdmin(address(this), user));
   }
 
   function isAllowedToResolveMarket(IERC20 marketToken, address user) public view override returns (bool) {
-    Land storage land = lands[address(marketToken)];
-
     return
-      land.active &&
-      (land.admins[user] || IPredictionMarketV3Factory(PMV3Factory).isPMControllerAdmin(address(this), user));
+      lands[address(marketToken)].active &&
+      (lands[address(marketToken)].admins[user] ||
+        IPredictionMarketV3Factory(PMV3Factory).isPMControllerAdmin(address(this), user));
   }
 
   function isLandAdmin(IERC20 landToken, address user) public view override returns (bool) {
-    Land storage land = lands[address(landToken)];
-
     return
-      land.active &&
-      (land.admins[user] || IPredictionMarketV3Factory(PMV3Factory).isPMControllerAdmin(address(this), user));
+      lands[address(landToken)].admins[user] ||
+      IPredictionMarketV3Factory(PMV3Factory).isPMControllerAdmin(address(this), user);
   }
 }

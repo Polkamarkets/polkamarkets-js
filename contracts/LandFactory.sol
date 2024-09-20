@@ -120,7 +120,7 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     Land storage land = lands[address(landToken)];
 
     require(land.active, "Land is not active");
-    require(land.admins[msg.sender], "Not admin of the land");
+    require(isLandAdmin(landToken, msg.sender), "Not admin of the land");
 
     uint256 amountToUnlock = land.lockAmount;
 
@@ -143,7 +143,7 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     Land storage land = lands[address(landToken)];
 
     require(!land.active, "Land is already active");
-    require(land.admins[msg.sender], "Not admin of the land");
+    require(isLandAdmin(landToken, msg.sender), "Not admin of the land");
 
     uint256 amountToLock = lockAmount > land.lockAmount ? lockAmount - land.lockAmount : 0;
 
@@ -166,8 +166,8 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
   function unlockOffsetFromLand(IERC20 landToken) external virtual {
     Land storage land = lands[address(landToken)];
 
-    require(land.active, "Land does not exist");
-    require(land.admins[msg.sender], "Not admin of the land");
+    require(land.active, "Land is not active");
+    require(isLandAdmin(landToken, msg.sender), "Not admin of the land");
 
     uint256 amountToUnlock = land.lockAmount > lockAmount ? land.lockAmount - lockAmount : 0;
 
@@ -190,7 +190,7 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     Land storage land = lands[address(landToken)];
 
     require(land.active, "Land does not exist");
-    require(land.admins[msg.sender], "Not admin of the land");
+    require(isLandAdmin(landToken, msg.sender), "Not admin of the land");
 
     // adding minting privileges to the admin
     if (fantasyTokens[address(landToken)]) {
@@ -206,7 +206,7 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     Land storage land = lands[address(landToken)];
 
     require(land.active, "Land does not exist");
-    require(land.admins[msg.sender], "Not admin of the land");
+    require(isLandAdmin(landToken, msg.sender), "Not admin of the land");
 
     // removing minting privileges from the admin
     if (fantasyTokens[address(landToken)]) {
@@ -236,7 +236,7 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     return land.active;
   }
 
-  function isLandAdmin(IERC20 marketToken, address user) external view virtual returns (bool) {
+  function isLandAdmin(IERC20 marketToken, address user) public view virtual returns (bool) {
     Land storage land = lands[address(marketToken)];
 
     return land.admins[user];
