@@ -36,6 +36,7 @@ class Application {
     gasPrice,
     isSocialLogin = false,
     socialLoginParams,
+    startBlock
   }) {
     this.web3Provider = web3Provider;
     // evm logs http source (optional)
@@ -43,6 +44,7 @@ class Application {
     // fixed gas price for txs (optional)
     this.gasPrice = gasPrice;
     this.isSocialLogin = isSocialLogin;
+    this.startBlock = startBlock;
 
     if (this.isSocialLogin) {
       this.socialLoginParams = socialLoginParams;
@@ -123,6 +125,19 @@ class Application {
     }
   };
 
+  contractDefaultParams(contractAddress) {
+    return {
+      web3: this.web3,
+      contractAddress,
+      acc: this.account,
+      web3EventsProvider: this.web3EventsProvider,
+      gasPrice: this.gasPrice,
+      isSocialLogin: this.isSocialLogin,
+      networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
+      startBlock: this.startBlock,
+    };
+  }
+
   /*************/
   /** GETTERS **/
   /*************/
@@ -135,13 +150,7 @@ class Application {
   getPredictionMarketContract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketContract({
-        web3: this.web3,
-        contractAddress,
-        acc: this.account,
-        web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice,
-        isSocialLogin: this.isSocialLogin,
-        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
+        ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
       throw err;
@@ -156,13 +165,7 @@ class Application {
   getPredictionMarketV2Contract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketV2Contract({
-        web3: this.web3,
-        contractAddress,
-        acc: this.account,
-        web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice,
-        isSocialLogin: this.isSocialLogin,
-        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
+        ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
       throw err;
@@ -177,14 +180,8 @@ class Application {
   getPredictionMarketV3Contract({ contractAddress = null, querierContractAddress = null } = {}) {
     try {
       return new PredictionMarketV3Contract({
-        web3: this.web3,
-        contractAddress,
+        ...this.contractDefaultParams(contractAddress),
         querierContractAddress,
-        acc: this.account,
-        web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice,
-        isSocialLogin: this.isSocialLogin,
-        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -199,13 +196,7 @@ class Application {
   getPredictionMarketV3FactoryContract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketV3FactoryContract({
-        web3: this.web3,
-        contractAddress,
-        acc: this.account,
-        web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice,
-        isSocialLogin: this.isSocialLogin,
-        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
+        ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
       throw err;
@@ -220,13 +211,7 @@ class Application {
   getPredictionMarketV3ControllerContract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketV3ControllerContract({
-        web3: this.web3,
-        contractAddress,
-        acc: this.account,
-        web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice,
-        isSocialLogin: this.isSocialLogin,
-        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
+        ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
       throw err;
@@ -241,13 +226,7 @@ class Application {
   getPredictionMarketV3ManagerContract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketV3ManagerContract({
-        web3: this.web3,
-        contractAddress,
-        acc: this.account,
-        web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice,
-        isSocialLogin: this.isSocialLogin,
-        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
+        ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
       throw err;
@@ -266,15 +245,9 @@ class Application {
   } = {}) {
     try {
       return new AchievementsContract({
-        web3: this.web3,
-        contractAddress,
+        ...this.contractDefaultParams(contractAddress),
         predictionMarketContractAddress,
         realitioERC20ContractAddress,
-        acc: this.account,
-        web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice,
-        isSocialLogin: this.isSocialLogin,
-        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
       });
     } catch (err) {
       throw err;
@@ -289,13 +262,7 @@ class Application {
   getVotingContract({ contractAddress = null } = {}) {
     try {
       return new VotingContract({
-        web3: this.web3,
-        contractAddress,
-        acc: this.account,
-        web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice,
-        isSocialLogin: this.isSocialLogin,
-        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
+        ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
       throw err;
@@ -310,13 +277,7 @@ class Application {
   getFantasyERC20Contract({ contractAddress = null } = {}) {
     try {
       return new FantasyERC20Contract({
-        web3: this.web3,
-        contractAddress,
-        acc: this.account,
-        web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice,
-        isSocialLogin: this.isSocialLogin,
-        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
+        ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
       throw err;
@@ -331,13 +292,7 @@ class Application {
   getRealitioERC20Contract({ contractAddress = null } = {}) {
     try {
       return new RealitioERC20Contract({
-        web3: this.web3,
-        contractAddress,
-        acc: this.account,
-        web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice,
-        isSocialLogin: this.isSocialLogin,
-        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
+        ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
       throw err;
@@ -352,13 +307,7 @@ class Application {
   getERC20Contract({ contractAddress = null }) {
     try {
       return new ERC20Contract({
-        web3: this.web3,
-        contractAddress: contractAddress,
-        acc: this.account,
-        web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice,
-        isSocialLogin: this.isSocialLogin,
-        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
+        ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
       throw err;
@@ -373,13 +322,7 @@ class Application {
   getWETH9Contract({ contractAddress = null }) {
     try {
       return new WETH9Contract({
-        web3: this.web3,
-        contractAddress: contractAddress,
-        acc: this.account,
-        web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice,
-        isSocialLogin: this.isSocialLogin,
-        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
+        ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
       throw err;
@@ -394,13 +337,7 @@ class Application {
   getArbitrationContract({ contractAddress = null }) {
     try {
       return new ArbitrationContract({
-        web3: this.web3,
-        contractAddress: contractAddress,
-        acc: this.account,
-        web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice,
-        isSocialLogin: this.isSocialLogin,
-        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
+        ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
       throw err;
@@ -415,13 +352,7 @@ class Application {
   getArbitrationProxyContract({ contractAddress = null }) {
     try {
       return new ArbitrationProxyContract({
-        web3: this.web3,
-        contractAddress: contractAddress,
-        acc: this.account,
-        web3EventsProvider: this.web3EventsProvider,
-        gasPrice: this.gasPrice,
-        isSocialLogin: this.isSocialLogin,
-        networkConfig: this.socialLoginParams ? this.socialLoginParams.networkConfig : null,
+        ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
       throw err;
