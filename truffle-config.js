@@ -6,6 +6,7 @@ const POLYGONSCAN_API_KEY = process.env.POLYGONSCAN_API_KEY;
 const GNOSIS_API_KEY = process.env.GNOSIS_API_KEY;
 const CELO_API_KEY = process.env.CELO_API_KEY;
 const INFURA_API_KEY = process.env.INFURA_API_KEY;
+const ARBITRUM_API_KEY = process.env.ARBITRUM_API_KEY;
 
 module.exports = {
   networks: {
@@ -75,6 +76,29 @@ module.exports = {
       timeoutBlocks: 200,
       gas: 25000000,
     },
+    arbitrum: {
+      provider: new HDWalletProvider(mnemonic, "https://arb1.arbitrum.io/rpc"),
+      network_id: 42161,
+      gasPrice: 200000000,
+      skipDryRun: true,
+      networkCheckTimeout: 10000,
+      timeoutBlocks: 200,
+      gas: 25000000,
+    },
+    arbitrum_sepolia: {
+      provider: new HDWalletProvider(mnemonic, "https://sepolia-rollup.arbitrum.io/rpc"),
+      network_id: 421614,
+      gasPrice: 200000000,
+      skipDryRun: true,
+      networkCheckTimeout: 10000,
+      timeoutBlocks: 200,
+      gas: 25000000,
+      verify: {
+        apiUrl: 'https://api-sepolia.arbiscan.io/api',
+        apiKey: ARBITRUM_API_KEY,
+        explorerUrl: 'https://sepolia.arbiscan.io/address',
+      },
+    },
   },
   // Configure your compilers
   compilers: {
@@ -104,6 +128,7 @@ module.exports = {
     etherscan: ETHERSCAN_API_KEY,
     polygonscan: POLYGONSCAN_API_KEY,
     gnosisscan: GNOSIS_API_KEY,
-    celoscan: CELO_API_KEY
+    celoscan: CELO_API_KEY,
+    arbiscan: ARBITRUM_API_KEY,
   }
 };
