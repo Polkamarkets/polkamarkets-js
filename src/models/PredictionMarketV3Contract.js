@@ -9,8 +9,9 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
     super({ abi: predictionV3, ...params });
     this.contractName = 'predictionMarketV3';
     if (params.isSocialLogin) {
+      // disabling shortcut as lands with external tokens are now enabled
       // social login tokens are standard ERC20 tokens
-      this.marketDecimals = 18;
+      // this.marketDecimals = 18;
     }
     if (params.querierContractAddress) {
       this.querier = new PredictionMarketV3QuerierContract({
@@ -171,10 +172,12 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
 
     const userMarketsData = await this.querier.getUserAllMarketsData({ user });
     const marketIds = Object.keys(userMarketsData).map(Number);
-    const decimals = 18;
+    // fetching all markets decimals asynchrounously
+    const marketDecimals = await Promise.all(marketIds.map(marketId => this.getMarketDecimals({ marketId })));
 
     const portfolio = marketIds.reduce((obj, marketId) => {
       const marketData = userMarketsData[marketId];
+      const decimals = marketDecimals[marketIds.indexOf(marketId)];
 
       const outcomeShares = Object.fromEntries(marketData.outcomeShares.map((item, index) => {
         return [
