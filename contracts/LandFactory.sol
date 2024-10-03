@@ -85,8 +85,8 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
   }
 
   function _createLand(FantasyERC20 landToken, IERC20 tokenToAnswer) internal returns (FantasyERC20) {
-    // ensuring LandFactory has pausing privileges
-    require(landToken.hasRole(keccak256("PAUSER_ROLE"), address(this)), "LandFactory does not have pausing privileges");
+    // checking if land with same token was already created
+    require(!lands[address(landToken)].active, "Land already exists");
 
     if (lockAmount > 0) {
       // transfer the lockAmount to the contract
@@ -133,8 +133,10 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     land.lockAmount = 0;
     land.lockUser = address(0);
 
-    // pausing token
-    FantasyERC20(address(landToken)).pause();
+    if (fantasyTokens[address(landToken)]) {
+      // pausing token
+      land.token.pause();
+    }
 
     emit LandDisabled(msg.sender, address(landToken), amountToUnlock);
   }
@@ -157,8 +159,10 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     land.lockAmount = land.lockAmount + amountToLock;
     land.lockUser = msg.sender;
 
-    // unpausing token
-    FantasyERC20(address(landToken)).unpause();
+    if (fantasyTokens[address(landToken)]) {
+      // unpausing token
+      land.token.unpause();
+    }
 
     emit LandEnabled(msg.sender, address(landToken), amountToLock);
   }
