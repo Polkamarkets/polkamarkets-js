@@ -50,7 +50,6 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
   }
 
   function updateLockAmount(uint256 newLockAmount) external onlyOwner {
-    require(newLockAmount > 0, "Lock amount must be greater than 0");
     require(newLockAmount != lockAmount, "Lock amount is the same");
 
     lockAmount = newLockAmount;
@@ -198,11 +197,7 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
     return controller.active;
   }
 
-  function isPMControllerAdmin(address controllerAddress, address user)
-    external
-    view
-    returns (bool)
-  {
+  function isPMControllerAdmin(address controllerAddress, address user) external view returns (bool) {
     Controller storage controller = controllers[address(controllerAddress)];
 
     return controller.admins[user];

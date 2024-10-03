@@ -26,6 +26,7 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
   mapping(address => Land) public lands;
   address[] public landTokens;
   uint256 public landTokensLength;
+  mapping(address => bool) public fantasyTokens;
 
   event LandCreated(address indexed user, address indexed token, address indexed tokenToAnswer, uint256 amountLocked);
 
@@ -51,10 +52,7 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     return _createLand(name, symbol, tokenAmountToClaim, tokenToAnswer, address(0), address(0));
   }
 
-  function createLand(
-    FantasyERC20 landToken,
-    IERC20 tokenToAnswer
-  ) external virtual returns (FantasyERC20) {
+  function createLand(FantasyERC20 landToken, IERC20 tokenToAnswer) external virtual returns (FantasyERC20) {
     return _createLand(landToken, tokenToAnswer);
   }
 
@@ -81,15 +79,14 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     // adding minting privileges to the msg.sender
     landToken.grantRole(keccak256("MINTER_ROLE"), msg.sender);
 
+    fantasyTokens[address(landToken)] = true;
+
     return _createLand(landToken, tokenToAnswer);
   }
 
-  function _createLand(
-    FantasyERC20 landToken,
-    IERC20 tokenToAnswer
-  ) internal returns (FantasyERC20) {
-    // ensuring LandFactory has pausing privileges
-    require(landToken.hasRole(keccak256("PAUSER_ROLE"), address(this)), "LandFactory does not have pausing privileges");
+  function _createLand(FantasyERC20 landToken, IERC20 tokenToAnswer) internal returns (FantasyERC20) {
+    // checking if land with same token was already created
+    require(!lands[address(landToken)].active, "Land already exists");
 
     if (lockAmount > 0) {
       // transfer the lockAmount to the contract
@@ -123,7 +120,7 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     Land storage land = lands[address(landToken)];
 
     require(land.active, "Land is not active");
-    require(land.admins[msg.sender], "Not admin of the land");
+    require(isLandAdmin(landToken, msg.sender), "Not admin of the land");
 
     uint256 amountToUnlock = land.lockAmount;
 
@@ -136,8 +133,10 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     land.lockAmount = 0;
     land.lockUser = address(0);
 
-    // pausing token
-    FantasyERC20(address(landToken)).pause();
+    if (fantasyTokens[address(landToken)]) {
+      // pausing token
+      land.token.pause();
+    }
 
     emit LandDisabled(msg.sender, address(landToken), amountToUnlock);
   }
@@ -146,7 +145,7 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     Land storage land = lands[address(landToken)];
 
     require(!land.active, "Land is already active");
-    require(land.admins[msg.sender], "Not admin of the land");
+    require(isLandAdmin(landToken, msg.sender), "Not admin of the land");
 
     uint256 amountToLock = lockAmount > land.lockAmount ? lockAmount - land.lockAmount : 0;
 
@@ -160,8 +159,10 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     land.lockAmount = land.lockAmount + amountToLock;
     land.lockUser = msg.sender;
 
-    // unpausing token
-    FantasyERC20(address(landToken)).unpause();
+    if (fantasyTokens[address(landToken)]) {
+      // unpausing token
+      land.token.unpause();
+    }
 
     emit LandEnabled(msg.sender, address(landToken), amountToLock);
   }
@@ -169,8 +170,8 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
   function unlockOffsetFromLand(IERC20 landToken) external virtual {
     Land storage land = lands[address(landToken)];
 
-    require(land.active, "Land does not exist");
-    require(land.admins[msg.sender], "Not admin of the land");
+    require(land.active, "Land is not active");
+    require(isLandAdmin(landToken, msg.sender), "Not admin of the land");
 
     uint256 amountToUnlock = land.lockAmount > lockAmount ? land.lockAmount - lockAmount : 0;
 
@@ -193,10 +194,12 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     Land storage land = lands[address(landToken)];
 
     require(land.active, "Land does not exist");
-    require(land.admins[msg.sender], "Not admin of the land");
+    require(isLandAdmin(landToken, msg.sender), "Not admin of the land");
 
     // adding minting privileges to the admin
-    land.token.grantRole(keccak256("MINTER_ROLE"), admin);
+    if (fantasyTokens[address(landToken)]) {
+      land.token.grantRole(keccak256("MINTER_ROLE"), admin);
+    }
 
     land.admins[admin] = true;
 
@@ -207,10 +210,12 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     Land storage land = lands[address(landToken)];
 
     require(land.active, "Land does not exist");
-    require(land.admins[msg.sender], "Not admin of the land");
+    require(isLandAdmin(landToken, msg.sender), "Not admin of the land");
 
     // removing minting privileges from the admin
-    land.token.revokeRole(keccak256("MINTER_ROLE"), admin);
+    if (fantasyTokens[address(landToken)]) {
+      land.token.revokeRole(keccak256("MINTER_ROLE"), admin);
+    }
 
     land.admins[admin] = false;
 
@@ -235,7 +240,7 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     return land.active;
   }
 
-  function isLandAdmin(IERC20 marketToken, address user) external view virtual returns (bool) {
+  function isLandAdmin(IERC20 marketToken, address user) public view virtual returns (bool) {
     Land storage land = lands[address(marketToken)];
 
     return land.admins[user];

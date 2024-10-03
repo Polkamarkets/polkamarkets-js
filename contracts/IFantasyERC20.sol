@@ -13,4 +13,8 @@ interface IFantasyERC20 is IERC20 {
   function claimAndApproveTokens() external;
 
   function hasUserClaimedTokens(address user) external view returns (bool);
+
+  function pause() external;
+
+  function unpause() external;
 }
