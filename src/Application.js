@@ -36,7 +36,8 @@ class Application {
     gasPrice,
     isSocialLogin = false,
     socialLoginParams,
-    startBlock
+    startBlock,
+    defaultDecimals
   }) {
     this.web3Provider = web3Provider;
     // evm logs http source (optional)
@@ -45,6 +46,7 @@ class Application {
     this.gasPrice = gasPrice;
     this.isSocialLogin = isSocialLogin;
     this.startBlock = startBlock;
+    this.defaultDecimals = defaultDecimals;
 
     if (this.isSocialLogin) {
       this.socialLoginParams = socialLoginParams;
@@ -134,6 +136,7 @@ class Application {
       gasPrice: this.gasPrice,
       isSocialLogin: this.isSocialLogin,
       startBlock: this.startBlock,
+      defaultDecimals: this.defaultDecimals
     };
   }
 

@@ -494,8 +494,8 @@ class PredictionMarketV2Contract extends IContract {
    * @return {Integer} decimals
    */
   async getMarketDecimals({marketId}) {
-    if (this.marketDecimals) {
-      return this.marketDecimals;
+    if (this.defaultDecimals) {
+      return this.defaultDecimals;
     }
 
     const marketAltData = await this.params.contract.getContract().methods.getMarketAltData(marketId).call();
