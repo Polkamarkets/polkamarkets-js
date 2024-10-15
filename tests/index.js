@@ -6,5 +6,6 @@ context('Unit Tests', () => {
   require('./predictionMarketV3ControllerContract');
   require('./predictionMarketV3FactoryContract');
   require('./fantasyERC20Contract');
+  require('./rewardsDistributorContract');
   require('./votingContract');
 });

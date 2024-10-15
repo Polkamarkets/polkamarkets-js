@@ -986,6 +986,20 @@ class IContract {
   async getBlock(blockNumber) {
     return await this.params.web3.eth.getBlock(blockNumber);
   }
+
+  async soliditySha3(args) {
+    return this.params.web3.utils.soliditySha3(...args)
+  }
+
+  async signMessage(message) {
+    if (this.acc) {
+      return await this.acc.account.sign(message);
+    } else {
+      // TODO need to test with forntend
+      // return await this.params.web3.eth.sign(message, await this.getMyAccount());
+      return await this.params.web3.eth.personal.sign(message, await this.getMyAccount());
+    }
+  }
 }
 
 module.exports = IContract;
