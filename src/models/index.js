@@ -13,6 +13,7 @@ const FantasyERC20Contract = require('./FantasyERC20Contract');
 const WETH9Contract = require('./WETH9Contract');
 const ArbitrationContract = require('./ArbitrationContract');
 const ArbitrationProxyContract = require('./ArbitrationProxyContract');
+const RewardsDistributorContract = require('./RewardsDistributorContract');
 
 module.exports = {
   ERC20Contract,
@@ -29,5 +30,6 @@ module.exports = {
   ArbitrationContract,
   ArbitrationProxyContract,
   PredictionMarketV3FactoryContract,
-  PredictionMarketV3ControllerContract
+  PredictionMarketV3ControllerContract,
+  RewardsDistributorContract
 }

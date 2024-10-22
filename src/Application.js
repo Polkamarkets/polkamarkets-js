@@ -16,6 +16,7 @@ const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
 const WETH9Contract = require("./models/index").WETH9Contract;
 const ArbitrationContract = require("./models/index").ArbitrationContract;
 const ArbitrationProxyContract = require("./models/index").ArbitrationProxyContract;
+const RewardsDistributorContract = require("./models/index").RewardsDistributorContract;
 
 const Account = require('./utils/Account');
 
@@ -360,6 +361,21 @@ class Application {
       throw err;
     }
   };
+
+  /**
+   * @name getRewardsDistributor
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a Rewards Distributor Contract
+   */
+  getRewardsDistributorContract({ contractAddress = null }) {
+    try {
+      return new RewardsDistributorContract({
+        ...this.contractDefaultParams(contractAddress)
+      });
+    } catch (err) {
+      throw err;
+    }
+  }
 
   /***********/
   /** UTILS **/
