@@ -53,7 +53,7 @@
         "node-gyp": "^9.4.0",
         "permissionless": "0.1.30",
         "superstruct": "^1.0.3",
-        "thirdweb": "^5.64.0",
+        "thirdweb": "5.63.2",
         "viem": "^2.13.3",
         "web3": "1.9.0"
     },
