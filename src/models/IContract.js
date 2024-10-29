@@ -393,6 +393,7 @@ class IContract {
     const signedUserOp = await signUserOp({
       userOp: userOperation,
       chain,
+      client,
       entrypointAddress: ENTRYPOINT_ADDRESS_V06,
       adminAccount: smartAccountSigner,
     });
