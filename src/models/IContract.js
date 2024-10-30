@@ -365,6 +365,19 @@ class IContract {
       paymasterAndData: '0x',
     }
 
+    const gasFees = await estimateUserOpGas({
+      userOp: userOperation,
+      options: {
+        entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+        chain,
+        client,
+      }
+    })
+
+    userOperation.verificationGasLimit = gasFees.verificationGasLimit;
+    userOperation.preVerificationGas = gasFees.preVerificationGas;
+    userOperation.callGasLimit = gasFees.callGasLimit;
+
     const sponsorUserOperationResult = await getPaymasterAndData(
       {
         userOp: userOperation,
@@ -384,19 +397,6 @@ class IContract {
       userOperation.callGasLimit = sponsorUserOperationResult.callGasLimit;
       userOperation.verificationGasLimit = sponsorUserOperationResult.verificationGasLimit;
       userOperation.preVerificationGas = sponsorUserOperationResult.preVerificationGas;
-    } else {
-      const gasFees = await estimateUserOpGas({
-        userOp: userOperation,
-        options: {
-          entrypointAddress: ENTRYPOINT_ADDRESS_V06,
-          chain,
-          client,
-        }
-      })
-
-      userOperation.verificationGasLimit = gasFees.verificationGasLimit;
-      userOperation.preVerificationGas = gasFees.preVerificationGas;
-      userOperation.callGasLimit = gasFees.callGasLimit;
     }
 
     const signedUserOp = await signUserOp({
