@@ -389,10 +389,20 @@ class IContract {
 
     userOperation.paymasterAndData = sponsorUserOperationResult.paymasterAndData;
 
+    if (
+      sponsorUserOperationResult.callGasLimit &&
+      sponsorUserOperationResult.verificationGasLimit &&
+      sponsorUserOperationResult.preVerificationGas
+    ) {
+      userOperation.callGasLimit = sponsorUserOperationResult.callGasLimit;
+      userOperation.verificationGasLimit = sponsorUserOperationResult.verificationGasLimit;
+      userOperation.preVerificationGas = sponsorUserOperationResult.preVerificationGas;
+    }
 
     const signedUserOp = await signUserOp({
       userOp: userOperation,
       chain,
+      client,
       entrypointAddress: ENTRYPOINT_ADDRESS_V06,
       adminAccount: smartAccountSigner,
     });
@@ -479,6 +489,7 @@ class IContract {
     const signedUserOp = await signUserOp({
       userOp: userOperation,
       chain,
+      client,
       entrypointAddress: ENTRYPOINT_ADDRESS_V06,
       adminAccount: provider.adminAccount,
     });
