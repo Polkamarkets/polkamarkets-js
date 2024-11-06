@@ -10,3 +10,6 @@
 [submodule "lib/openzeppelin-contracts-upgradeable.git"]
 	path = lib/openzeppelin-contracts-upgradeable.git
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable.git
+[submodule "lib/openzeppelin-contracts.git"]
+	path = lib/openzeppelin-contracts.git
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts.git
