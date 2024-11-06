@@ -168,7 +168,26 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
       // should be non-blocking
     }
 
-    const userMarketsData = await this.querier.getUserAllMarketsData({ user });
+    const chunkSize = 250;
+    let userMarketsData;
+
+    // chunking data to avoid out of gas errors
+    const marketIndex = await this.getMarketIndex();
+
+    if (marketIndex > chunkSize) {
+      const chunks = Math.ceil(marketIndex / chunkSize);
+      const promises = Array.from({ length: chunks }, async (_, i) => {
+        const marketIds = Array.from({ length: chunkSize }, (_, j) => i * chunkSize + j).filter(id => id < marketIndex);
+        const chunkMarketData = await this.querier.getUserMarketsData({ user, marketIds });
+        return chunkMarketData;
+      });
+      const chunksData = await Promise.all(promises);
+      // concatenating all arrays into a single one
+      userMarketsData = chunksData.reduce((obj, chunk) => [...obj, ...chunk], []);
+    } else {
+      userMarketsData = await this.querier.getUserAllMarketsData({ user });
+    }
+
     const marketIds = Object.keys(userMarketsData).map(Number);
     // fetching all markets decimals asynchrounously
     const marketDecimals = await Promise.all(marketIds.map(marketId => this.getMarketDecimals({ marketId })));
@@ -227,6 +246,10 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
       this.getContract().methods.adminResolveMarketOutcome(marketId, outcomeId),
       false,
     );
+  }
+
+  async getMarketIndex() {
+    return parseInt(await this.getContract().methods.marketIndex().call());
   }
 }
 
