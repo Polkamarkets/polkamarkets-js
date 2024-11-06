@@ -7,3 +7,7 @@ docs/
 
 xunit.xml
 .DS_Store
+
+/cache
+/out
+/zkout
