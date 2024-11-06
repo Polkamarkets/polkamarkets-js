@@ -13,3 +13,6 @@
 [submodule "lib/openzeppelin-contracts.git"]
 	path = lib/openzeppelin-contracts.git
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts.git
+[submodule "lib/reality-eth-monorepo"]
+	path = lib/reality-eth-monorepo
+	url = https://github.com/RealityETH/reality-eth-monorepo
