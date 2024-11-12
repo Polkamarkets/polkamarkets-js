@@ -10,8 +10,11 @@ const { createClient, createPublicClient, http } = require('viem');
 const { signerToSimpleSmartAccount } = require('permissionless/accounts');
 
 const { getPaymasterAndData, estimateUserOpGas, bundleUserOp, signUserOp, waitForUserOpReceipt, getUserOpGasFees, createUnsignedUserOp } = require('thirdweb/wallets/smart');
-const { createThirdwebClient, getContract, prepareContractCall } = require('thirdweb');
+const { createThirdwebClient, getContract, prepareContractCall, prepareTransaction, sendTransaction, waitForReceipt } = require('thirdweb');
 const { defineChain } = require('thirdweb/chains');
+const { ethers5Adapter } = require('thirdweb/adapters/ethers5');
+const { smartWallet } = require('thirdweb/wallets/smart');
+
 /**
  * Contract Object Interface
  * @constructor IContract
@@ -537,6 +540,46 @@ class IContract {
     return receipt;
   }
 
+  async useThirdWebForGaslessWithZKSync(f, tx, methodCallData, networkConfig, provider) {
+
+    const signer = provider.getSigner();
+
+    const account = await ethers5Adapter.signer.fromEthers({ signer });
+
+    const client = createThirdwebClient({ clientId: networkConfig.thirdWebClientId });
+    const chain = defineChain(networkConfig.chainId);
+
+    const wallet = smartWallet({
+      chain,
+      sponsorGas: true, // enable sponsored transactions
+    });
+
+    const smartAccount = await wallet.connect({
+      client,
+      personalAccount: account,
+    });
+
+    const transaction = prepareTransaction({
+      chain,
+      client,
+      to: tx.to,
+      data: tx.data
+    });
+
+    const res = await sendTransaction({
+      transaction,
+      account: smartAccount,
+    });
+
+    const receipt = await waitForReceipt({
+      client,
+      chain,
+      transactionHash: res.transactionHash,
+    });
+
+    return receipt;
+  }
+
   async sendGaslessTransactions(f) {
     const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
     const networkConfig = smartAccount.networkConfig;
@@ -567,6 +610,8 @@ class IContract {
           if (smartAccount.provider.adminAccount) {
             // if exists adminAccount it means it's using thirdwebauth
             receipt = await this.useThirdWebForGaslessTransactionsWithThirdWebAuth(f, tx, methodCallData, networkConfig, smartAccount.provider);
+          } else if (smartAccount.provider.provider) {
+            receipt = await this.useThirdWebForGaslessWithZKSync(f, tx, methodCallData, networkConfig, smartAccount.provider);
           } else {
             receipt = await this.useThirdWebForGaslessTransactions(f, tx, methodCallData, networkConfig, smartAccount.provider);
           }

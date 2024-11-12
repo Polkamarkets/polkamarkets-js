@@ -76,6 +76,11 @@ class PolkamarketsSmartAccount {
       return this.provider.smartAccount.address;
     }
 
+    if (this.networkConfig.useThirdWeb && this.provider.provider) {
+      // if exists provider it means it's using an ZKSYNC network
+      return this.provider.getSigner().getAddress();
+    }
+
     if (this.networkConfig.usePimlico || this.networkConfig.useThirdWeb) {
       const publicClient = createPublicClient({
         chain: this.networkConfig.viemChain,
