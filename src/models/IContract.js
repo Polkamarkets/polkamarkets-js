@@ -542,22 +542,28 @@ class IContract {
 
   async useThirdWebForGaslessWithZKSync(f, tx, methodCallData, networkConfig, provider) {
 
-    const signer = provider.getSigner();
-
-    const account = await ethers5Adapter.signer.fromEthers({ signer });
-
     const client = createThirdwebClient({ clientId: networkConfig.thirdWebClientId });
     const chain = defineChain(networkConfig.chainId);
+    let smartAccount
 
-    const wallet = smartWallet({
-      chain,
-      sponsorGas: true, // enable sponsored transactions
-    });
+    if (provider.address) {
+      // it's already a thirdweb smart account
+      smartAccount = provider;
+    } else {
+      const signer = provider.getSigner();
 
-    const smartAccount = await wallet.connect({
-      client,
-      personalAccount: account,
-    });
+      const account = await ethers5Adapter.signer.fromEthers({ signer });
+
+      const wallet = smartWallet({
+        chain,
+        sponsorGas: true, // enable sponsored transactions
+      });
+
+      smartAccount = await wallet.connect({
+        client,
+        personalAccount: account,
+      });
+    }
 
     const transaction = prepareTransaction({
       chain,
@@ -607,11 +613,11 @@ class IContract {
         if (networkConfig.usePimlico) {
           receipt = await this.usePimlicoForGaslessTransactions(f, tx, methodCallData, networkConfig, smartAccount.provider);
         } else if (networkConfig.useThirdWeb) {
-          if (smartAccount.provider.adminAccount) {
+          if (networkConfig.isZkSync) {
+            receipt = await this.useThirdWebForGaslessWithZKSync(f, tx, methodCallData, networkConfig, smartAccount.provider);
+          } else if (smartAccount.provider.adminAccount) {
             // if exists adminAccount it means it's using thirdwebauth
             receipt = await this.useThirdWebForGaslessTransactionsWithThirdWebAuth(f, tx, methodCallData, networkConfig, smartAccount.provider);
-          } else if (smartAccount.provider.provider) {
-            receipt = await this.useThirdWebForGaslessWithZKSync(f, tx, methodCallData, networkConfig, smartAccount.provider);
           } else {
             receipt = await this.useThirdWebForGaslessTransactions(f, tx, methodCallData, networkConfig, smartAccount.provider);
           }

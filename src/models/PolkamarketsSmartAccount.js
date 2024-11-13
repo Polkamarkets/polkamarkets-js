@@ -71,14 +71,17 @@ class PolkamarketsSmartAccount {
       return address;
     }
 
+    if (this.networkConfig.useThirdWeb && this.networkConfig.isZkSync) {
+      if (this.provider.address) {
+        return this.provider.address;
+      }
+
+      return this.provider.getSigner().getAddress();
+    }
+
     if (this.networkConfig.useThirdWeb && this.provider.adminAccount) {
       // if exists adminAccount it means it's using thirdwebauth
       return this.provider.smartAccount.address;
-    }
-
-    if (this.networkConfig.useThirdWeb && this.provider.provider) {
-      // if exists provider it means it's using an ZKSYNC network
-      return this.provider.getSigner().getAddress();
     }
 
     if (this.networkConfig.usePimlico || this.networkConfig.useThirdWeb) {
