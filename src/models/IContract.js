@@ -544,11 +544,13 @@ class IContract {
 
     const client = createThirdwebClient({ clientId: networkConfig.thirdWebClientId });
     const chain = defineChain(networkConfig.chainId);
-    let smartAccount
+    let smartAccount;
 
     if (provider.address) {
       // it's already a thirdweb smart account
       smartAccount = provider;
+    } else if (provider.smartAccount) {
+      smartAccount = provider.smartAccount;
     } else {
       const signer = provider.getSigner();
 

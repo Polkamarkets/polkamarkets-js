@@ -74,6 +74,8 @@ class PolkamarketsSmartAccount {
     if (this.networkConfig.useThirdWeb && this.networkConfig.isZkSync) {
       if (this.provider.address) {
         return this.provider.address;
+      } else if (this.provider.smartAccount) {
+        return this.provider.smartAccount.address;
       }
 
       return this.provider.getSigner().getAddress();
