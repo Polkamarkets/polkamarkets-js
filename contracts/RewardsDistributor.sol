@@ -14,12 +14,12 @@ contract RewardsDistributor is Nonces, AccessControl {
   event UserClaimAmountIncreased(address indexed user, IERC20 indexed token, uint256 amount);
   event TokensWithdrawn(address indexed account, IERC20 indexed token, uint256 amount);
 
-  mapping(address => mapping(IERC20 => uint256)) amountsToClaim;
+  mapping(address => mapping(IERC20 => uint256)) private _amountsToClaim;
   mapping(address account => uint256) private _nonces;
 
   // ------ Modifiers ------
 
-  modifier mustBeAdmin() {
+  modifier onlyAdmin() {
     require(hasRole(ADMIN_ROLE, msg.sender), "RewardsDistributor: must have admin role");
     _;
   }
@@ -30,7 +30,7 @@ contract RewardsDistributor is Nonces, AccessControl {
   }
 
   function claim(address user, address receiver, uint256 amount, IERC20 token, uint256 nonce, bytes memory signature) external {
-    require(amountsToClaim[user][token] >= amount, "RewardsDistributor: not enough tokens to claim");
+    require(_amountsToClaim[user][token] >= amount, "RewardsDistributor: not enough tokens to claim");
 
     _useCheckedNonce(user, nonce);
 
@@ -38,36 +38,57 @@ contract RewardsDistributor is Nonces, AccessControl {
     bytes32 message = (keccak256(abi.encodePacked(user, receiver, amount, token, nonce))).toEthSignedMessageHash();
     require(message.recover(signature) == user, "RewardsDistributor: invalid signature");
 
+    // checking the contract has enough balance to transfer
+    require(token.balanceOf(address(this)) >= amount, "RewardsDistributor: not enough balance to transfer");
+
     token.transfer(receiver, amount);
 
-    amountsToClaim[user][token] -= amount;
+    _amountsToClaim[user][token] -= amount;
 
     emit TokensClaimed(user, receiver, token, amount);
   }
 
   function amountToClaim(address user, IERC20 token) external view returns (uint256) {
-    return amountsToClaim[user][token];
+    return _amountsToClaim[user][token];
   }
 
   /// ADMIN FUNCTIONS
 
-  function increaseUserClaimAmount(address user, uint256 amount, IERC20 token) external mustBeAdmin  {
-    amountsToClaim[user][token] += amount;
+  function increaseUserClaimAmount(address user, uint256 amount, IERC20 token) external onlyAdmin  {
+    _amountsToClaim[user][token] += amount;
 
     emit UserClaimAmountIncreased(user, token, amount);
   }
 
-  function withdrawTokens(IERC20 token, uint256 amount) external mustBeAdmin {
+  function increaseUsersClaimAmounts(address[] calldata users, uint256[] calldata amounts, IERC20 token) external onlyAdmin {
+    require(users.length == amounts.length, "RewardsDistributor: arrays length mismatch");
+
+    for (uint256 i = 0; i < users.length; i++) {
+      _amountsToClaim[users[i]][token] += amounts[i];
+    }
+  }
+
+  function resetUserClaimAmount(address user, IERC20 token) external onlyAdmin {
+    _amountsToClaim[user][token] = 0;
+  }
+
+  function resetUsersClaimAmounts(address[] calldata users, IERC20 token) external onlyAdmin {
+    for (uint256 i = 0; i < users.length; i++) {
+      _amountsToClaim[users[i]][token] = 0;
+    }
+  }
+
+  function withdrawTokens(IERC20 token, uint256 amount) external onlyAdmin {
     token.transfer(msg.sender, amount);
 
     emit TokensWithdrawn(msg.sender, token, amount);
   }
 
-  function addAdmin(address account) external mustBeAdmin {
+  function addAdmin(address account) external onlyAdmin {
     grantRole(ADMIN_ROLE, account);
   }
 
-  function removeAdmin(address account) external mustBeAdmin {
+  function removeAdmin(address account) external onlyAdmin {
     revokeRole(ADMIN_ROLE, account);
   }
 
