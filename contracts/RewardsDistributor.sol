@@ -15,6 +15,7 @@ contract RewardsDistributor is Nonces, AccessControl {
   event TokensWithdrawn(address indexed account, IERC20 indexed token, uint256 amount);
 
   mapping(address => mapping(IERC20 => uint256)) private _amountsToClaim;
+  mapping(address => mapping(IERC20 => uint256)) private _amountsClaimed;
   mapping(address account => uint256) private _nonces;
 
   // ------ Modifiers ------
@@ -30,7 +31,7 @@ contract RewardsDistributor is Nonces, AccessControl {
   }
 
   function claim(address user, address receiver, uint256 amount, IERC20 token, uint256 nonce, bytes memory signature) external {
-    require(_amountsToClaim[user][token] >= amount, "RewardsDistributor: not enough tokens to claim");
+    require(amountToClaim(user, token) >= amount, "RewardsDistributor: not enough tokens to claim");
 
     _useCheckedNonce(user, nonce);
 
@@ -43,13 +44,18 @@ contract RewardsDistributor is Nonces, AccessControl {
 
     token.transfer(receiver, amount);
 
-    _amountsToClaim[user][token] -= amount;
+    // _amountsToClaim[user][token] -= amount;
+    _amountsClaimed[user][token] += amount;
 
     emit TokensClaimed(user, receiver, token, amount);
   }
 
-  function amountToClaim(address user, IERC20 token) external view returns (uint256) {
-    return _amountsToClaim[user][token];
+  function amountToClaim(address user, IERC20 token) public view returns (uint256) {
+    return _amountsToClaim[user][token] - _amountsClaimed[user][token];
+  }
+
+  function claimAmounts(address user, IERC20 token) external view returns (uint256, uint256) {
+    return (_amountsClaimed[user][token], _amountsToClaim[user][token]);
   }
 
   /// ADMIN FUNCTIONS
@@ -68,13 +74,15 @@ contract RewardsDistributor is Nonces, AccessControl {
     }
   }
 
-  function resetUserClaimAmount(address user, IERC20 token) external onlyAdmin {
-    _amountsToClaim[user][token] = 0;
+  function setUserClaimAmount(address user, uint256 amount, IERC20 token) external onlyAdmin {
+    _amountsToClaim[user][token] = amount;
   }
 
-  function resetUsersClaimAmounts(address[] calldata users, IERC20 token) external onlyAdmin {
+  function setUsersClaimAmounts(address[] calldata users, uint256[] calldata amounts, IERC20 token) external onlyAdmin {
+    require(users.length == amounts.length, "RewardsDistributor: arrays length mismatch");
+
     for (uint256 i = 0; i < users.length; i++) {
-      _amountsToClaim[users[i]][token] = 0;
+      _amountsToClaim[users[i]][token] = amounts[i];
     }
   }
 
