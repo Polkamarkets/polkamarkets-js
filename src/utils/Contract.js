@@ -69,12 +69,21 @@ class Contract {
 
   async send(account, byteCode, value = '0x0', callback = () => { }) {
     return new Promise(async (resolve, reject) => {
+      let gasPrice;
+      try {
+        gasPrice = await this.web3.eth.getGasPrice();
+        gasPrice *= 2;
+      } catch (err) {
+        // should be non-blocking, defaulting to 10 gwei
+        gasPrice = '10000000000';
+      }
+
       let tx = {
         data: byteCode,
         from: account.address,
         to: this.address,
         gas: 4430000,
-        gasPrice: 20000000000,
+        gasPrice,
         value: value ? value : '0x0'
       }
 
