@@ -179,7 +179,7 @@ context('Rewards Distributor Contract', async () => {
         });
       } catch (error) {
         res = { status: false };
-        expect(error.reason).to.equal('RewardsDistributor: not enough tokens to claim');
+        expect(JSON.stringify(error)).to.include('RewardsDistributor: not enough tokens to claim');
       }
 
       expect(res.status).to.equal(false);
@@ -240,7 +240,7 @@ context('Rewards Distributor Contract', async () => {
         });
       } catch (error) {
         res = { status: false };
-        expect(error.reason).to.equal('RewardsDistributor: invalid signature');
+        expect(JSON.stringify(error)).to.include('RewardsDistributor: invalid signature');
       }
 
       expect(res.status).to.equal(false);
@@ -291,7 +291,7 @@ context('Rewards Distributor Contract', async () => {
         });
       } catch (error) {
         res = { status: false };
-        expect(error.reason).to.equal('RewardsDistributor: invalid signature');
+        expect(JSON.stringify(error)).to.include('RewardsDistributor: invalid signature');
       }
 
       expect(res.status).to.equal(false);
@@ -395,7 +395,7 @@ context('Rewards Distributor Contract', async () => {
         });
       } catch (error) {
         res = { status: false };
-        expect(error.reason).to.equal('RewardsDistributor: must have admin role');
+        expect(JSON.stringify(error)).to.include('RewardsDistributor: must have admin role');
       }
 
       expect(res.status).to.equal(false);
@@ -417,7 +417,7 @@ context('Rewards Distributor Contract', async () => {
         res = await rewardsDistributorContractForUser2.addAdmin({user: USER1_ADDRESS});
       } catch (error) {
         res = { status: false };
-        expect(error.reason).to.equal('RewardsDistributor: must have admin role');
+        expect(JSON.stringify(error)).to.include('RewardsDistributor: must have admin role');
       }
 
       expect(res.status).to.equal(false);
@@ -431,17 +431,17 @@ context('Rewards Distributor Contract', async () => {
 
         let isAdmin = await rewardsDistributorContractForUser2.isAdmin({ user: deployerAddress });
         expect(isAdmin).to.equal(true);
-  
+
         let res;
         try {
           res = await rewardsDistributorContractForUser2.removeAdmin({ user: deployerAddress });
         } catch (error) {
           res = { status: false };
-          expect(error.reason).to.equal('RewardsDistributor: must have admin role');
+          expect(JSON.stringify(error)).to.include('RewardsDistributor: must have admin role');
         }
-  
+
         expect(res.status).to.equal(false);
-  
+
         isAdmin = await rewardsDistributorContractForUser2.isAdmin({ user: deployerAddress });
 
         expect(isAdmin).to.equal(true);
@@ -481,19 +481,19 @@ context('Rewards Distributor Contract', async () => {
     it('should remove user 1 as admin and not be able to add amount to claim', mochaAsync(async () => {
 
         let isAdmin = await rewardsDistributorContract.isAdmin({ user: USER1_ADDRESS });
-  
+
         expect(isAdmin).to.equal(true);
 
         let res = await rewardsDistributorContract.removeAdmin({ user: USER1_ADDRESS });
-  
+
         expect(res.status).to.equal(true);
-  
+
         isAdmin = await rewardsDistributorContract.isAdmin({ user: USER1_ADDRESS });
-  
+
         expect(isAdmin).to.equal(false);
-  
+
         let amountToClaim = await rewardsDistributorContractForUser1.getAmountToClaim({ user: USER3_ADDRESS, tokenAddress: ERC20ContractAddress });
-  
+
         expect(amountToClaim).to.equal(0);
 
         try {
@@ -504,11 +504,11 @@ context('Rewards Distributor Contract', async () => {
           });
         } catch (error) {
           res = { status: false };
-          expect(error.reason).to.equal('RewardsDistributor: must have admin role');
+          expect(JSON.stringify(error)).to.include('RewardsDistributor: must have admin role');
         }
 
         expect(res.status).to.equal(false);
-  
+
         amountToClaim = await rewardsDistributorContractForUser1.getAmountToClaim({ user: USER3_ADDRESS, tokenAddress: ERC20ContractAddress });
 
         expect(amountToClaim).to.equal(0);
