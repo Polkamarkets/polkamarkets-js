@@ -1,6 +1,8 @@
 
 const simpleAccount = require("../interfaces").simpleAccount;
 
+const IContract = require('./IContract');
+
 /**
  * Simple Acount Contract Object
  * @constructor Simple Acount
