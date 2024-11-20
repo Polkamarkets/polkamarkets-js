@@ -12331,10 +12331,10 @@ performance-now@^2.1.0:
   resolved "https://registry.yarnpkg.com/performance-now/-/performance-now-2.1.0.tgz#6309f4e0e5fa913ec1c69307ae364b4b377c9e7b"
   integrity sha1-Ywn04OX6kT7BxpMHrjZLSzd8nns=
 
-permissionless@^0.2.18:
-  version "0.2.18"
-  resolved "https://registry.yarnpkg.com/permissionless/-/permissionless-0.2.18.tgz#247505e746c5191b2dc9abff1459cfffca8e97d5"
-  integrity sha512-l8w4eisCExu2wgIkLUEwVab2+qIjmFl2QVy0MeVal5RxZZrxf+R2y1yJBnRwPnHjrB/aRRNQDN78qqtZ7G3joQ==
+permissionless@0.1.30:
+  version "0.1.30"
+  resolved "https://registry.yarnpkg.com/permissionless/-/permissionless-0.1.30.tgz#c5ea0e5ee4bbd4a89b2a85068bab16ddc5a5d52e"
+  integrity sha512-q2ZaKGiOElfy9IEFRbS8jS5f3V/gNUtWBALGtwSB16aAeWvK583oNaLizUS85pgnc1DCJ8yiKG7hm2IOvjuSBg==
 
 picocolors@^1.0.0:
   version "1.0.0"

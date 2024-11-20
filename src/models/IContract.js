@@ -7,7 +7,7 @@ const ethers = require('ethers').ethers;
 const { ENTRYPOINT_ADDRESS_V06, bundlerActions, providerToSmartAccountSigner, getAccountNonce } = require('permissionless');
 const { pimlicoBundlerActions, pimlicoPaymasterActions } = require('permissionless/actions/pimlico');
 const { createClient, createPublicClient, http } = require('viem');
-const { toSimpleSmartAccount, toThirdwebSmartAccount } = require('permissionless/accounts');
+const { signerToSimpleSmartAccount } = require('permissionless/accounts');
 
 const { getPaymasterAndData, estimateUserOpGas, bundleUserOp, signUserOp, waitForUserOpReceipt, getUserOpGasFees, createUnsignedUserOp } = require('thirdweb/wallets/smart');
 const { createThirdwebClient, getContract, prepareContractCall, prepareTransaction, sendTransaction, waitForReceipt } = require('thirdweb');
@@ -228,7 +228,7 @@ class IContract {
 
     const smartAccountSigner = await providerToSmartAccountSigner(provider);
 
-    const smartAccount = await toSimpleSmartAccount(publicClient, {
+    const smartAccount = await signerToSimpleSmartAccount(publicClient, {
       signer: smartAccountSigner,
       factoryAddress: PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
       entryPoint: ENTRYPOINT_ADDRESS_V06,
@@ -326,7 +326,7 @@ class IContract {
 
     const smartAccountSigner = await providerToSmartAccountSigner(provider);
 
-    const smartAccount = await toSimpleSmartAccount(publicClient, {
+    const smartAccount = await signerToSimpleSmartAccount(publicClient, {
       signer: smartAccountSigner,
       factoryAddress: PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
       entryPoint: ENTRYPOINT_ADDRESS_V06,
@@ -1059,25 +1059,9 @@ class IContract {
     if (this.acc) {
       return await this.acc.account.sign(message);
     } else {
-      const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
-      const networkConfig = smartAccount.networkConfig;
-
-      const client = createPublicClient({
-        chain: networkConfig.viemChain,
-        transport: http(networkConfig.rpcUrl)
-      });
-
-      const smartAccountSigner = await providerToSmartAccountSigner(smartAccount.provider);
-      const account = await toThirdwebSmartAccount({
-        client,
-        owner: smartAccountSigner,
-      })
-
-      return await account.signMessage({message});
-
       // TODO need to test with forntend
       // return await this.params.web3.eth.sign(message, await this.getMyAccount());
-      // return await this.params.web3.eth.personal.sign(message, await this.getMyAccount());
+      return await this.params.web3.eth.personal.sign(message, await this.getMyAccount());
     }
   }
 }
