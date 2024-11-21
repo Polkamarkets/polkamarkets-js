@@ -15,6 +15,7 @@ const ArbitrationContract = require('./ArbitrationContract');
 const ArbitrationProxyContract = require('./ArbitrationProxyContract');
 const RewardsDistributorContract = require('./RewardsDistributorContract');
 const SimpleAccountContract = require('./SimpleAccountContract');
+const AccountCoreContract = require('./AccountCoreContract');
 
 module.exports = {
   ERC20Contract,
@@ -34,4 +35,5 @@ module.exports = {
   PredictionMarketV3ControllerContract,
   RewardsDistributorContract,
   SimpleAccountContract,
+  AccountCoreContract
 }

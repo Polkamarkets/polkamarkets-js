@@ -14,6 +14,7 @@ let index = {
   realitio: require("../../build/contracts/RealitioERC20.json"),
   rewardsDistributor: require("../../build/contracts/RewardsDistributor.json"),
   simpleAccount: require("../../build/contracts/SimpleAccount.json"),
+  accountCore: require("../../build/contracts/AccountCore.json"),
   voting: require("../../build/contracts/Voting.json"),
   weth: require("../../build/contracts/WETH9.json"),
 };

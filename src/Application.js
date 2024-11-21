@@ -18,6 +18,7 @@ const ArbitrationContract = require("./models/index").ArbitrationContract;
 const ArbitrationProxyContract = require("./models/index").ArbitrationProxyContract;
 const RewardsDistributorContract = require("./models/index").RewardsDistributorContract;
 const SimpleAccountContract = require("./models/index").SimpleAccountContract;
+const AccountCoreContract = require("./models/index").AccountCoreContract;
 
 const Account = require('./utils/Account');
 
@@ -381,11 +382,26 @@ class Application {
   /**
    * @name getSimpleAccount
    * @param {Address} ContractAddress (Opt) If it is deployed
-   * @description Create a Rewards Distributor Contract
+   * @description Create a Simple Account Contract
    */
   getSimpleAccountContract({ contractAddress = null }) {
     try {
       return new SimpleAccountContract({
+        ...this.contractDefaultParams(contractAddress)
+      });
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  /**
+   * @name getAccountCore
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a Account Core Contract
+   */
+  getAccountCoreContract({ contractAddress = null }) {
+    try {
+      return new AccountCoreContract({
         ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
