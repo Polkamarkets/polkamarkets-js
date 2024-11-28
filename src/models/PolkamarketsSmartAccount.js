@@ -13,7 +13,7 @@ class PolkamarketsSmartAccount {
   static singleton = (() => {
     let smartAccount;
 
-    function createInstance(provider, networkConfig, isConnectedWallet) {
+    function createInstance(provider, networkConfig, isConnectedWallet, signer) {
       const options = {
         projectId: networkConfig.particleProjectId,
         clientKey: networkConfig.particleClientKey,
@@ -32,6 +32,7 @@ class PolkamarketsSmartAccount {
       instance.networkConfig = networkConfig;
       instance.provider = provider
       instance.isConnectedWallet = isConnectedWallet
+      instance.signer = signer
       if (!networkConfig.usePimlico && !networkConfig.useThirdWeb) {
         instance.smartAccount = new SmartAccount(provider, options);
         instance.smartAccount.setSmartAccountContract({ name: 'SIMPLE', version: '1.0.0' })
@@ -40,9 +41,9 @@ class PolkamarketsSmartAccount {
     }
 
     return {
-      getInstance: (provider, networkConfig, isConnectedWallet) => {
+      getInstance: (provider, networkConfig, isConnectedWallet, signer) => {
         if (!smartAccount) {
-          smartAccount = createInstance(provider, networkConfig, isConnectedWallet);
+          smartAccount = createInstance(provider, networkConfig, isConnectedWallet, signer);
         }
         return smartAccount;
       },
