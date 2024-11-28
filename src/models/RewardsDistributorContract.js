@@ -119,7 +119,7 @@ class RewardsDistributorContract extends IContract {
 
     const signature = await this.signMessage(hash);
 
-    return {signature: signature.signature, nonce};
+    return {signature, nonce};
   }
 
   /**

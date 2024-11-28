@@ -1057,11 +1057,19 @@ class IContract {
 
   async signMessage(message) {
     if (this.acc) {
-      return await this.acc.account.sign(message);
+      const sig = await this.acc.account.sign(message);
+      return sig.signature;
     } else {
-      // TODO need to test with forntend
-      // return await this.params.web3.eth.sign(message, await this.getMyAccount());
-      return await this.params.web3.eth.personal.sign(message, await this.getMyAccount());
+      if (this.params.isSocialLogin) {
+        const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
+        const signer = smartAccount.signer;
+        if (signer) {
+          return await signer.signMessage(ethers.utils.arrayify(message));
+        }
+      }
+
+      const sig = await this.params.web3.eth.personal.sign(message, await this.getMyAccount());
+      return sig.signature;
     }
   }
 }

@@ -83,7 +83,7 @@ class Application {
    * @name login
    * @description Login with Metamask or a web3 provider
    */
-  async login(provider = null, isConnectedWallet = null) {
+  async login(provider = null, isConnectedWallet = null, signer = null) {
     if (this.isSocialLogin) {
       if (!this.provider) {
         this.smartAccount = PolkamarketsSmartAccount.singleton.getInstanceIfExists()
@@ -91,7 +91,7 @@ class Application {
 
       if ((!this.smartAccount || !this.smartAccount.provider) && provider) {
         PolkamarketsSmartAccount.singleton.clearInstance();
-        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig, isConnectedWallet);
+        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig, isConnectedWallet, signer);
       }
 
       return true;
