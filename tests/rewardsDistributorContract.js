@@ -535,4 +535,142 @@ context('Rewards Distributor Contract', async () => {
 
   });
 
+  context ('Alias permission', async () => {
+    it('should not add alias if not admin', mochaAsync(async () => {
+      let isAlias = await rewardsDistributorContractForUser2.isAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+
+      expect(isAlias).to.equal(false);
+
+      let res;
+      try {
+        res = await rewardsDistributorContractForUser2.addAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+      } catch (error) {
+        res = { status: false };
+        expect(JSON.stringify(error)).to.include('RewardsDistributor: must have admin role');
+      }
+
+      expect(res.status).to.equal(false);
+
+      isAlias = await rewardsDistributorContractForUser2.isAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+
+      expect(isAlias).to.equal(false);
+    }));
+
+    it('should add alias if admin', mochaAsync(async () => {
+      let isAlias = await rewardsDistributorContract.isAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+
+      expect(isAlias).to.equal(false);
+
+      let res = await rewardsDistributorContract.addAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+
+      expect(res.status).to.equal(true);
+
+      isAlias = await rewardsDistributorContract.isAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+
+      expect(isAlias).to.equal(true);
+    }));
+
+    it('should remove alias if admin', mochaAsync(async () => {
+      let isAlias = await rewardsDistributorContract.isAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+
+      expect(isAlias).to.equal(true);
+
+      let res = await rewardsDistributorContract.removeAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+
+      expect(res.status).to.equal(true);
+
+      isAlias = await rewardsDistributorContract.isAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+
+      expect(isAlias).to.equal(false);
+    }));
+
+    it('should not remove alias if not admin', mochaAsync(async () => {
+      let isAlias = await rewardsDistributorContract.isAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+
+      expect(isAlias).to.equal(false);
+
+      let res = await rewardsDistributorContract.addAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+
+      expect(res.status).to.equal(true);
+
+      isAlias = await rewardsDistributorContract.isAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+
+      expect(isAlias).to.equal(true);
+
+      let resRemove;
+      try {
+        resRemove = await rewardsDistributorContractForUser2.removeAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+      } catch (error) {
+        resRemove = { status: false };
+        expect(JSON.stringify(error)).to.include('RewardsDistributor: must have admin role');
+      }
+
+      expect(resRemove.status).to.equal(false);
+
+      isAlias = await rewardsDistributorContract.isAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+
+      expect(isAlias).to.equal(true);
+    }));
+
+    it('should be able to claim as alias', mochaAsync(async () => {
+      const currentUser1Balance = await ERC20Contract.balanceOf({ address: USER1_ADDRESS });
+      const currentUser2Balance = await ERC20Contract.balanceOf({ address: USER2_ADDRESS });
+
+      const amountToClaim = 1000;
+
+      // add amount to claim for user 1
+      const resIncreaseAmount = await rewardsDistributorContract.increaseUserClaimAmount({
+        user: USER1_ADDRESS,
+        amount: amountToClaim,
+        tokenAddress: ERC20ContractAddress
+      });
+
+      expect(resIncreaseAmount.status).to.equal(true);
+
+      const amountLeftToClaim = await rewardsDistributorContract.getAmountToClaim({ user: USER1_ADDRESS, tokenAddress: ERC20ContractAddress });
+      expect(amountLeftToClaim).to.greaterThan(0);
+
+
+      await ERC20Contract.mint({
+        address: rewardsDistributorContractAddress,
+        amount: amountLeftToClaim
+      });
+
+      // add alias
+      let res = await rewardsDistributorContract.addAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+      expect(res.status).to.equal(true);
+
+      let isAlias = await rewardsDistributorContract.isAlias({ owner: USER1_ADDRESS, target: USER2_ADDRESS });
+      expect(isAlias).to.equal(true);
+
+      const distributionData = await rewardsDistributorContractForUser2.signMessageToClaim(
+        {
+          user: USER1_ADDRESS,
+          receiver: USER2_ADDRESS,
+          amount: amountLeftToClaim,
+          tokenAddress: ERC20ContractAddress,
+        });
+
+      // claim with user2
+      res = await rewardsDistributorContractForUser2.claim({
+        user: USER1_ADDRESS,
+        receiver: USER2_ADDRESS,
+        amount: amountLeftToClaim,
+        tokenAddress: ERC20ContractAddress,
+        nonce: distributionData.nonce,
+        signature: distributionData.signature
+      });
+
+      expect(res.status).to.equal(true);
+
+      const newContractOwnerBalance = await ERC20Contract.balanceOf({ address: rewardsDistributorContractAddress });
+      const newUser1Balance = await ERC20Contract.balanceOf({ address: USER1_ADDRESS });
+      const newUser2Balance = await ERC20Contract.balanceOf({ address: USER2_ADDRESS });
+
+      expect(newContractOwnerBalance).to.equal(0);
+      expect(newUser1Balance).to.equal(currentUser1Balance);
+      expect(newUser2Balance).to.equal(currentUser2Balance + amountLeftToClaim);
+    }));
+  });
+
 });

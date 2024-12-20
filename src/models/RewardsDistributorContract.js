@@ -66,6 +66,19 @@ class RewardsDistributorContract extends IContract {
       .call();
   }
 
+  /**
+   * @function isAlias
+   * @description Check if user is an alias
+   * @param {Address} user
+   * @returns {Boolean} isAlias
+   */
+  async isAlias({ owner, target }) {
+    return await this.params.contract
+      .getContract()
+      .methods
+      .isAlias(owner, target)
+      .call();
+  }
 
   /* POST Functions */
 
@@ -141,6 +154,38 @@ class RewardsDistributorContract extends IContract {
   async removeAdmin({ user }) {
     return await this.__sendTx(
       this.getContract().methods.removeAdmin(user)
+    );
+  }
+
+  /**
+   * @function addAlias
+   * @description Add an alias to a user
+   * @param {Address} user
+   */
+  async addAlias({ owner, target }) {
+    if (!owner) {
+      return await this.__sendTx(
+        this.getContract().methods.addAlias(target)
+      );
+    }
+    return await this.__sendTx(
+      this.getContract().methods.addAlias(owner, target)
+    );
+  }
+
+  /**
+   * @function removeAlias
+   * @description Remove an alias from a user
+   * @param {Address} user
+   */
+  async removeAlias({ owner, target }) {
+    if (!owner) {
+      return await this.__sendTx(
+        this.getContract().methods.removeAlias(target)
+      );
+    }
+    return await this.__sendTx(
+      this.getContract().methods.removeAlias(owner, target)
     );
   }
 

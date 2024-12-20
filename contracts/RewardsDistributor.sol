@@ -13,10 +13,13 @@ contract RewardsDistributor is Nonces, AccessControl {
   event TokensClaimed(address indexed user, address indexed receiver, IERC20 indexed token, uint256 amount);
   event UserClaimAmountIncreased(address indexed user, IERC20 indexed token, uint256 amount);
   event TokensWithdrawn(address indexed account, IERC20 indexed token, uint256 amount);
+  event AliasAdded(address indexed owner, address indexed target, address indexed addedBy);
+  event AliasRemoved(address indexed owner, address indexed target, address indexed removedBy);
 
   mapping(address => mapping(IERC20 => uint256)) private _amountsToClaim;
   mapping(address => mapping(IERC20 => uint256)) private _amountsClaimed;
   mapping(address account => uint256) private _nonces;
+  mapping(address => mapping(address => bool)) private aliases;
 
   // ------ Modifiers ------
 
@@ -37,7 +40,8 @@ contract RewardsDistributor is Nonces, AccessControl {
 
     // this recreates the message that was signed on the client
     bytes32 message = (keccak256(abi.encodePacked(user, receiver, amount, token, nonce))).toEthSignedMessageHash();
-    require(message.recover(signature) == user, "RewardsDistributor: invalid signature");
+    address signer = message.recover(signature);
+    require(signer == user || aliases[user][signer], "RewardsDistributor: invalid signature");
 
     // checking the contract has enough balance to transfer
     require(token.balanceOf(address(this)) >= amount, "RewardsDistributor: not enough balance to transfer");
@@ -100,7 +104,35 @@ contract RewardsDistributor is Nonces, AccessControl {
     revokeRole(ADMIN_ROLE, account);
   }
 
+  function addAlias(address target) external {
+    aliases[msg.sender][target] = true;
+
+    emit AliasAdded(msg.sender, target, msg.sender);
+  }
+
+  function removeAlias(address target) external {
+    aliases[msg.sender][target] = false;
+
+    emit AliasRemoved(msg.sender, target, msg.sender);
+  }
+
+  function addAlias(address owner, address target) external onlyAdmin {
+    aliases[owner][target] = true;
+
+    emit AliasAdded(owner, target, msg.sender);
+  }
+
+  function removeAlias(address owner, address target) external onlyAdmin {
+    aliases[owner][target] = false;
+
+    emit AliasRemoved(owner, target, msg.sender);
+  }
+
   function isAdmin(address account) external view returns (bool) {
     return hasRole(ADMIN_ROLE, account);
+  }
+
+  function isAlias(address owner, address target) external view returns (bool) {
+    return aliases[owner][target];
   }
 }
