@@ -17,6 +17,8 @@ const WETH9Contract = require("./models/index").WETH9Contract;
 const ArbitrationContract = require("./models/index").ArbitrationContract;
 const ArbitrationProxyContract = require("./models/index").ArbitrationProxyContract;
 const RewardsDistributorContract = require("./models/index").RewardsDistributorContract;
+const SimpleAccountContract = require("./models/index").SimpleAccountContract;
+const AccountCoreContract = require("./models/index").AccountCoreContract;
 
 const Account = require('./utils/Account');
 
@@ -81,7 +83,7 @@ class Application {
    * @name login
    * @description Login with Metamask or a web3 provider
    */
-  async login(provider = null, isConnectedWallet = null) {
+  async login(provider = null, isConnectedWallet = null, signer = null) {
     if (this.isSocialLogin) {
       if (!this.provider) {
         this.smartAccount = PolkamarketsSmartAccount.singleton.getInstanceIfExists()
@@ -89,7 +91,7 @@ class Application {
 
       if ((!this.smartAccount || !this.smartAccount.provider) && provider) {
         PolkamarketsSmartAccount.singleton.clearInstance();
-        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig, isConnectedWallet);
+        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig, isConnectedWallet, signer);
       }
 
       return true;
@@ -370,6 +372,36 @@ class Application {
   getRewardsDistributorContract({ contractAddress = null }) {
     try {
       return new RewardsDistributorContract({
+        ...this.contractDefaultParams(contractAddress)
+      });
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  /**
+   * @name getSimpleAccount
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a Simple Account Contract
+   */
+  getSimpleAccountContract({ contractAddress = null }) {
+    try {
+      return new SimpleAccountContract({
+        ...this.contractDefaultParams(contractAddress)
+      });
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  /**
+   * @name getAccountCore
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a Account Core Contract
+   */
+  getAccountCoreContract({ contractAddress = null }) {
+    try {
+      return new AccountCoreContract({
         ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
