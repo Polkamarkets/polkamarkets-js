@@ -343,9 +343,9 @@ contract PPMMarket is ReentrancyGuard {
   }
 
   function _calcWeight(uint256 probability) internal pure returns (uint256) {
-    uint256 centered = ((probability - ONE / 2) * ONE) / (ONE + K * _pow((probability - ONE / 2), 2));
-    uint256 penalty = ONE / _pow(ONE - _pow(probability, 4), 2);
-    return ((ONE / 2 + centered) * penalty) / ONE;
+    int256 centered = int256((probability - ONE / 2) * ONE ** 2) / int256(ONE ** 2 + K * _pow((probability - ONE / 2), 2));
+    uint256 penalty = ONE ** 2 / _pow(ONE - _pow(probability, 4), 2);
+    return (uint256(int256(ONE / 2) + centered)) * penalty / ONE;
   }
 
   function calcWeightedPrice(uint256 priceBefore, uint256 priceAfter) public pure returns (uint256) {
@@ -552,10 +552,18 @@ contract PPMMarket is ReentrancyGuard {
     require(resolvedOutcome.shares.holders[msg.sender] > 0, "user doesn't hold outcome shares");
     require(resolvedOutcome.shares.claims[msg.sender] == false, "user already claimed winnings");
 
-    // 1 share => price = 1
-    // uint256 shares = resolvedOutcome.shares.holders[msg.sender];
-    // TODO
-    uint256 value = 0;
+    // fetching balance from all pools other than resolved outcome
+    uint256 totalPool = 0;
+    for (uint256 i = 0; i < market.outcomeCount; i++) {
+      if (i != market.resolution.outcomeId) {
+        totalPool += market.outcomes[i].shares.balance;
+      }
+    }
+
+    // fetching user shares percentage from own outcome pool
+    uint256 userPool = resolvedOutcome.shares.total;
+    uint256 userShare = resolvedOutcome.shares.holders[msg.sender] * ONE / userPool;
+    uint256 value = (totalPool * userShare) / ONE;
 
     // assuring market has enough funds
     require(market.balance >= value, "insufficient market balance");
