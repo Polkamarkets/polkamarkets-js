@@ -9,6 +9,7 @@ const PredictionMarketV3Contract = require("./models/index").PredictionMarketV3C
 const PredictionMarketV3ManagerContract = require("./models/index").PredictionMarketV3ManagerContract;
 const PredictionMarketV3ControllerContract = require("./models/index").PredictionMarketV3ControllerContract;
 const PredictionMarketV3FactoryContract = require("./models/index").PredictionMarketV3FactoryContract;
+const PPMMarketContract = require("./models/index").PPMMarketContract;
 const AchievementsContract = require("./models/index").AchievementsContract;
 const RealitioERC20Contract = require("./models/index").RealitioERC20Contract;
 const VotingContract = require("./models/index").VotingContract;
@@ -228,6 +229,21 @@ class Application {
   getPredictionMarketV3ManagerContract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketV3ManagerContract({
+        ...this.contractDefaultParams(contractAddress)
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name getPPMMarketContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PPMMarket Contract
+   */
+  getPPMMarketContract({ contractAddress = null } = {}) {
+    try {
+      return new PPMMarketContract({
         ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {

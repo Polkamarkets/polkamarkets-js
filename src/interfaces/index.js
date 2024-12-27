@@ -11,6 +11,7 @@ let index = {
   predictionV3Controller: require("../../build/contracts/PredictionMarketV3Controller.json"),
   predictionMarketV3Factory: require("../../build/contracts/PredictionMarketV3Factory.json"),
   predictionV3Querier: require("../../build/contracts/PredictionMarketV3Querier.json"),
+  ppmm: require("../../build/contracts/PPMMarket.json"),
   realitio: require("../../build/contracts/RealitioERC20.json"),
   voting: require("../../build/contracts/Voting.json"),
   weth: require("../../build/contracts/WETH9.json"),
