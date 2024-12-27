@@ -530,6 +530,9 @@ class PPMMarketContract extends IContract {
     fee = 0,
     treasuryFee = 0,
     treasury = '0x0000000000000000000000000000000000000000',
+    realitioAddress,
+    realitioTimeout,
+    PM3ManagerAddress
   }) {
     const desc = await this.prepareCreateMarketDescription({
       value,
@@ -547,7 +550,12 @@ class PPMMarketContract extends IContract {
       treasury,
     });
 
-    return await this.__sendTx(this.getContract().methods.createMarket(desc));
+    return await this.__sendTx(this.getContract().methods.createMarket({
+      ...desc,
+      realitio: realitioAddress,
+      realitioTimeout,
+      manager: PM3ManagerAddress
+    }));
   };
 
 /**
