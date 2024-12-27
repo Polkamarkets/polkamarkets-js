@@ -170,8 +170,8 @@ contract PPMMarket is ReentrancyGuard {
   IWETH public immutable WETH;
 
   // formula vars
+  uint256 public constant K = ONE; // Parameter k for weight centering
   uint256 public constant R = 2; // Parameter r for probability adjustment
-  uint256 public constant K = 1; // Parameter k for weight centering
   uint256 public constant W = 50; // Parameter w (percent) for weighted probability blending (50% for now)
 
   // ------ Modifiers ------
@@ -299,53 +299,16 @@ contract PPMMarket is ReentrancyGuard {
       })
     );
     // transferring funds
-    desc.token.safeTransferFrom(msg.sender, address(this), desc.value);
+    // desc.token.safeTransferFrom(msg.sender, address(this), desc.value);
 
     return marketId;
   }
 
-  function createMarketWithETH(CreateMarketDescription calldata desc) external payable returns (uint256) {
-    require(address(desc.token) == address(WETH), "Market token is not WETH");
-    require(msg.value == desc.value, "value does not match arguments");
-    uint256 marketId = _createMarket(
-      CreateMarketDescription({
-        value: desc.value,
-        closesAt: desc.closesAt,
-        outcomes: desc.outcomes,
-        token: desc.token,
-        distribution: desc.distribution,
-        question: desc.question,
-        image: desc.image,
-        arbitrator: desc.arbitrator,
-        fee: desc.fee,
-        treasuryFee: desc.treasuryFee,
-        treasury: desc.treasury,
-        realitio: desc.realitio,
-        realitioTimeout: desc.realitioTimeout,
-        manager: desc.manager
-      })
-    );
-    // transferring funds
-    IWETH(WETH).deposit{value: msg.value}();
-
-    return marketId;
-  }
-
-  function mintAndCreateMarket(CreateMarketDescription calldata desc) external returns (uint256) {
-    // mint the amount of tokens to the user
-    IFantasyERC20(address(desc.token)).mint(msg.sender, desc.value);
-
-    uint256 marketId = _createMarket(desc);
-    // transferring funds
-    desc.token.safeTransferFrom(msg.sender, address(this), desc.value);
-
-    return marketId;
-  }
-
-  function _calcWeight(uint256 probability) internal pure returns (uint256) {
-    int256 centered = int256((probability - ONE / 2) * ONE ** 2) / int256(ONE ** 2 + K * _pow((probability - ONE / 2), 2));
-    uint256 penalty = ONE ** 2 / _pow(ONE - _pow(probability, 4), 2);
-    return (uint256(int256(ONE / 2) + centered)) * penalty / ONE;
+  function calcWeight(uint256 probability) public pure returns (uint256) {
+    int256 centered = ((int256(probability) - int256(ONE / 2)) * int256(ONE)**2) /
+      (int256(ONE)**2 + int256(K) * int256(_pow((int256(probability) - int256(ONE / 2)), 2)));
+    uint256 penalty = ONE**2 / _pow(ONE - _pow(probability, 4), 2);
+    return ((uint256(int256(ONE / 2) + centered)) * penalty) / ONE;
   }
 
   function calcWeightedPrice(uint256 priceBefore, uint256 priceAfter) public pure returns (uint256) {
@@ -362,7 +325,7 @@ contract PPMMarket is ReentrancyGuard {
     uint256 priceAfter = getMarketOutcomePriceAfterBuy(marketId, outcomeId, amount);
     uint256 priceWeighted = calcWeightedPrice(priceBefore, priceAfter);
 
-    uint256 weight = _calcWeight(priceWeighted);
+    uint256 weight = calcWeight(priceWeighted);
     return (amount * ONE) / weight;
   }
 
@@ -376,7 +339,7 @@ contract PPMMarket is ReentrancyGuard {
     uint256 priceAfter = getMarketOutcomePriceAfterSell(marketId, outcomeId, amount);
     uint256 priceWeighted = calcWeightedPrice(priceBefore, priceAfter);
 
-    uint256 weight = _calcWeight(priceWeighted);
+    uint256 weight = calcWeight(priceWeighted);
     return (amount * ONE) / weight;
   }
 
@@ -562,7 +525,7 @@ contract PPMMarket is ReentrancyGuard {
 
     // fetching user shares percentage from own outcome pool
     uint256 userPool = resolvedOutcome.shares.total;
-    uint256 userShare = resolvedOutcome.shares.holders[msg.sender] * ONE / userPool;
+    uint256 userShare = (resolvedOutcome.shares.holders[msg.sender] * ONE) / userPool;
     uint256 value = (totalPool * userShare) / ONE;
 
     // assuring market has enough funds
@@ -762,20 +725,13 @@ contract PPMMarket is ReentrancyGuard {
   }
 
   function getUserLiquidityPoolShare(uint256 marketId, address user) external view returns (uint256) {
-    Market storage market = markets[marketId];
-
-    return (market.liquidityShares[user] * ONE) / market.liquidity;
+    // TODO
+    return 0;
   }
 
   function getUserClaimableFees(uint256 marketId, address user) public view returns (uint256) {
-    Market storage market = markets[marketId];
-
-    uint256 rawAmount = (market.fees.poolWeight * market.liquidityShares[user]) / market.liquidity;
-
-    // No fees left to claim
-    if (market.fees.claimed[user] > rawAmount) return 0;
-
-    return rawAmount - market.fees.claimed[user];
+    // TODO
+    return 0;
   }
 
   function getMarkets() external view returns (uint256[] memory) {
@@ -926,7 +882,12 @@ contract PPMMarket is ReentrancyGuard {
       totalPool += _pow(market.outcomes[i].shares.balance, R);
     }
 
-    return totalPool > 0 ? (_pow(market.outcomes[outcomeId].shares.balance, R) * ONE) / totalPool : 0;
+    if (totalPool == 0) {
+      // returning 1 / outcomeCount if no shares are held
+      return ONE / market.outcomeCount;
+    }
+
+    return (_pow(market.outcomes[outcomeId].shares.balance, R) * ONE) / totalPool;
   }
 
   /**
@@ -990,7 +951,7 @@ contract PPMMarket is ReentrancyGuard {
     Market storage market = markets[marketId];
     MarketOutcome storage outcome = market.outcomes[outcomeId];
 
-    return (getMarketOutcomePrice(marketId, outcomeId), outcome.shares.total, outcome.shares.total);
+    return (getMarketOutcomePrice(marketId, outcomeId), outcome.shares.balance, outcome.shares.total);
   }
 
   function getMarketOutcomesShares(uint256 marketId) private view returns (uint256[] memory) {
@@ -1011,6 +972,14 @@ contract PPMMarket is ReentrancyGuard {
     uint256 result = ONE;
     for (uint256 i = 0; i < exponent; i++) {
       result = (result * base) / ONE;
+    }
+    return result;
+  }
+
+  function _pow(int256 base, uint256 exponent) internal pure returns (int256) {
+    int256 result = int256(ONE);
+    for (uint256 i = 0; i < exponent; i++) {
+      result = (result * base) / int256(ONE);
     }
     return result;
   }
