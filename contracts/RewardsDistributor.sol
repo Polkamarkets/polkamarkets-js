@@ -11,6 +11,7 @@ contract RewardsDistributor is Nonces, AccessControl {
   bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
   event TokensClaimed(address indexed user, address indexed receiver, IERC20 indexed token, uint256 amount);
+  event UserClaimAmountSet(address indexed user, IERC20 indexed token, uint256 amount);
   event UserClaimAmountIncreased(address indexed user, IERC20 indexed token, uint256 amount);
   event TokensWithdrawn(address indexed account, IERC20 indexed token, uint256 amount);
   event AliasAdded(address indexed owner, address indexed target, address indexed addedBy);
@@ -33,9 +34,13 @@ contract RewardsDistributor is Nonces, AccessControl {
     _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
   }
 
-  function claim(address user, address receiver, uint256 amount, IERC20 token, uint256 nonce, bytes memory signature) external {
-    require(amountToClaim(user, token) >= amount, "RewardsDistributor: not enough tokens to claim");
+  function claim(address user, address receiver, uint256 amount, IERC20 token) external {
+    require(msg.sender == user || aliases[user][msg.sender], "RewardsDistributor: invalid user");
 
+    _claim(user, receiver, amount, token);
+  }
+
+  function claim(address user, address receiver, uint256 amount, IERC20 token, uint256 nonce, bytes memory signature) external {
     _useCheckedNonce(user, nonce);
 
     // this recreates the message that was signed on the client
@@ -43,8 +48,13 @@ contract RewardsDistributor is Nonces, AccessControl {
     address signer = message.recover(signature);
     require(signer == user || aliases[user][signer], "RewardsDistributor: invalid signature");
 
+    _claim(user, receiver, amount, token);
+  }
+
+  function _claim(address user, address receiver, uint256 amount, IERC20 token) private {
     // checking the contract has enough balance to transfer
     require(token.balanceOf(address(this)) >= amount, "RewardsDistributor: not enough balance to transfer");
+    require(amountToClaim(user, token) >= amount, "RewardsDistributor: not enough tokens to claim");
 
     token.transfer(receiver, amount);
 
@@ -62,6 +72,18 @@ contract RewardsDistributor is Nonces, AccessControl {
     return (_amountsClaimed[user][token], _amountsToClaim[user][token]);
   }
 
+  function claimsAmounts(address[] calldata users, IERC20 token) external view returns (uint256[] memory, uint256[] memory) {
+    uint256[] memory claimed = new uint256[](users.length);
+    uint256[] memory toClaim = new uint256[](users.length);
+
+    for (uint256 i = 0; i < users.length; i++) {
+      claimed[i] = _amountsClaimed[users[i]][token];
+      toClaim[i] = _amountsToClaim[users[i]][token];
+    }
+
+    return (claimed, toClaim);
+  }
+
   /// ADMIN FUNCTIONS
 
   function increaseUserClaimAmount(address user, uint256 amount, IERC20 token) external onlyAdmin  {
@@ -75,11 +97,14 @@ contract RewardsDistributor is Nonces, AccessControl {
 
     for (uint256 i = 0; i < users.length; i++) {
       _amountsToClaim[users[i]][token] += amounts[i];
+      emit UserClaimAmountIncreased(users[i], token, amounts[i]);
     }
   }
 
   function setUserClaimAmount(address user, uint256 amount, IERC20 token) external onlyAdmin {
     _amountsToClaim[user][token] = amount;
+
+    emit UserClaimAmountSet(user, token, amount);
   }
 
   function setUsersClaimAmounts(address[] calldata users, uint256[] calldata amounts, IERC20 token) external onlyAdmin {
@@ -87,6 +112,7 @@ contract RewardsDistributor is Nonces, AccessControl {
 
     for (uint256 i = 0; i < users.length; i++) {
       _amountsToClaim[users[i]][token] = amounts[i];
+      emit UserClaimAmountSet(users[i], token, amounts[i]);
     }
   }
 

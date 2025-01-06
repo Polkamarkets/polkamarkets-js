@@ -98,6 +98,24 @@ class RewardsDistributorContract extends IContract {
   };
 
   /**
+   * @function claimWithoutSignature
+   * @description Claim user amount
+   * @param {Address} user
+   * @param {Address} receiver
+   * @param {Integer} amount
+   * @param {Address} tokenAddress
+   * @param {Integer} nonce
+   * @param {String} signature
+   */
+  async claimWithoutSignature({ user, receiver, amount, tokenAddress }) {
+    const amountDecimals = Numbers.toSmartContractDecimals(amount, 18);
+
+    return await this.__sendTx(
+      this.getContract().methods.claim(user, receiver, amountDecimals, tokenAddress)
+    );
+  }
+
+  /**
    * @function claim
    * @description Claim user amount
    * @param {Address} user

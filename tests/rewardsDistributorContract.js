@@ -98,7 +98,6 @@ context('Rewards Distributor Contract', async () => {
     }));
 
     it('should user 2 claim amount of user 1', mochaAsync(async () => {
-
       const currentContractBalance = await ERC20Contract.balanceOf({ address: rewardsDistributorContractAddress });
       const currentUser1Balance = await ERC20Contract.balanceOf({ address: USER1_ADDRESS });
       const currentUser2Balance = await ERC20Contract.balanceOf({ address: USER2_ADDRESS });
@@ -107,7 +106,7 @@ context('Rewards Distributor Contract', async () => {
       expect(currentUser1Balance).to.equal(0);
       expect(currentUser2Balance).to.equal(0);
 
-      const amountToClaim = await rewardsDistributorContract.getAmountToClaim({ user: USER1_ADDRESS, tokenAddress: ERC20ContractAddress });
+      const amountToClaim = await rewardsDistributorContract.getAmountToClaim({ user: USER1_ADDRESS, tokenAddress: ERC20ContractAddress }) / 2;
 
       expect(amountToClaim).to.greaterThan(0);
 
@@ -132,6 +131,36 @@ context('Rewards Distributor Contract', async () => {
 
       expect(res.status).to.equal(true);
 
+      const newContractOwnerBalance = await ERC20Contract.balanceOf({ address: rewardsDistributorContractAddress });
+      const newUser1Balance = await ERC20Contract.balanceOf({ address: USER1_ADDRESS });
+      const newUser2Balance = await ERC20Contract.balanceOf({ address: USER2_ADDRESS });
+
+      expect(newContractOwnerBalance).to.equal(Math.round(currentContractBalance - amountToClaim));
+      expect(newUser1Balance).to.equal(0);
+      expect(newUser2Balance).to.equal(amountToClaim);
+    }));
+
+    it('should user 1 claim its own amount without signature', mochaAsync(async () => {
+      const currentContractBalance = await ERC20Contract.balanceOf({ address: rewardsDistributorContractAddress });
+      const currentUser1Balance = await ERC20Contract.balanceOf({ address: USER1_ADDRESS });
+
+      expect(currentContractBalance).to.greaterThan(0);
+      expect(currentUser1Balance).to.equal(0);
+
+      const amountToClaim = await rewardsDistributorContract.getAmountToClaim({ user: USER1_ADDRESS, tokenAddress: ERC20ContractAddress });
+
+      expect(amountToClaim).to.greaterThan(0);
+
+      // claim with user2
+      const res = await rewardsDistributorContractForUser1.claimWithoutSignature({
+        user: USER1_ADDRESS,
+        receiver: USER2_ADDRESS,
+        amount: amountToClaim,
+        tokenAddress: ERC20ContractAddress,
+      });
+
+      expect(res.status).to.equal(true);
+
       const amountLeftToClaim = await rewardsDistributorContract.getAmountToClaim({ user: USER1_ADDRESS, tokenAddress: ERC20ContractAddress });
 
       expect(amountLeftToClaim).to.equal(0);
@@ -142,7 +171,7 @@ context('Rewards Distributor Contract', async () => {
 
       expect(newContractOwnerBalance).to.equal(Math.round(currentContractBalance - amountToClaim));
       expect(newUser1Balance).to.equal(0);
-      expect(newUser2Balance).to.equal(amountToClaim);
+      expect(newUser2Balance).to.equal(amountToClaim * 2);
 
     }));
 
