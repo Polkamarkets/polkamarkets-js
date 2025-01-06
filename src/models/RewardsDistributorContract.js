@@ -52,6 +52,20 @@ class RewardsDistributorContract extends IContract {
     return Numbers.fromDecimalsNumber(amountLeftToClaim, 18)
   }
 
+  async getClaimAmounts({ user, tokenAddress }) {
+    const claimAmounts = await this.params.contract
+      .getContract()
+      .methods
+      .claimAmounts(user, tokenAddress)
+      .call();
+
+    return {
+      claimed: Numbers.fromDecimalsNumber(claimAmounts[0], 18),
+      total: Numbers.fromDecimalsNumber(claimAmounts[1], 18),
+      toClaim: Numbers.fromDecimalsNumber(claimAmounts[1], 18) - Numbers.fromDecimalsNumber(claimAmounts[0], 18)
+    };
+  }
+
   /**
    * @function isAdmin
    * @description Check if user is admin
