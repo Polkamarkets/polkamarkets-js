@@ -552,18 +552,20 @@ class IContract {
     } else if (provider.smartAccount) {
       smartAccount = provider.smartAccount;
     } else {
-      const signer = provider.getSigner();
-
-      const account = await ethers5Adapter.signer.fromEthers({ signer });
-
       const wallet = smartWallet({
         chain,
         sponsorGas: true, // enable sponsored transactions
       });
 
+      let personalAccount = provider.personalAccount
+      if (!provider.personalAccount) {
+        const signer = provider.getSigner();
+        personalAccount = await ethers5Adapter.signer.fromEthers({ signer });
+      }
+
       smartAccount = await wallet.connect({
         client,
-        personalAccount: account,
+        personalAccount,
       });
     }
 
