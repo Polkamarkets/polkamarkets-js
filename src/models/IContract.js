@@ -230,7 +230,7 @@ class IContract {
 
     const smartAccount = await signerToSimpleSmartAccount(publicClient, {
       signer: smartAccountSigner,
-      factoryAddress: PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
+      factoryAddress: networkConfig.factoryAddress || PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
       entryPoint: ENTRYPOINT_ADDRESS_V06,
     })
 
@@ -328,7 +328,7 @@ class IContract {
 
     const smartAccount = await signerToSimpleSmartAccount(publicClient, {
       signer: smartAccountSigner,
-      factoryAddress: PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
+      factoryAddress: networkConfig.factoryAddress || PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
       entryPoint: ENTRYPOINT_ADDRESS_V06,
     })
 
@@ -461,7 +461,7 @@ class IContract {
 
     const factoryContract = getContract({
       client: client,
-      address: PolkamarketsSmartAccount.THIRDWEB_FACTORY_ADDRESS,
+      address: networkConfig.factoryAddress || PolkamarketsSmartAccount.THIRDWEB_FACTORY_ADDRESS,
       chain: chain,
     });
 
