@@ -71,6 +71,16 @@ class PolkamarketsSmartAccount {
       return address;
     }
 
+    if (this.networkConfig.useThirdWeb && this.networkConfig.isZkSync) {
+      if (this.provider.address) {
+        return this.provider.address;
+      } else if (this.provider.smartAccount) {
+        return this.provider.smartAccount.address;
+      }
+
+      return this.provider.getSigner().getAddress();
+    }
+
     if (this.networkConfig.useThirdWeb && this.provider.adminAccount) {
       // if exists adminAccount it means it's using thirdwebauth
       return this.provider.smartAccount.address;
@@ -86,7 +96,7 @@ class PolkamarketsSmartAccount {
 
       const smartAccount = await signerToSimpleSmartAccount(publicClient, {
         signer: smartAccountSigner,
-        factoryAddress: PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
+        factoryAddress: this.networkConfig.factoryAddress || PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
         entryPoint: ENTRYPOINT_ADDRESS_V06,
       })
 
