@@ -251,6 +251,51 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
   async getMarketIndex() {
     return parseInt(await this.getContract().methods.marketIndex().call());
   }
+
+  async getMarketsPrices({ marketIds }) {
+    if (!this.querier) {
+      const marketPrices = await Promise.all(marketIds.map(marketId => this.getMarketPrices({ marketId })));
+
+      return Object.fromEntries(marketIds.map((marketId, index) => [marketId, marketPrices[index]]));
+    }
+
+    const chunkSize = 250;
+    let marketsPrices;
+
+    // chunking data to avoid out of gas errors
+    if (marketIds.length > chunkSize) {
+      const chunks = Math.ceil(marketIds.length / chunkSize);
+      const promises = Array.from({ length: chunks }, async (_, i) => {
+        const chunkMarketIds = marketIds.slice(i * chunkSize, i * chunkSize + chunkSize);
+        const chunkMarketPrices = await this.querier.getMarketsPrices({ marketIds: chunkMarketIds });
+        return chunkMarketPrices;
+      });
+      const chunksData = await Promise.all(promises);
+      // concatenating all arrays into a single one
+      marketsPrices = chunksData.reduce((obj, chunk) => [...obj, ...chunk], []);
+    } else {
+      marketsPrices = await this.querier.getMarketsPrices({ marketIds });
+    }
+
+    // fetching all markets decimals asynchrounously
+    const marketDecimals = await Promise.all(marketIds.map(marketId => this.getMarketDecimals({ marketId })));
+
+    return marketIds.reduce((obj, marketId) => {
+      const index = marketIds.indexOf(marketId);
+      const marketData = marketsPrices[index];
+      const decimals = marketDecimals[index];
+
+      return {
+        ...obj,
+        [marketId]: {
+          liquidity: Numbers.fromDecimalsNumber(marketData.liquidityPrice, decimals),
+          outcomes: Object.fromEntries(marketData.outcomePrices.map((item, index) => {
+            return [index, Numbers.fromDecimalsNumber(item, decimals)];
+          }))
+        }
+      };
+    });
+  }
 }
 
 module.exports = PredictionMarketV3Contract;
