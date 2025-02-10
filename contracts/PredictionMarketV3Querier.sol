@@ -18,6 +18,11 @@ contract PredictionMarketV3Querier {
     bool voidedSharesToClaim;
   }
 
+  struct MarketPrices {
+    uint256 liquidityPrice;
+    uint256[] outcomePrices;
+  }
+
   /// @dev protocol is immutable and has no ownership
   constructor(IPredictionMarketV3 _PredictionMarketV3) {
     PredictionMarketV3 = _PredictionMarketV3;
@@ -52,6 +57,12 @@ contract PredictionMarketV3Querier {
       });
   }
 
+  function getMarketPrices(uint256 marketId) public view returns (MarketPrices memory) {
+    (uint256 liquidityPrice, uint256[] memory outcomePrices) = PredictionMarketV3.getMarketPrices(marketId);
+
+    return MarketPrices({liquidityPrice: liquidityPrice, outcomePrices: outcomePrices});
+  }
+
   function getUserMarketsData(uint256[] calldata marketIds, address user)
     external
     view
@@ -75,5 +86,15 @@ contract PredictionMarketV3Querier {
     }
 
     return userMarketsData;
+  }
+
+  function getMarketsPrices(uint256[] calldata marketIds) external view returns (MarketPrices[] memory) {
+    MarketPrices[] memory marketPrices = new MarketPrices[](marketIds.length);
+
+    for (uint256 i = 0; i < marketIds.length; i++) {
+      marketPrices[i] = getMarketPrices(marketIds[i]);
+    }
+
+    return marketPrices;
   }
 }
