@@ -350,7 +350,7 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
       const decimals = marketDecimals[event.returnValues.marketId];
 
       return {
-        action: actions[Numbers.fromBigNumberToInteger(event.returnValues.action, 18)],
+        action: this.constructor.ACTIONS[Numbers.fromBigNumberToInteger(event.returnValues.action, 18)],
         marketId: Numbers.fromBigNumberToInteger(event.returnValues.marketId, 18),
         outcomeId: Numbers.fromBigNumberToInteger(event.returnValues.outcomeId, 18),
         shares: Numbers.fromDecimalsNumber(event.returnValues.shares, decimals),
