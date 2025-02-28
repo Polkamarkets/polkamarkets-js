@@ -497,6 +497,9 @@ class PredictionMarketV2Contract extends IContract {
     if (this.defaultDecimals) {
       return this.defaultDecimals;
     }
+    if (this.marketDecimals && this.marketDecimals[marketId]) {
+      return this.marketDecimals[marketId];
+    }
 
     const marketAltData = await this.params.contract.getContract().methods.getMarketAltData(marketId).call();
     const contractAddress = marketAltData[3];

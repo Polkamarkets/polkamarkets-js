@@ -190,11 +190,11 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
 
     const marketIds = Object.keys(userMarketsData).map(Number);
     // fetching all markets decimals asynchrounously
-    const marketDecimals = await Promise.all(marketIds.map(marketId => this.getMarketDecimals({ marketId })));
+    const marketDecimals = await this.getMarketsERC20Decimals({ marketIds });
 
     const portfolio = marketIds.reduce((obj, marketId) => {
       const marketData = userMarketsData[marketId];
-      const decimals = marketDecimals[marketIds.indexOf(marketId)];
+      const decimals = marketDecimals[marketId];
 
       const outcomeShares = Object.fromEntries(marketData.outcomeShares.map((item, index) => {
         return [
@@ -278,12 +278,12 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
     }
 
     // fetching all markets decimals asynchrounously
-    const marketDecimals = await Promise.all(marketIds.map(marketId => this.getMarketDecimals({ marketId })));
+    const marketDecimals = await this.getMarketsERC20Decimals({ marketIds });
 
     return marketIds.reduce((obj, marketId) => {
       const index = marketIds.indexOf(marketId);
       const marketData = marketsPrices[index];
-      const decimals = marketDecimals[index];
+      const decimals = marketDecimals[marketId];
 
       return {
         ...obj,
@@ -328,6 +328,33 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
     }
 
     return Object.fromEntries(marketIds.map((marketId, index) => [marketId, marketsDecimals[index]]));
+  }
+
+  async getActions({ user }) {
+    if (!this.querier) {
+      return super.getActions({ user });
+    }
+
+    const events = await this.getEvents('MarketActionTx', { user });
+
+    // fetching decimals for each market (unique)
+    const marketIds = events.map(event => event.returnValues.marketId).filter((x, i, a) => a.indexOf(x) == i);
+    const marketDecimals = await this.getMarketsERC20Decimals({ marketIds });
+
+    // filtering by address
+    return events.map(event => {
+      const decimals = marketDecimals[event.returnValues.marketId];
+
+      return {
+        action: actions[Numbers.fromBigNumberToInteger(event.returnValues.action, 18)],
+        marketId: Numbers.fromBigNumberToInteger(event.returnValues.marketId, 18),
+        outcomeId: Numbers.fromBigNumberToInteger(event.returnValues.outcomeId, 18),
+        shares: Numbers.fromDecimalsNumber(event.returnValues.shares, decimals),
+        value: Numbers.fromDecimalsNumber(event.returnValues.value, decimals),
+        timestamp: Numbers.fromBigNumberToInteger(event.returnValues.timestamp, 18),
+        transactionHash: event.transactionHash,
+      }
+    });
   }
 }
 
