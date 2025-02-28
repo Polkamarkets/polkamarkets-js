@@ -296,6 +296,39 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
       };
     });
   }
+
+  async getMarketsERC20Decimals({ marketIds }) {
+    if (!this.querier) {
+      let marketERC20Decimals = {};
+
+      for(let i = 0; i < marketIds.length; i++) {
+        const marketId = marketIds[i];
+        const decimals = await this.getMarketERC20Decimals({ marketId });
+        marketERC20Decimals[marketId] = decimals;
+      }
+      return marketERC20Decimals;
+    }
+
+    const chunkSize = 250;
+    let marketsDecimals;
+
+    // chunking data to avoid out of gas errors
+    if (marketIds.length > chunkSize) {
+      const chunks = Math.ceil(marketIds.length / chunkSize);
+      const promises = Array.from({ length: chunks }, async (_, i) => {
+        const chunkMarketIds = marketIds.slice(i * chunkSize, i * chunkSize + chunkSize);
+        const chunkMarketDecimals = await this.querier.getMarketsERC20Decimals({ marketIds: chunkMarketIds });
+        return chunkMarketDecimals;
+      });
+      const chunksData = await Promise.all(promises);
+      // concatenating all arrays into a single one
+      marketsDecimals = chunksData.reduce((obj, chunk) => [...obj, ...chunk], []);
+    } else {
+      marketsDecimals = await this.querier.getMarketsERC20Decimals({ marketIds });
+    }
+
+    return Object.fromEntries(marketIds.map((marketId, index) => [marketId, marketsDecimals[index]]));
+  }
 }
 
 module.exports = PredictionMarketV3Contract;
