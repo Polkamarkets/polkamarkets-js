@@ -494,11 +494,11 @@ class PredictionMarketV2Contract extends IContract {
    * @return {Integer} decimals
    */
   async getMarketDecimals({marketId}) {
-    if (this.defaultDecimals) {
-      return this.defaultDecimals;
-    }
     if (this.marketDecimals && this.marketDecimals[marketId]) {
       return this.marketDecimals[marketId];
+    }
+    if (this.defaultDecimals) {
+      return this.defaultDecimals;
     }
 
     const marketAltData = await this.params.contract.getContract().methods.getMarketAltData(marketId).call();
