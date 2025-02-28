@@ -17,6 +17,7 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
         contractAddress: params.querierContractAddress
       });
     }
+    this.marketDecimals = {};
   }
 
   async mintAndCreateMarket ({
@@ -326,6 +327,9 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
     } else {
       marketsDecimals = await this.querier.getMarketsERC20Decimals({ marketIds });
     }
+
+    // storing in instance var
+    this.marketDecimals = { ...this.marketDecimals, ...marketsDecimals };
 
     return Object.fromEntries(marketIds.map((marketId, index) => [marketId, marketsDecimals[index]]));
   }
