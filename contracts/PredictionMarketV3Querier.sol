@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
+// openzeppelin imports
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 // local imports
 import "./IPredictionMarketV3.sol";
 
@@ -63,6 +65,12 @@ contract PredictionMarketV3Querier {
     return MarketPrices({liquidityPrice: liquidityPrice, outcomePrices: outcomePrices});
   }
 
+  function getMarketERC20Decimals(uint256 marketId) public view returns (uint8) {
+    (, , , address token, , , , , ) = PredictionMarketV3.getMarketAltData(marketId);
+
+    return IERC20Metadata(token).decimals();
+  }
+
   function getUserMarketsData(uint256[] calldata marketIds, address user)
     external
     view
@@ -96,5 +104,15 @@ contract PredictionMarketV3Querier {
     }
 
     return marketPrices;
+  }
+
+  function getMarketsERC20Decimals(uint256[] calldata marketIds) external view returns (uint8[] memory) {
+    uint8[] memory decimals = new uint8[](marketIds.length);
+
+    for (uint256 i = 0; i < marketIds.length; i++) {
+      decimals[i] = getMarketERC20Decimals(marketIds[i]);
+    }
+
+    return decimals;
   }
 }
