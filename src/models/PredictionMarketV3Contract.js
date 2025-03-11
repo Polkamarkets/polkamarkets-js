@@ -198,11 +198,21 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
       const decimals = marketDecimals[marketId];
 
       const outcomeShares = Object.fromEntries(marketData.outcomeShares.map((item, index) => {
+      const shares = Numbers.fromDecimalsNumber(item, decimals);
+      const price = this.getAverageOutcomeBuyPrice({events, marketId, outcomeId: index});
+      const voidedWinningsToClaim = marketData.voidedSharesToClaim && shares > 0;
+      const voidedWinningsClaimed = voidedWinningsToClaim && events.some((event) => {
+        return event.action === 'Claim Voided' &&
+          event.marketId === marketId &&
+          event.outcomeId === index
+        });
         return [
           index,
           {
-            shares: Numbers.fromDecimalsNumber(item, decimals),
-            price: this.getAverageOutcomeBuyPrice({events, marketId, outcomeId: index})
+            shares,
+            price,
+            voidedWinningsToClaim,
+            voidedWinningsClaimed
           }
         ];
       }));
