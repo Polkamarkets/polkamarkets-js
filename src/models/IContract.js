@@ -1052,6 +1052,28 @@ class IContract {
   async getBlock(blockNumber) {
     return await this.params.web3.eth.getBlock(blockNumber);
   }
+
+  async soliditySha3(args) {
+    return this.params.web3.utils.soliditySha3(...args)
+  }
+
+  async signMessage(message) {
+    if (this.acc) {
+      const sig = await this.acc.account.sign(message);
+      return sig.signature;
+    } else {
+      if (this.params.isSocialLogin) {
+        const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
+        const signer = smartAccount.signer;
+        if (signer) {
+          return await signer.signMessage(ethers.utils.arrayify(message));
+        }
+      }
+
+      const sig = await this.params.web3.eth.personal.sign(message, await this.getMyAccount());
+      return sig.signature;
+    }
+  }
 }
 
 module.exports = IContract;
