@@ -31,6 +31,7 @@
         "@openzeppelin/truffle-upgrades": "^1.7.0",
         "@particle-network/aa": "^1.2.0",
         "@reality.eth/reality-eth-lib": "^3.2.10",
+        "@types/mocha": "^10.0.10",
         "axios": "^0.24.0",
         "babel-cli": "^6.26.0",
         "babel-plugin-transform-runtime": "^6.23.0",
