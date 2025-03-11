@@ -55,6 +55,7 @@ function getAverageOutcomeBuyPriceV2({ events, marketId, outcomeId }) {
 
 const testDatasets = [
   {
+    name: "Double buy",
     events: [
       { action: "Buy", marketId: 1, outcomeId: 1, shares: 100, value: 500 }, // local avg = 5
       { action: "Buy", marketId: 1, outcomeId: 1, shares: 50, value: 300 }, // local avg = 6, new avg formula = (5 * 100 + 6 * 50) / 150 = 5.33
@@ -63,6 +64,7 @@ const testDatasets = [
   },
 
   {
+    name: "Buy, partial sell, buy",
     events: [
       { action: "Buy", marketId: 1, outcomeId: 1, shares: 100, value: 500 }, // local avg = 5
       { action: "Sell", marketId: 1, outcomeId: 1, shares: 50, value: 200 }, // sell, avg = 5
@@ -72,6 +74,7 @@ const testDatasets = [
   },
 
   {
+    name: "Simple sell",
     events: [
       { action: "Sell", marketId: 1, outcomeId: 1, shares: 50, value: 200 }, // sell, avg = 0
     ],
@@ -79,6 +82,7 @@ const testDatasets = [
   },
 
   {
+    name: "Buy, sell, buy, sell",
     events: [
       { action: "Buy", marketId: 1, outcomeId: 1, shares: 200, value: 800 }, // local avg = 4, avg = 4
       { action: "Sell", marketId: 1, outcomeId: 1, shares: 50, value: 200 }, // sell, avg = 4
@@ -89,6 +93,17 @@ const testDatasets = [
   },
 
   {
+    name: "Buy, sell everything, buy",
+    events: [
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 100, value: 500 }, // local avg = 5
+      { action: "Sell", marketId: 1, outcomeId: 1, shares: 100, value: 500 }, // sell everything, avg = 0
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 50, value: 300 }, // local avg = 6, avg = 6
+    ],
+    expected: 6,
+  },
+
+  {
+    name: "No events",
     events: [],
     expected: 0,
   },
@@ -97,7 +112,9 @@ const testDatasets = [
 // 2. Покупки и частичная продажа
 describe("getAverageOutcomeBuyPriceV1", () => {
   testDatasets.forEach((dataset, index) => {
-    it(`should return correct average for dataset ${index + 1}`, () => {
+    it(`should return correct average for dataset #${index + 1} "${
+      dataset.name
+    }"`, () => {
       const result = getAverageOutcomeBuyPriceV1({
         events: dataset.events,
         marketId: 1,
@@ -110,7 +127,9 @@ describe("getAverageOutcomeBuyPriceV1", () => {
 
 describe("getAverageOutcomeBuyPriceV2", () => {
   testDatasets.forEach((dataset, index) => {
-    it(`should return correct average for dataset ${index + 1}`, () => {
+    it(`should return correct average for dataset #${index + 1} "${
+      dataset.name
+    }"`, () => {
       const result = getAverageOutcomeBuyPriceV2({
         events: dataset.events,
         marketId: 1,
@@ -123,7 +142,9 @@ describe("getAverageOutcomeBuyPriceV2", () => {
 
 describe("Comparison of V1 and V2", () => {
   testDatasets.forEach((dataset, index) => {
-    it(`should return the same average for dataset ${index + 1}`, () => {
+    it(`should return the same average for dataset #${index + 1} "${
+      dataset.name
+    }"`, () => {
       const resultV1 = getAverageOutcomeBuyPriceV1({
         events: dataset.events,
         marketId: 1,
