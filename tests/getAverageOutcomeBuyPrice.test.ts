@@ -103,6 +103,24 @@ const testDatasets = [
   },
 
   {
+    name: "Complex realworld example",
+    events: [
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 1421.16, value: 1000 },
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 1151.19, value: 1000 },
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 1077.79, value: 1000 },
+      { action: "Sell", marketId: 1, outcomeId: 1, shares: 3650.14, value: 581.154 },
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 4129.38, value: 800 },
+      { action: "Sell", marketId: 1, outcomeId: 1, shares: 4129.37, value: 799.999 },
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 1220.82, value: 1000 },
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 1190.56, value: 1000 },
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 1091.43, value: 1000 },
+      { action: "Sell", marketId: 1, outcomeId: 1, shares: 3502.82, value: 586.356 },
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 13.8745, value: 10 },
+    ],
+    expected: 0.72,
+  },
+
+  {
     name: "No events",
     events: [],
     expected: 0,
