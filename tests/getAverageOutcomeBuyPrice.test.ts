@@ -57,26 +57,26 @@ const testDatasets = [
   {
     name: "Double buy",
     events: [
-      { action: "Buy", marketId: 1, outcomeId: 1, shares: 100, value: 500 }, // local avg = 5
-      { action: "Buy", marketId: 1, outcomeId: 1, shares: 50, value: 300 }, // local avg = 6, new avg formula = (5 * 100 + 6 * 50) / 150 = 5.33
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 500, value: 100 }, // local avg = 0.2
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 300, value: 50 }, // local avg = 0.167, new avg formula = (0.2 * 500 + 0.167 * 300) / 800 = 0.1875
     ],
-    expected: 5.33,
+    expected: 0.1875,
   },
 
   {
     name: "Buy, partial sell, buy",
     events: [
-      { action: "Buy", marketId: 1, outcomeId: 1, shares: 100, value: 500 }, // local avg = 5
-      { action: "Sell", marketId: 1, outcomeId: 1, shares: 50, value: 200 }, // sell, avg = 5
-      { action: "Buy", marketId: 1, outcomeId: 1, shares: 50, value: 500 }, // local avg = 10, new avg formula = (5 * 50 + 10 * 50) / 100 = 7.5
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 500, value: 100 }, // local avg = 0.2
+      { action: "Sell", marketId: 1, outcomeId: 1, shares: 200, value: 40 }, // sell, avg = 0.2
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 500, value: 50 }, // local avg = 0.1, new avg formula = (0.2 * 300 + 0.1 * 500) / 800 = 0.1375
     ],
-    expected: 7.5,
+    expected: 0.1375,
   },
 
   {
     name: "Simple sell",
     events: [
-      { action: "Sell", marketId: 1, outcomeId: 1, shares: 50, value: 200 }, // sell, avg = 0
+      { action: "Sell", marketId: 1, outcomeId: 1, shares: 200, value: 40 }, // sell, avg = 0
     ],
     expected: 0,
   },
@@ -84,22 +84,22 @@ const testDatasets = [
   {
     name: "Buy, sell, buy, sell",
     events: [
-      { action: "Buy", marketId: 1, outcomeId: 1, shares: 200, value: 800 }, // local avg = 4, avg = 4
-      { action: "Sell", marketId: 1, outcomeId: 1, shares: 50, value: 200 }, // sell, avg = 4
-      { action: "Buy", marketId: 1, outcomeId: 1, shares: 100, value: 600 }, // local avg = 6, new avg formula = (4 * 150 + 6 * 100) / 250 = 4.8
-      { action: "Sell", marketId: 1, outcomeId: 1, shares: 100, value: 400 }, // sell, avg = 4.8
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 800, value: 200 }, // local avg = 0.25, avg = 0.25
+      { action: "Sell", marketId: 1, outcomeId: 1, shares: 200, value: 50 }, // sell, avg = 0.25
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 600, value: 100 }, // local avg = 0.167, new avg formula = (0.25 * 600 + 0.167 * 600) / 1200 = 0.2083
+      { action: "Sell", marketId: 1, outcomeId: 1, shares: 400, value: 100 }, // sell, avg = 0.2083
     ],
-    expected: 4.8,
+    expected: 0.2083,
   },
 
   {
     name: "Buy, sell everything, buy",
     events: [
-      { action: "Buy", marketId: 1, outcomeId: 1, shares: 100, value: 500 }, // local avg = 5
-      { action: "Sell", marketId: 1, outcomeId: 1, shares: 100, value: 500 }, // sell everything, avg = 0
-      { action: "Buy", marketId: 1, outcomeId: 1, shares: 50, value: 300 }, // local avg = 6, avg = 6
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 500, value: 100 }, // local avg = 0.2
+      { action: "Sell", marketId: 1, outcomeId: 1, shares: 500, value: 100 }, // sell everything, avg = 0
+      { action: "Buy", marketId: 1, outcomeId: 1, shares: 300, value: 50 }, // local avg = 0.167, avg = 0.167
     ],
-    expected: 6,
+    expected: 0.167,
   },
 
   {
