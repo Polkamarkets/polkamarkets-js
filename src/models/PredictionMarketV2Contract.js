@@ -196,22 +196,26 @@ class PredictionMarketV2Contract extends IContract {
    * @param {Integer} outcomeId
    * @returns {Integer} price
    */
-  getAverageOutcomeBuyPrice({events, marketId, outcomeId}) {
-    // filtering by marketId + outcomeId + buy action
-    events = events.filter(event => {
-      return (
-        event.action === 'Buy' &&
-        event.marketId === marketId &&
-        event.outcomeId === outcomeId
-      );
+  getAverageOutcomeBuyPrice({ events, marketId, outcomeId }) {
+    let totalShares = 0;
+    let totalAmount = 0;
+  
+    events.forEach((event) => {
+      if (event.marketId === marketId && event.outcomeId === outcomeId) {
+        if (event.action === "Buy") {
+          totalShares += event.shares;
+          totalAmount += event.value;
+        } else if (event.action === "Sell") {
+          const proportion = event.shares / totalShares;
+          totalShares -= event.shares;
+          totalAmount *= 1 - proportion;
+        }
+      }
     });
-
-    if (events.length === 0) return 0;
-
-    const totalShares = events.map(item => item.shares).reduce((prev, next) => prev + next);
-    const totalAmount = events.map(item => item.value).reduce((prev, next) => prev + next);
-
-    return totalAmount / totalShares;
+  
+    return totalShares && totalAmount
+      ? totalAmount / totalShares
+      : 0;
   }
 
   /**
