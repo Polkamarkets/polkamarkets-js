@@ -48,7 +48,7 @@ function getAverageOutcomeBuyPriceV2({ events, marketId, outcomeId }) {
     }
   });
 
-  return totalShares === totalShares && totalAmount
+  return totalShares && totalAmount
     ? totalAmount / totalShares
     : 0;
 }

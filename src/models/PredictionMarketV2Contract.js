@@ -221,7 +221,7 @@ class PredictionMarketV2Contract extends IContract {
       }
     });
   
-    return totalShares === totalShares && totalAmount
+    return totalShares && totalAmount
       ? totalAmount / totalShares
       : 0;
   }
