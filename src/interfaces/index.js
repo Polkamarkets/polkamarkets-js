@@ -14,6 +14,7 @@ let index = {
   realitio: require("../../build/contracts/RealitioERC20.json"),
   voting: require("../../build/contracts/Voting.json"),
   weth: require("../../build/contracts/WETH9.json"),
+  referralReward: require("../../build/contracts/ReferralReward.json"),
 };
 
 module.exports = index;

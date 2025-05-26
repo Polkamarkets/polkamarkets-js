@@ -51,7 +51,7 @@ contract PredictionMarketV3 is ReentrancyGuard {
     uint256 outcomeId,
     uint256 shares,
     uint256 value,
-    uint256 timestamp,
+    uint256 timestamp
   );
 
   event MarketOutcomeShares(uint256 indexed marketId, uint256 timestamp, uint256[] outcomeShares, uint256 liquidity);
