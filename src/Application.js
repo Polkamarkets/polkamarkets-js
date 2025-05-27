@@ -1,87 +1,85 @@
-const web3 = require("web3");
+const Web3 = require("web3");
 
-const polkamarketssmartaccount = require("./models/PolkamarketsSmartAccount");
+const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
 
-const erc20contract = require("./models/index").erc20contract;
-const predictionmarketcontract =
-  require("./models/index").predictionmarketcontract;
-const predictionmarketv2contract =
-  require("./models/index").predictionmarketv2contract;
-const predictionmarketv3contract =
-  require("./models/index").predictionmarketv3contract;
-const predictionmarketv3managercontract =
-  require("./models/index").predictionmarketv3managercontract;
-const predictionmarketv3controllercontract =
-  require("./models/index").predictionmarketv3controllercontract;
-const predictionmarketv3factorycontract =
-  require("./models/index").predictionmarketv3factorycontract;
-const achievementscontract = require("./models/index").achievementscontract;
-const realitioerc20contract = require("./models/index").realitioerc20contract;
-const votingcontract = require("./models/index").votingcontract;
-const fantasyerc20contract = require("./models/index").fantasyerc20contract;
-const weth9contract = require("./models/index").weth9contract;
-const arbitrationcontract = require("./models/index").arbitrationcontract;
-const arbitrationproxycontract =
-  require("./models/index").arbitrationproxycontract;
+const ERC20Contract = require("./models/index").ERC20Contract;
+const PredictionMarketContract =
+  require("./models/index").PredictionMarketContract;
+const PredictionMarketV2Contract =
+  require("./models/index").PredictionMarketV2Contract;
+const PredictionMarketV3Contract =
+  require("./models/index").PredictionMarketV3Contract;
+const PredictionMarketV3ManagerContract =
+  require("./models/index").PredictionMarketV3ManagerContract;
+const PredictionMarketV3ControllerContract =
+  require("./models/index").PredictionMarketV3ControllerContract;
+const PredictionMarketV3FactoryContract =
+  require("./models/index").PredictionMarketV3FactoryContract;
+const AchievementsContract = require("./models/index").AchievementsContract;
+const RealitioERC20Contract = require("./models/index").RealitioERC20Contract;
+const VotingContract = require("./models/index").VotingContract;
+const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
+const WETH9Contract = require("./models/index").WETH9Contract;
+const ArbitrationContract = require("./models/index").ArbitrationContract;
+const ArbitrationProxyContract =
+  require("./models/index").ArbitrationProxyContract;
 
-const referralcontract = require("./models/index").referralrewardcontract;
+const Account = require("./utils/Account");
 
-const account = require("./utils/Account");
-
-const networksenum = Object.freeze({
-  1: "main",
-  2: "morden",
-  3: "ropsten",
-  4: "rinkeby",
-  42: "kovan",
+const networksEnum = Object.freeze({
+  1: "Main",
+  2: "Morden",
+  3: "Ropsten",
+  4: "Rinkeby",
+  42: "Kovan",
 });
 
-class application {
+class Application {
   constructor({
-    web3provider,
-    web3privatekey,
-    web3eventsprovider,
-    gasprice,
-    issociallogin = false,
-    socialloginparams,
-    startblock,
-    defaultdecimals,
+    web3Provider,
+    web3PrivateKey,
+    web3EventsProvider,
+    gasPrice,
+    isSocialLogin = false,
+    socialLoginParams,
+    startBlock,
+    defaultDecimals,
   }) {
-    this.web3provider = web3provider;
+    this.web3Provider = web3Provider;
     // evm logs http source (optional)
-    this.web3eventsprovider = web3eventsprovider;
+    this.web3EventsProvider = web3EventsProvider;
     // fixed gas price for txs (optional)
-    this.gasprice = gasprice;
-    this.issociallogin = issociallogin;
-    this.startblock = startblock;
-    this.defaultdecimals = defaultdecimals;
+    this.gasPrice = gasPrice;
+    this.isSocialLogin = isSocialLogin;
+    this.startBlock = startBlock;
+    this.defaultDecimals = defaultDecimals;
 
-    if (this.issociallogin) {
-      this.socialloginparams = socialloginparams;
+    if (this.isSocialLogin) {
+      this.socialLoginParams = socialLoginParams;
     }
 
-    // important: this parameter should only be used for testing purposes
-    if (web3privatekey && !this.issociallogin) {
+    // IMPORTANT: this parameter should only be used for testing purposes
+    if (web3PrivateKey && !this.isSocialLogin) {
       this.start();
       this.login();
-      this.account = new account(
+      this.account = new Account(
         this.web3,
-        this.web3.eth.accounts.privatekeytoaccount(web3privatekey)
+        this.web3.eth.accounts.privateKeyToAccount(web3PrivateKey)
       );
     }
   }
 
   /**********/
-  /** core **/
+  /** CORE **/
   /**********/
 
   /**
    * @name start
-   * @description start the application
+   * @description Start the Application
    */
   start() {
-    this.web3 = new web3(new web3.providers.httpprovider(this.web3provider));
-    this.web3.eth.handlerevert = true;
+    this.web3 = new Web3(new Web3.providers.HttpProvider(this.web3Provider));
+    this.web3.eth.handleRevert = true;
     if (typeof window !== "undefined") {
       window.web3 = this.web3;
     }
@@ -89,21 +87,21 @@ class application {
 
   /**
    * @name login
-   * @description login with metamask or a web3 provider
+   * @description Login with Metamask or a web3 provider
    */
-  async login(provider = null, isconnectedwallet = null) {
-    if (this.issociallogin) {
+  async login(provider = null, isConnectedWallet = null) {
+    if (this.isSocialLogin) {
       if (!this.provider) {
-        this.smartaccount =
-          polkamarketssmartaccount.singleton.getinstanceifexists();
+        this.smartAccount =
+          PolkamarketsSmartAccount.singleton.getInstanceIfExists();
       }
 
-      if ((!this.smartaccount || !this.smartaccount.provider) && provider) {
-        polkamarketssmartaccount.singleton.clearinstance();
-        this.smartaccount = polkamarketssmartaccount.singleton.getinstance(
+      if ((!this.smartAccount || !this.smartAccount.provider) && provider) {
+        PolkamarketsSmartAccount.singleton.clearInstance();
+        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(
           provider,
-          this.socialloginparams.networkconfig,
-          isconnectedwallet
+          this.socialLoginParams.networkConfig,
+          isConnectedWallet
         );
       }
 
@@ -114,7 +112,7 @@ class application {
           return false;
         }
         if (window.ethereum) {
-          window.web3 = new web3(window.ethereum);
+          window.web3 = new Web3(window.ethereum);
           this.web3 = window.web3;
           await window.ethereum.enable();
           return true;
@@ -127,12 +125,12 @@ class application {
   }
 
   /**
-   * @name isloggedin
-   * @description returns wether metamask account is connected to service or not
+   * @name isLoggedIn
+   * @description Returns wether metamask account is connected to service or not
    */
-  async isloggedin() {
-    if (this.issociallogin) {
-      return !!(this.smartaccount && this.smartaccount.provider);
+  async isLoggedIn() {
+    if (this.isSocialLogin) {
+      return !!(this.smartAccount && this.smartAccount.provider);
     } else {
       try {
         if (
@@ -150,32 +148,32 @@ class application {
     }
   }
 
-  contractdefaultparams(contractaddress) {
+  contractDefaultParams(contractAddress) {
     return {
       web3: this.web3,
-      contractaddress,
+      contractAddress,
       acc: this.account,
-      web3eventsprovider: this.web3eventsprovider,
-      gasprice: this.gasprice,
-      issociallogin: this.issociallogin,
-      startblock: this.startblock,
-      defaultdecimals: this.defaultdecimals,
+      web3EventsProvider: this.web3EventsProvider,
+      gasPrice: this.gasPrice,
+      isSocialLogin: this.isSocialLogin,
+      startBlock: this.startBlock,
+      defaultDecimals: this.defaultDecimals,
     };
   }
 
   /*************/
-  /** getters **/
+  /** GETTERS **/
   /*************/
 
   /**
-   * @name getpredictionmarketcontract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a predictionmarket contract
+   * @name getPredictionMarketContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PredictionMarket Contract
    */
-  getpredictionmarketcontract({ contractaddress = null } = {}) {
+  getPredictionMarketContract({ contractAddress = null } = {}) {
     try {
-      return new predictionmarketcontract({
-        ...this.contractdefaultparams(contractaddress),
+      return new PredictionMarketContract({
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
@@ -183,14 +181,14 @@ class application {
   }
 
   /**
-   * @name getpredictionmarketv2contract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a predictionmarketv2 contract
+   * @name getPredictionMarketV2Contract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PredictionMarketV2 Contract
    */
-  getpredictionmarketv2contract({ contractaddress = null } = {}) {
+  getPredictionMarketV2Contract({ contractAddress = null } = {}) {
     try {
-      return new predictionmarketv2contract({
-        ...this.contractdefaultparams(contractaddress),
+      return new PredictionMarketV2Contract({
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
@@ -198,32 +196,32 @@ class application {
   }
 
   /**
-   * @name getpredictionmarketv3contract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a predictionmarketv3 contract
+   * @name getPredictionMarketV3Contract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PredictionMarketV3 Contract
    */
-  getpredictionmarketv3contract({
-    contractaddress = null,
-    queriercontractaddress = null,
+  getPredictionMarketV3Contract({
+    contractAddress = null,
+    querierContractAddress = null,
   } = {}) {
     try {
-      return new predictionmarketv3contract({
-        ...this.contractdefaultparams(contractaddress),
-        queriercontractaddress,
+      return new PredictionMarketV3Contract({
+        ...this.contractDefaultParams(contractAddress),
+        querierContractAddress,
       });
     } catch (err) {
       throw err;
     }
   }
   /**
-   * @name getpredictionmarketv3factorycontract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a predictionmarketv3factory contract
+   * @name getPredictionMarketV3FactoryContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PredictionMarketV3Factory Contract
    */
-  getpredictionmarketv3factorycontract({ contractaddress = null } = {}) {
+  getPredictionMarketV3FactoryContract({ contractAddress = null } = {}) {
     try {
-      return new predictionmarketv3factorycontract({
-        ...this.contractdefaultparams(contractaddress),
+      return new PredictionMarketV3FactoryContract({
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
@@ -231,14 +229,14 @@ class application {
   }
 
   /**
-   * @name predictionmarketv3controllercontract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a predictionmarketv3controllercontract contract
+   * @name PredictionMarketV3ControllerContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PredictionMarketV3ControllerContract Contract
    */
-  getpredictionmarketv3controllercontract({ contractaddress = null } = {}) {
+  getPredictionMarketV3ControllerContract({ contractAddress = null } = {}) {
     try {
-      return new predictionmarketv3controllercontract({
-        ...this.contractdefaultparams(contractaddress),
+      return new PredictionMarketV3ControllerContract({
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
@@ -246,14 +244,14 @@ class application {
   }
 
   /**
-   * @name getpredictionmarketv3managercontract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a predictionmarketv3manager contract
+   * @name getPredictionMarketV3ManagerContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PredictionMarketV3Manager Contract
    */
-  getpredictionmarketv3managercontract({ contractaddress = null } = {}) {
+  getPredictionMarketV3ManagerContract({ contractAddress = null } = {}) {
     try {
-      return new predictionmarketv3managercontract({
-        ...this.contractdefaultparams(contractaddress),
+      return new PredictionMarketV3ManagerContract({
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
@@ -261,20 +259,20 @@ class application {
   }
 
   /**
-   * @name getachievementscontract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a predictionmarket contract
+   * @name getAchievementsContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PredictionMarket Contract
    */
-  getachievementscontract({
-    contractaddress = null,
-    predictionmarketcontractaddress = null,
-    realitioerc20contractaddress = null,
+  getAchievementsContract({
+    contractAddress = null,
+    predictionMarketContractAddress = null,
+    realitioERC20ContractAddress = null,
   } = {}) {
     try {
-      return new achievementscontract({
-        ...this.contractdefaultparams(contractaddress),
-        predictionmarketcontractaddress,
-        realitioerc20contractaddress,
+      return new AchievementsContract({
+        ...this.contractDefaultParams(contractAddress),
+        predictionMarketContractAddress,
+        realitioERC20ContractAddress,
       });
     } catch (err) {
       throw err;
@@ -282,14 +280,14 @@ class application {
   }
 
   /**
-   * @name getvotingcontract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a voting contract
+   * @name getVotingContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a Voting Contract
    */
-  getvotingcontract({ contractaddress = null } = {}) {
+  getVotingContract({ contractAddress = null } = {}) {
     try {
-      return new votingcontract({
-        ...this.contractdefaultparams(contractaddress),
+      return new VotingContract({
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
@@ -297,14 +295,14 @@ class application {
   }
 
   /**
-   * @name getfantasyerc20contract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a fantasy erc20 contract
+   * @name getFantasyERC20Contract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a Fantasy ERC20 Contract
    */
-  getfantasyerc20contract({ contractaddress = null } = {}) {
+  getFantasyERC20Contract({ contractAddress = null } = {}) {
     try {
-      return new fantasyerc20contract({
-        ...this.contractdefaultparams(contractaddress),
+      return new FantasyERC20Contract({
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
@@ -312,14 +310,14 @@ class application {
   }
 
   /**
-   * @name getrealitioerc20contract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a realitioerc20 contract
+   * @name getRealitioERC20Contract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a RealitioERC20 Contract
    */
-  getrealitioerc20contract({ contractaddress = null } = {}) {
+  getRealitioERC20Contract({ contractAddress = null } = {}) {
     try {
-      return new realitioerc20contract({
-        ...this.contractdefaultparams(contractaddress),
+      return new RealitioERC20Contract({
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
@@ -327,14 +325,14 @@ class application {
   }
 
   /**
-   * @name geterc20contract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a erc20 contract
+   * @name getERC20Contract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a ERC20 Contract
    */
-  geterc20contract({ contractaddress = null }) {
+  getERC20Contract({ contractAddress = null }) {
     try {
-      return new erc20contract({
-        ...this.contractdefaultparams(contractaddress),
+      return new ERC20Contract({
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
@@ -342,14 +340,14 @@ class application {
   }
 
   /**
-   * @name getweth9contract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a weth9 contract
+   * @name getWETH9Contract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a WETH9 Contract
    */
-  getweth9contract({ contractaddress = null }) {
+  getWETH9Contract({ contractAddress = null }) {
     try {
-      return new weth9contract({
-        ...this.contractdefaultparams(contractaddress),
+      return new WETH9Contract({
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
@@ -357,14 +355,14 @@ class application {
   }
 
   /**
-   * @name getarbitrationcontract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a arbitration contract
+   * @name getArbitrationContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a Arbitration Contract
    */
-  getarbitrationcontract({ contractaddress = null }) {
+  getArbitrationContract({ contractAddress = null }) {
     try {
-      return new arbitrationcontract({
-        ...this.contractdefaultparams(contractaddress),
+      return new ArbitrationContract({
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
@@ -372,14 +370,14 @@ class application {
   }
 
   /**
-   * @name getarbitrationproxycontract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a arbitration proxy contract
+   * @name getArbitrationProxyContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a Arbitration Proxy Contract
    */
-  getarbitrationproxycontract({ contractaddress = null }) {
+  getArbitrationProxyContract({ contractAddress = null }) {
     try {
-      return new arbitrationproxycontract({
-        ...this.contractdefaultparams(contractaddress),
+      return new ArbitrationProxyContract({
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
@@ -387,14 +385,14 @@ class application {
   }
 
   /**
-   * @name getreferralrewardcontract
-   * @param {address} contractaddress (opt) if it is deployed
-   * @description create a referralreward contract
+   * @name getReferralRewardContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a ReferralReward Proxy Contract
    */
-  getreferralrewardcontract({ contractaddress = null } = {}) {
+  getReferralRewardContract({ contractAddress = null } = {}) {
     try {
-      return new referralcontract({
-        ...this.contractdefaultparams(contractaddress),
+      return new ReferralRewardContract({
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
@@ -402,60 +400,60 @@ class application {
   }
 
   /***********/
-  /** utils **/
+  /** UTILS **/
   /***********/
 
   /**
-   * @name getethnetwork
-   * @description access current eth network used
-   * @returns {string} eth network
+   * @name getETHNetwork
+   * @description Access current ETH Network used
+   * @returns {String} Eth Network
    */
-  async getethnetwork() {
-    const netid = await this.web3.eth.net.getid();
-    const networkname = networksenum.hasownproperty(netid)
-      ? networksenum[netid]
-      : "unknown";
-    return networkname;
+  async getETHNetwork() {
+    const netId = await this.web3.eth.net.getId();
+    const networkName = networksEnum.hasOwnProperty(netId)
+      ? networksEnum[netId]
+      : "Unknown";
+    return networkName;
   }
 
   /**
-   * @name getaddress
-   * @description access current address being used under web3 injector (ex : metamask)
-   * @returns {address} address
+   * @name getAddress
+   * @description Access current Address Being Used under Web3 Injector (ex : Metamask)
+   * @returns {Address} Address
    */
-  async getaddress() {
-    if (this.issociallogin) {
-      if (this.smartaccount && this.smartaccount.provider) {
-        return await this.smartaccount.getaddress();
+  async getAddress() {
+    if (this.isSocialLogin) {
+      if (this.smartAccount && this.smartAccount.provider) {
+        return await this.smartAccount.getAddress();
       }
       return "";
     } else {
-      const accounts = await this.web3.eth.getaccounts();
+      const accounts = await this.web3.eth.getAccounts();
       return accounts[0];
     }
   }
 
   /**
-   * @name getethbalance
-   * @description access current eth balance available for the injected web3 address
-   * @returns {integer} balance
+   * @name getETHBalance
+   * @description Access current ETH Balance Available for the Injected Web3 Address
+   * @returns {Integer} Balance
    */
-  async getethbalance() {
-    const address = await this.getaddress();
-    let wei = await window.web3.eth.getbalance(address);
-    return this.web3.utils.fromwei(wei, "ether");
+  async getETHBalance() {
+    const address = await this.getAddress();
+    let wei = await window.web3.eth.getBalance(address);
+    return this.web3.utils.fromWei(wei, "ether");
   }
 
-  async socialloginwithjwt(id, jwttoken) {
-    throw new error("not implemented");
+  async socialLoginWithJWT(id, jwtToken) {
+    throw new Error("Not implemented");
   }
 
-  async socialloginlogout() {
-    if (this.smartaccount) {
-      polkamarketssmartaccount.singleton.clearinstance();
-      this.smartaccount = null;
+  async socialLoginLogout() {
+    if (this.smartAccount) {
+      PolkamarketsSmartAccount.singleton.clearInstance();
+      this.smartAccount = null;
     }
   }
 }
 
-module.exports = application;
+module.exports = Application;
