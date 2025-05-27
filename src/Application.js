@@ -28,7 +28,7 @@ const referralcontract = require("./models/index").referralrewardcontract;
 
 const account = require("./utils/Account");
 
-const networksenum = object.freeze({
+const networksenum = Object.freeze({
   1: "main",
   2: "morden",
   3: "ropsten",
