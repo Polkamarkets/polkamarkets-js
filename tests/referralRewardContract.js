@@ -10,6 +10,7 @@ context("ReferralReward Contract", async () => {
   let otherAccount;
   let referralRewardContract;
 
+  // Test data
   let epoch = 0;
   let merkleRoot =
     "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"; // dummy root
@@ -37,9 +38,11 @@ context("ReferralReward Contract", async () => {
         accountAddress = await app.getAddress();
         referralRewardContract = app.getReferralRewardContract({});
         await referralRewardContract.deploy({});
-        const referralRewardContractAddress =
-          referralRewardContract.getAddress();
-        expect(referralRewardContractAddress).to.not.equal(null);
+        const contractAddress = referralRewardContract.getAddress();
+        expect(contractAddress).to.not.equal(null);
+
+        // get another account for unauthorized testing
+        otherAccount = await app.getOtherAccount();
       })
     );
   });
@@ -54,6 +57,7 @@ context("ReferralReward Contract", async () => {
         });
         expect(res.status).to.equal(true);
 
+        // verify updated root
         const root = await referralRewardContract
           .getContract()
           .methods.merkleRoots(epoch)
@@ -65,8 +69,6 @@ context("ReferralReward Contract", async () => {
     it(
       "should fail if non-owner tries to update Merkle Root",
       mochaAsync(async () => {
-        otherAccount = await app.getOtherAccount(); // e.g., from your utils
-
         const unauthorizedContract = app.getReferralRewardContract({
           from: otherAccount,
         });
@@ -78,6 +80,18 @@ context("ReferralReward Contract", async () => {
               "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
           })
         ).to.be.rejectedWith(/Ownable: caller is not the owner/);
+      })
+    );
+
+    it(
+      "should fail to update Merkle Root twice for the same epoch",
+      mochaAsync(async () => {
+        await expect(
+          referralRewardContract.updateMerkleRoot({
+            epoch,
+            merkleRoot,
+          })
+        ).to.be.rejectedWith(/Merkle root already set/);
       })
     );
 
@@ -95,10 +109,8 @@ context("ReferralReward Contract", async () => {
     it(
       "should fail if another account tries to claim for someone else",
       mochaAsync(async () => {
-        const anotherAccount = await app.getOtherAccount();
-
         const unauthorizedClaimContract = app.getReferralRewardContract({
-          from: anotherAccount,
+          from: otherAccount,
         });
 
         await expect(
@@ -114,7 +126,7 @@ context("ReferralReward Contract", async () => {
     );
 
     it(
-      "should fail if Merkle proof is invalid",
+      "should fail with invalid Merkle proof",
       mochaAsync(async () => {
         const invalidProof = [
           "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
@@ -133,7 +145,7 @@ context("ReferralReward Contract", async () => {
     );
 
     it(
-      "should successfully claim reward",
+      "should claim reward successfully",
       mochaAsync(async () => {
         const res = await referralRewardContract.claim({
           epoch,
@@ -169,18 +181,6 @@ context("ReferralReward Contract", async () => {
           index,
         });
         expect(claimed).to.equal(true);
-      })
-    );
-
-    it(
-      "should fail to update the Merkle root again for the same epoch",
-      mochaAsync(async () => {
-        await expect(
-          referralRewardContract.updateMerkleRoot({
-            epoch,
-            merkleRoot,
-          })
-        ).to.be.rejectedWith(/Merkle root already set/);
       })
     );
   });

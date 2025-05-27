@@ -1,19 +1,42 @@
 const Contract = require("../utils/Contract");
 const _ = require("lodash");
-const axios = require('axios');
-const PolkamarketsSmartAccount = require('./PolkamarketsSmartAccount');
-const ethers = require('ethers').ethers;
+const axios = require("axios");
+const PolkamarketsSmartAccount = require("./PolkamarketsSmartAccount");
+const ethers = require("ethers").ethers;
 
-const { ENTRYPOINT_ADDRESS_V06, bundlerActions, providerToSmartAccountSigner, getAccountNonce } = require('permissionless');
-const { pimlicoBundlerActions, pimlicoPaymasterActions } = require('permissionless/actions/pimlico');
-const { createClient, createPublicClient, http } = require('viem');
-const { signerToSimpleSmartAccount } = require('permissionless/accounts');
+const {
+  ENTRYPOINT_ADDRESS_V06,
+  bundlerActions,
+  providerToSmartAccountSigner,
+  getAccountNonce,
+} = require("permissionless");
+const {
+  pimlicoBundlerActions,
+  pimlicoPaymasterActions,
+} = require("permissionless/actions/pimlico");
+const { createClient, createPublicClient, http } = require("viem");
+const { signerToSimpleSmartAccount } = require("permissionless/accounts");
 
-const { getPaymasterAndData, estimateUserOpGas, bundleUserOp, signUserOp, waitForUserOpReceipt, getUserOpGasFees, createUnsignedUserOp } = require('thirdweb/wallets/smart');
-const { createThirdwebClient, getContract, prepareContractCall, prepareTransaction, sendTransaction, waitForReceipt } = require('thirdweb');
-const { defineChain } = require('thirdweb/chains');
-const { ethers5Adapter } = require('thirdweb/adapters/ethers5');
-const { smartWallet } = require('thirdweb/wallets/smart');
+const {
+  getPaymasterAndData,
+  estimateUserOpGas,
+  bundleUserOp,
+  signUserOp,
+  waitForUserOpReceipt,
+  getUserOpGasFees,
+  createUnsignedUserOp,
+} = require("thirdweb/wallets/smart");
+const {
+  createThirdwebClient,
+  getContract,
+  prepareContractCall,
+  prepareTransaction,
+  sendTransaction,
+  waitForReceipt,
+} = require("thirdweb");
+const { defineChain } = require("thirdweb/chains");
+const { ethers5Adapter } = require("thirdweb/adapters/ethers5");
+const { smartWallet } = require("thirdweb/wallets/smart");
 
 /**
  * Contract Object Interface
@@ -24,7 +47,6 @@ const { smartWallet } = require('thirdweb/wallets/smart');
  * @param {Account} acc ? (opt)
  */
 
-
 class IContract {
   constructor({
     web3,
@@ -34,7 +56,7 @@ class IContract {
     web3EventsProvider,
     gasPrice,
     isSocialLogin = false,
-    startBlock
+    startBlock,
   }) {
     try {
       if (!abi) {
@@ -42,7 +64,7 @@ class IContract {
       }
       if (!web3) {
         throw new Error("Please provide a valid web3 provider");
-      };
+      }
 
       this.web3 = web3;
 
@@ -75,18 +97,19 @@ class IContract {
     } catch (err) {
       throw err;
     }
-  };
+  }
 
-  async __metamaskCall({ f, acc, value, callback = () => { } }) {
-    return f.send({
-      from: acc,
-      value: value,
-      gasPrice: this.params.gasPrice,
-      maxPriorityFeePerGas: null,
-      maxFeePerGas: null
-    })
+  async __metamaskCall({ f, acc, value, callback = () => {} }) {
+    return f
+      .send({
+        from: acc,
+        value: value,
+        gasPrice: this.params.gasPrice,
+        maxPriorityFeePerGas: null,
+        maxFeePerGas: null,
+      })
       .on("confirmation", (confirmationNumber, receipt) => {
-        callback(confirmationNumber)
+        callback(confirmationNumber);
         if (confirmationNumber > 0) {
           resolve(receipt);
         }
@@ -95,34 +118,42 @@ class IContract {
         throw err;
         // reject(err);
       });
-  };
+  }
 
   waitForTransactionHashToBeGenerated(userOpHash, networkConfig) {
     return new Promise((resolve, reject) => {
       const interval = setInterval(async () => {
-        const userOperation = await axios.post(`${networkConfig.bundlerRPC}/rpc?chainId=${networkConfig.chainId}`,
+        const userOperation = await axios.post(
+          `${networkConfig.bundlerRPC}/rpc?chainId=${networkConfig.chainId}`,
           {
-            "method": "eth_getUserOperationByHash",
-            "params": [
-              userOpHash
-            ]
+            method: "eth_getUserOperationByHash",
+            params: [userOpHash],
           }
         );
 
-        if (userOperation.data.result && userOperation.data.result.transactionHash) {
+        if (
+          userOperation.data.result &&
+          userOperation.data.result.transactionHash
+        ) {
           clearInterval(interval);
           resolve(userOperation.data.result.transactionHash);
         } else if (networkConfig.bundlerAPI) {
           let userOperationData;
           try {
-            userOperationData = await axios.get(`${networkConfig.bundlerAPI}/user_operations/${userOpHash}`);
+            userOperationData = await axios.get(
+              `${networkConfig.bundlerAPI}/user_operations/${userOpHash}`
+            );
           } catch (error) {
             // fetch should be non-blocking
           }
 
-          if (userOperationData && userOperationData.data && userOperationData.data.status === 'failed') {
+          if (
+            userOperationData &&
+            userOperationData.data &&
+            userOperationData.data.status === "failed"
+          ) {
             clearInterval(interval);
-            reject(new Error('User operation failed'));
+            reject(new Error("User operation failed"));
           }
         }
       }, 1000);
@@ -141,7 +172,10 @@ class IContract {
     const abiCoder = new ethers.utils.AbiCoder();
 
     const userOpHash = ethers.utils.keccak256(this.packUserOp(userOp, true));
-    const enc = abiCoder.encode(['bytes32', 'address', 'uint256'], [userOpHash, entryPoint, chainId]);
+    const enc = abiCoder.encode(
+      ["bytes32", "address", "uint256"],
+      [userOpHash, entryPoint, chainId]
+    );
     return ethers.utils.keccak256(enc);
   }
 
@@ -149,7 +183,18 @@ class IContract {
     const abiCoder = new ethers.utils.AbiCoder();
     if (forSignature) {
       return abiCoder.encode(
-        ['address', 'uint256', 'bytes32', 'bytes32', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'bytes32'],
+        [
+          "address",
+          "uint256",
+          "bytes32",
+          "bytes32",
+          "uint256",
+          "uint256",
+          "uint256",
+          "uint256",
+          "uint256",
+          "bytes32",
+        ],
         [
           userOp.sender,
           userOp.nonce,
@@ -161,12 +206,24 @@ class IContract {
           userOp.maxFeePerGas,
           userOp.maxPriorityFeePerGas,
           ethers.utils.keccak256(userOp.paymasterAndData),
-        ],
+        ]
       );
     } else {
       // for the purpose of calculating gas cost encode also signature (and no keccak of bytes)
       return abiCoder.encode(
-        ['address', 'uint256', 'bytes', 'bytes', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'bytes', 'bytes'],
+        [
+          "address",
+          "uint256",
+          "bytes",
+          "bytes",
+          "uint256",
+          "uint256",
+          "uint256",
+          "uint256",
+          "uint256",
+          "bytes",
+          "bytes",
+        ],
         [
           userOp.sender,
           userOp.nonce,
@@ -179,7 +236,7 @@ class IContract {
           userOp.maxPriorityFeePerGas,
           userOp.paymasterAndData,
           userOp.signature,
-        ],
+        ]
       );
     }
   }
@@ -187,9 +244,10 @@ class IContract {
   waitForTransactionHashToBeGeneratedPimlico(userOpHash, pimlicoBundlerClient) {
     return new Promise((resolve, reject) => {
       const interval = setInterval(async () => {
-        const getStatusResult = await pimlicoBundlerClient.getUserOperationStatus({
-          hash: userOpHash,
-        })
+        const getStatusResult =
+          await pimlicoBundlerClient.getUserOperationStatus({
+            hash: userOpHash,
+          });
 
         if (getStatusResult.transactionHash) {
           clearInterval(interval);
@@ -199,8 +257,16 @@ class IContract {
     });
   }
 
-  async usePimlicoForGaslessTransactions(f, tx, methodCallData, networkConfig, provider) {
-    const accountABI = ["function execute(address to, uint256 value, bytes data)"];
+  async usePimlicoForGaslessTransactions(
+    f,
+    tx,
+    methodCallData,
+    networkConfig,
+    provider
+  ) {
+    const accountABI = [
+      "function execute(address to, uint256 value, bytes data)",
+    ];
     const account = new ethers.utils.Interface(accountABI);
     const callData = account.encodeFunctionData("execute", [
       tx.to,
@@ -210,42 +276,52 @@ class IContract {
 
     const publicClient = createPublicClient({
       chain: networkConfig.viemChain,
-      transport: http(networkConfig.rpcUrl)
+      transport: http(networkConfig.rpcUrl),
     });
 
     const bundlerClient = createClient({
-      transport: http(`${networkConfig.pimlicoUrl}/${networkConfig.chainId}/rpc?apikey=${networkConfig.pimlicoApiKey}`),
+      transport: http(
+        `${networkConfig.pimlicoUrl}/${networkConfig.chainId}/rpc?apikey=${networkConfig.pimlicoApiKey}`
+      ),
       chain: networkConfig.viemChain,
     })
       .extend(bundlerActions(ENTRYPOINT_ADDRESS_V06))
-      .extend(pimlicoBundlerActions(ENTRYPOINT_ADDRESS_V06))
-
+      .extend(pimlicoBundlerActions(ENTRYPOINT_ADDRESS_V06));
 
     const paymasterClient = createClient({
-      transport: http(`${networkConfig.pimlicoUrl}/${networkConfig.chainId}/rpc?apikey=${networkConfig.pimlicoApiKey}`),
+      transport: http(
+        `${networkConfig.pimlicoUrl}/${networkConfig.chainId}/rpc?apikey=${networkConfig.pimlicoApiKey}`
+      ),
       chain: networkConfig.viemChain,
-    }).extend(pimlicoPaymasterActions(ENTRYPOINT_ADDRESS_V06))
+    }).extend(pimlicoPaymasterActions(ENTRYPOINT_ADDRESS_V06));
 
     const smartAccountSigner = await providerToSmartAccountSigner(provider);
 
     const smartAccount = await signerToSimpleSmartAccount(publicClient, {
       signer: smartAccountSigner,
-      factoryAddress: networkConfig.factoryAddress || PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
+      factoryAddress:
+        networkConfig.factoryAddress ||
+        PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
       entryPoint: ENTRYPOINT_ADDRESS_V06,
-    })
+    });
 
     const initCode = await smartAccount.getInitCode();
     const senderAddress = smartAccount.address;
 
-    const gasPrice = await bundlerClient.getUserOperationGasPrice()
+    const gasPrice = await bundlerClient.getUserOperationGasPrice();
 
-    const key = BigInt(Math.floor(Math.random() * 6277101735386680763835789423207666416102355444464034512895));
+    const key = BigInt(
+      Math.floor(
+        Math.random() *
+          6277101735386680763835789423207666416102355444464034512895
+      )
+    );
 
     const nonce = await getAccountNonce(publicClient, {
       sender: senderAddress,
       entryPoint: ENTRYPOINT_ADDRESS_V06,
-      key
-    })
+      key,
+    });
 
     const userOperation = {
       sender: senderAddress,
@@ -255,39 +331,59 @@ class IContract {
       maxFeePerGas: Number(gasPrice.fast.maxFeePerGas),
       maxPriorityFeePerGas: Number(gasPrice.fast.maxPriorityFeePerGas),
       signature: await smartAccount.getDummySignature(),
-    }
+    };
 
-    const sponsorUserOperationResult = await paymasterClient.sponsorUserOperation({
-      userOperation,
-    })
+    const sponsorUserOperationResult =
+      await paymasterClient.sponsorUserOperation({
+        userOperation,
+      });
 
     const sponsoredUserOperation = {
       ...userOperation,
       ...sponsorUserOperationResult,
-    }
+    };
 
-    const signature = await smartAccount.signUserOperation(sponsoredUserOperation);
+    const signature = await smartAccount.signUserOperation(
+      sponsoredUserOperation
+    );
 
     sponsoredUserOperation.signature = signature;
 
-    let userOpHash = this.getUserOpHash(networkConfig.chainId, sponsoredUserOperation, ENTRYPOINT_ADDRESS_V06);
+    let userOpHash = this.getUserOpHash(
+      networkConfig.chainId,
+      sponsoredUserOperation,
+      ENTRYPOINT_ADDRESS_V06
+    );
 
     if (networkConfig.bundlerAPI) {
-      sponsoredUserOperation.nonce = ethers.BigNumber.from(sponsoredUserOperation.nonce).toHexString();
-      sponsoredUserOperation.maxFeePerGas = ethers.BigNumber.from(sponsoredUserOperation.maxFeePerGas).toHexString();
-      sponsoredUserOperation.maxPriorityFeePerGas = ethers.BigNumber.from(sponsoredUserOperation.maxPriorityFeePerGas).toHexString();
-      sponsoredUserOperation.preVerificationGas = ethers.BigNumber.from(sponsoredUserOperation.preVerificationGas).toHexString();
-      sponsoredUserOperation.verificationGasLimit = ethers.BigNumber.from(sponsoredUserOperation.verificationGasLimit).toHexString();
-      sponsoredUserOperation.callGasLimit = ethers.BigNumber.from(sponsoredUserOperation.callGasLimit).toHexString();
+      sponsoredUserOperation.nonce = ethers.BigNumber.from(
+        sponsoredUserOperation.nonce
+      ).toHexString();
+      sponsoredUserOperation.maxFeePerGas = ethers.BigNumber.from(
+        sponsoredUserOperation.maxFeePerGas
+      ).toHexString();
+      sponsoredUserOperation.maxPriorityFeePerGas = ethers.BigNumber.from(
+        sponsoredUserOperation.maxPriorityFeePerGas
+      ).toHexString();
+      sponsoredUserOperation.preVerificationGas = ethers.BigNumber.from(
+        sponsoredUserOperation.preVerificationGas
+      ).toHexString();
+      sponsoredUserOperation.verificationGasLimit = ethers.BigNumber.from(
+        sponsoredUserOperation.verificationGasLimit
+      ).toHexString();
+      sponsoredUserOperation.callGasLimit = ethers.BigNumber.from(
+        sponsoredUserOperation.callGasLimit
+      ).toHexString();
 
-      const txResponse = await axios.post(`${networkConfig.bundlerAPI}/user_operations`,
+      const txResponse = await axios.post(
+        `${networkConfig.bundlerAPI}/user_operations`,
         {
           user_operation: {
             user_operation: sponsoredUserOperation,
             user_operation_hash: userOpHash,
             user_operation_data: [this.operationDataFromCall(f)],
             network_id: networkConfig.chainId,
-          }
+          },
         }
       );
 
@@ -297,21 +393,32 @@ class IContract {
     } else {
       userOpHash = await bundlerClient.sendUserOperation({
         userOperation: sponsoredUserOperation,
-      })
+      });
     }
 
-    const transactionHash = await this.waitForTransactionHashToBeGeneratedPimlico(userOpHash, bundlerClient);
+    const transactionHash =
+      await this.waitForTransactionHashToBeGeneratedPimlico(
+        userOpHash,
+        bundlerClient
+      );
 
-    const receipt = await publicClient.waitForTransactionReceipt(
-      { hash: transactionHash }
-    )
+    const receipt = await publicClient.waitForTransactionReceipt({
+      hash: transactionHash,
+    });
 
     return receipt;
-
   }
 
-  async useThirdWebForGaslessTransactions(f, tx, methodCallData, networkConfig, provider) {
-    const accountABI = ["function execute(address to, uint256 value, bytes data)"];
+  async useThirdWebForGaslessTransactions(
+    f,
+    tx,
+    methodCallData,
+    networkConfig,
+    provider
+  ) {
+    const accountABI = [
+      "function execute(address to, uint256 value, bytes data)",
+    ];
     const account = new ethers.utils.Interface(accountABI);
     const callData = account.encodeFunctionData("execute", [
       tx.to,
@@ -321,41 +428,48 @@ class IContract {
 
     const publicClient = createPublicClient({
       chain: networkConfig.viemChain,
-      transport: http(networkConfig.rpcUrl)
+      transport: http(networkConfig.rpcUrl),
     });
 
     const smartAccountSigner = await providerToSmartAccountSigner(provider);
 
     const smartAccount = await signerToSimpleSmartAccount(publicClient, {
       signer: smartAccountSigner,
-      factoryAddress: networkConfig.factoryAddress || PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
+      factoryAddress:
+        networkConfig.factoryAddress ||
+        PolkamarketsSmartAccount.PIMLICO_FACTORY_ADDRESS,
       entryPoint: ENTRYPOINT_ADDRESS_V06,
-    })
+    });
 
     const initCode = await smartAccount.getInitCode();
     const senderAddress = smartAccount.address;
 
-    const client = createThirdwebClient({ clientId: networkConfig.thirdWebClientId });
+    const client = createThirdwebClient({
+      clientId: networkConfig.thirdWebClientId,
+    });
 
     const chain = defineChain(networkConfig.chainId);
 
-    const gasPrice = await getUserOpGasFees(
-      {
-        options: {
-          entrypointAddress: ENTRYPOINT_ADDRESS_V06,
-          chain,
-          client,
-        }
-      }
-    );
+    const gasPrice = await getUserOpGasFees({
+      options: {
+        entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+        chain,
+        client,
+      },
+    });
 
-    const key = BigInt(Math.floor(Math.random() * 6277101735386680763835789423207666416102355444464034512895));
+    const key = BigInt(
+      Math.floor(
+        Math.random() *
+          6277101735386680763835789423207666416102355444464034512895
+      )
+    );
 
     const nonce = await getAccountNonce(publicClient, {
       sender: senderAddress,
       entryPoint: ENTRYPOINT_ADDRESS_V06,
-      key
-    })
+      key,
+    });
 
     const userOperation = {
       sender: senderAddress,
@@ -365,8 +479,8 @@ class IContract {
       maxFeePerGas: Number(gasPrice.maxFeePerGas),
       maxPriorityFeePerGas: Number(gasPrice.maxPriorityFeePerGas),
       signature: await smartAccount.getDummySignature(),
-      paymasterAndData: '0x',
-    }
+      paymasterAndData: "0x",
+    };
 
     const gasFees = await estimateUserOpGas({
       userOp: userOperation,
@@ -374,23 +488,22 @@ class IContract {
         entrypointAddress: ENTRYPOINT_ADDRESS_V06,
         chain,
         client,
-      }
-    })
+      },
+    });
 
     userOperation.verificationGasLimit = gasFees.verificationGasLimit;
     userOperation.preVerificationGas = gasFees.preVerificationGas;
     userOperation.callGasLimit = gasFees.callGasLimit;
 
-    const sponsorUserOperationResult = await getPaymasterAndData(
-      {
-        userOp: userOperation,
-        client,
-        chain,
-        entrypointAddress: ENTRYPOINT_ADDRESS_V06,
-      }
-    );
+    const sponsorUserOperationResult = await getPaymasterAndData({
+      userOp: userOperation,
+      client,
+      chain,
+      entrypointAddress: ENTRYPOINT_ADDRESS_V06,
+    });
 
-    userOperation.paymasterAndData = sponsorUserOperationResult.paymasterAndData;
+    userOperation.paymasterAndData =
+      sponsorUserOperationResult.paymasterAndData;
 
     if (
       sponsorUserOperationResult.callGasLimit &&
@@ -398,8 +511,10 @@ class IContract {
       sponsorUserOperationResult.preVerificationGas
     ) {
       userOperation.callGasLimit = sponsorUserOperationResult.callGasLimit;
-      userOperation.verificationGasLimit = sponsorUserOperationResult.verificationGasLimit;
-      userOperation.preVerificationGas = sponsorUserOperationResult.preVerificationGas;
+      userOperation.verificationGasLimit =
+        sponsorUserOperationResult.verificationGasLimit;
+      userOperation.preVerificationGas =
+        sponsorUserOperationResult.preVerificationGas;
     }
 
     const signedUserOp = await signUserOp({
@@ -410,29 +525,43 @@ class IContract {
       adminAccount: smartAccountSigner,
     });
 
-    let userOpHash = this.getUserOpHash(networkConfig.chainId, signedUserOp, ENTRYPOINT_ADDRESS_V06);
+    let userOpHash = this.getUserOpHash(
+      networkConfig.chainId,
+      signedUserOp,
+      ENTRYPOINT_ADDRESS_V06
+    );
 
     if (networkConfig.bundlerAPI) {
-      userOperation.nonce = ethers.BigNumber.from(userOperation.nonce).toHexString();
-      userOperation.maxFeePerGas = ethers.BigNumber.from(userOperation.maxFeePerGas).toHexString();
-      userOperation.maxPriorityFeePerGas = ethers.BigNumber.from(userOperation.maxPriorityFeePerGas).toHexString();
-      userOperation.preVerificationGas = ethers.BigNumber.from(userOperation.preVerificationGas).toHexString();
-      userOperation.verificationGasLimit = ethers.BigNumber.from(userOperation.verificationGasLimit).toHexString();
-      userOperation.callGasLimit = ethers.BigNumber.from(userOperation.callGasLimit).toHexString();
+      userOperation.nonce = ethers.BigNumber.from(
+        userOperation.nonce
+      ).toHexString();
+      userOperation.maxFeePerGas = ethers.BigNumber.from(
+        userOperation.maxFeePerGas
+      ).toHexString();
+      userOperation.maxPriorityFeePerGas = ethers.BigNumber.from(
+        userOperation.maxPriorityFeePerGas
+      ).toHexString();
+      userOperation.preVerificationGas = ethers.BigNumber.from(
+        userOperation.preVerificationGas
+      ).toHexString();
+      userOperation.verificationGasLimit = ethers.BigNumber.from(
+        userOperation.verificationGasLimit
+      ).toHexString();
+      userOperation.callGasLimit = ethers.BigNumber.from(
+        userOperation.callGasLimit
+      ).toHexString();
       userOperation.signature = signedUserOp.signature;
 
       // currently txs are not bundled in thirdweb
-      axios.post(`${networkConfig.bundlerAPI}/user_operations`,
-        {
-          user_operation: {
-            user_operation: userOperation,
-            user_operation_hash: userOpHash,
-            user_operation_data: [this.operationDataFromCall(f)],
-            network_id: networkConfig.chainId,
-          },
-          do_not_bundle: true
-        }
-      );
+      axios.post(`${networkConfig.bundlerAPI}/user_operations`, {
+        user_operation: {
+          user_operation: userOperation,
+          user_operation_hash: userOpHash,
+          user_operation_data: [this.operationDataFromCall(f)],
+          network_id: networkConfig.chainId,
+        },
+        do_not_bundle: true,
+      });
     }
 
     userOpHash = await bundleUserOp({
@@ -441,8 +570,8 @@ class IContract {
         entrypointAddress: ENTRYPOINT_ADDRESS_V06,
         chain,
         client,
-      }
-    })
+      },
+    });
 
     const receipt = await waitForUserOpReceipt({
       chain,
@@ -453,15 +582,24 @@ class IContract {
     return receipt;
   }
 
-  async useThirdWebForGaslessTransactionsWithThirdWebAuth(f, tx, methodCallData, networkConfig, provider) {
-
-    const client = createThirdwebClient({ clientId: networkConfig.thirdWebClientId });
+  async useThirdWebForGaslessTransactionsWithThirdWebAuth(
+    f,
+    tx,
+    methodCallData,
+    networkConfig,
+    provider
+  ) {
+    const client = createThirdwebClient({
+      clientId: networkConfig.thirdWebClientId,
+    });
 
     const chain = defineChain(networkConfig.chainId);
 
     const factoryContract = getContract({
       client: client,
-      address: networkConfig.factoryAddress || PolkamarketsSmartAccount.THIRDWEB_FACTORY_ADDRESS,
+      address:
+        networkConfig.factoryAddress ||
+        PolkamarketsSmartAccount.THIRDWEB_FACTORY_ADDRESS,
       chain: chain,
     });
 
@@ -474,11 +612,7 @@ class IContract {
     const transaction = prepareContractCall({
       contract: accountContract,
       method: "function execute(address, uint256, bytes)",
-      params: [
-        tx.to,
-        0n,
-        tx.data,
-      ],
+      params: [tx.to, BigInt(0), tx.data],
     });
 
     const userOperation = await createUnsignedUserOp({
@@ -497,29 +631,43 @@ class IContract {
       adminAccount: provider.adminAccount,
     });
 
-    let userOpHash = this.getUserOpHash(networkConfig.chainId, signedUserOp, ENTRYPOINT_ADDRESS_V06);
+    let userOpHash = this.getUserOpHash(
+      networkConfig.chainId,
+      signedUserOp,
+      ENTRYPOINT_ADDRESS_V06
+    );
 
     if (networkConfig.bundlerAPI) {
-      userOperation.nonce = ethers.BigNumber.from(userOperation.nonce).toHexString();
-      userOperation.maxFeePerGas = ethers.BigNumber.from(userOperation.maxFeePerGas).toHexString();
-      userOperation.maxPriorityFeePerGas = ethers.BigNumber.from(userOperation.maxPriorityFeePerGas).toHexString();
-      userOperation.preVerificationGas = ethers.BigNumber.from(userOperation.preVerificationGas).toHexString();
-      userOperation.verificationGasLimit = ethers.BigNumber.from(userOperation.verificationGasLimit).toHexString();
-      userOperation.callGasLimit = ethers.BigNumber.from(userOperation.callGasLimit).toHexString();
+      userOperation.nonce = ethers.BigNumber.from(
+        userOperation.nonce
+      ).toHexString();
+      userOperation.maxFeePerGas = ethers.BigNumber.from(
+        userOperation.maxFeePerGas
+      ).toHexString();
+      userOperation.maxPriorityFeePerGas = ethers.BigNumber.from(
+        userOperation.maxPriorityFeePerGas
+      ).toHexString();
+      userOperation.preVerificationGas = ethers.BigNumber.from(
+        userOperation.preVerificationGas
+      ).toHexString();
+      userOperation.verificationGasLimit = ethers.BigNumber.from(
+        userOperation.verificationGasLimit
+      ).toHexString();
+      userOperation.callGasLimit = ethers.BigNumber.from(
+        userOperation.callGasLimit
+      ).toHexString();
       userOperation.signature = signedUserOp.signature;
 
       // currently txs are not bundled in thirdweb
-      axios.post(`${networkConfig.bundlerAPI}/user_operations`,
-        {
-          user_operation: {
-            user_operation: userOperation,
-            user_operation_hash: userOpHash,
-            user_operation_data: [this.operationDataFromCall(f)],
-            network_id: networkConfig.chainId,
-          },
-          do_not_bundle: true
-        }
-      );
+      axios.post(`${networkConfig.bundlerAPI}/user_operations`, {
+        user_operation: {
+          user_operation: userOperation,
+          user_operation_hash: userOpHash,
+          user_operation_data: [this.operationDataFromCall(f)],
+          network_id: networkConfig.chainId,
+        },
+        do_not_bundle: true,
+      });
     }
 
     userOpHash = await bundleUserOp({
@@ -528,8 +676,8 @@ class IContract {
         entrypointAddress: ENTRYPOINT_ADDRESS_V06,
         chain,
         client,
-      }
-    })
+      },
+    });
 
     const receipt = await waitForUserOpReceipt({
       chain,
@@ -540,9 +688,16 @@ class IContract {
     return receipt;
   }
 
-  async useThirdWebForGaslessWithZKSync(f, tx, methodCallData, networkConfig, provider) {
-
-    const client = createThirdwebClient({ clientId: networkConfig.thirdWebClientId });
+  async useThirdWebForGaslessWithZKSync(
+    f,
+    tx,
+    methodCallData,
+    networkConfig,
+    provider
+  ) {
+    const client = createThirdwebClient({
+      clientId: networkConfig.thirdWebClientId,
+    });
     const chain = defineChain(networkConfig.chainId);
     let smartAccount;
 
@@ -557,7 +712,7 @@ class IContract {
         sponsorGas: true, // enable sponsored transactions
       });
 
-      let personalAccount = provider.personalAccount
+      let personalAccount = provider.personalAccount;
       if (!provider.personalAccount) {
         const signer = provider.getSigner();
         personalAccount = await ethers5Adapter.signer.fromEthers({ signer });
@@ -573,7 +728,7 @@ class IContract {
       chain,
       client,
       to: tx.to,
-      data: tx.data
+      data: tx.data,
     });
 
     const res = await sendTransaction({
@@ -594,12 +749,16 @@ class IContract {
     const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
     const networkConfig = smartAccount.networkConfig;
 
-    const { isConnectedWallet, signer } = await smartAccount.providerIsConnectedWallet();
+    const { isConnectedWallet, signer } =
+      await smartAccount.providerIsConnectedWallet();
 
     const methodName = f._method.name;
 
     const contractInterface = new ethers.utils.Interface(this.params.abi.abi);
-    const methodCallData = contractInterface.encodeFunctionData(methodName, f.arguments);
+    const methodCallData = contractInterface.encodeFunctionData(
+      methodName,
+      f.arguments
+    );
 
     const tx = {
       to: this.params.contractAddress,
@@ -610,20 +769,47 @@ class IContract {
       let receipt;
 
       if (isConnectedWallet) {
-        const txResponse = await signer.sendTransaction({ ...tx, gasLimit: 210000 });
+        const txResponse = await signer.sendTransaction({
+          ...tx,
+          gasLimit: 210000,
+        });
         receipt = await txResponse.wait();
       } else {
-
         if (networkConfig.usePimlico) {
-          receipt = await this.usePimlicoForGaslessTransactions(f, tx, methodCallData, networkConfig, smartAccount.provider);
+          receipt = await this.usePimlicoForGaslessTransactions(
+            f,
+            tx,
+            methodCallData,
+            networkConfig,
+            smartAccount.provider
+          );
         } else if (networkConfig.useThirdWeb) {
           if (networkConfig.isZkSync) {
-            receipt = await this.useThirdWebForGaslessWithZKSync(f, tx, methodCallData, networkConfig, smartAccount.provider);
+            receipt = await this.useThirdWebForGaslessWithZKSync(
+              f,
+              tx,
+              methodCallData,
+              networkConfig,
+              smartAccount.provider
+            );
           } else if (smartAccount.provider.adminAccount) {
             // if exists adminAccount it means it's using thirdwebauth
-            receipt = await this.useThirdWebForGaslessTransactionsWithThirdWebAuth(f, tx, methodCallData, networkConfig, smartAccount.provider);
+            receipt =
+              await this.useThirdWebForGaslessTransactionsWithThirdWebAuth(
+                f,
+                tx,
+                methodCallData,
+                networkConfig,
+                smartAccount.provider
+              );
           } else {
-            receipt = await this.useThirdWebForGaslessTransactions(f, tx, methodCallData, networkConfig, smartAccount.provider);
+            receipt = await this.useThirdWebForGaslessTransactions(
+              f,
+              tx,
+              methodCallData,
+              networkConfig,
+              smartAccount.provider
+            );
           }
         } else {
           // trying operation 3 times
@@ -631,7 +817,9 @@ class IContract {
           let feeQuotesResult;
           for (let i = 0; i < retries; i++) {
             try {
-              feeQuotesResult = await smartAccount.smartAccount.getFeeQuotes(tx);
+              feeQuotesResult = await smartAccount.smartAccount.getFeeQuotes(
+                tx
+              );
               break;
             } catch (error) {
               await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -649,15 +837,26 @@ class IContract {
           let userOpHash = feeQuotesResult.verifyingPaymasterGasless.userOpHash;
 
           // Get random key
-          const key = BigInt(Math.floor(Math.random() * 6277101735386680763835789423207666416102355444464034512895));
+          const key = BigInt(
+            Math.floor(
+              Math.random() *
+                6277101735386680763835789423207666416102355444464034512895
+            )
+          );
 
           const entrypointAbi = [
             "function getNonce(address sender, uint192 key) view returns (uint256)",
           ];
 
-          const ethersProvider = new ethers.providers.JsonRpcProvider(this.params.web3.currentProvider.host);
+          const ethersProvider = new ethers.providers.JsonRpcProvider(
+            this.params.web3.currentProvider.host
+          );
 
-          const entrypointContract = new ethers.Contract(ENTRYPOINT_ADDRESS_V06, entrypointAbi, ethersProvider);
+          const entrypointContract = new ethers.Contract(
+            ENTRYPOINT_ADDRESS_V06,
+            entrypointAbi,
+            ethersProvider
+          );
 
           const senderAddress = await smartAccount.getAddress();
 
@@ -665,54 +864,57 @@ class IContract {
 
           userOp.nonce = nonce.toHexString();
 
-
-          const paymasterSponsorData = await axios.post(`https://paymaster.particle.network`,
+          const paymasterSponsorData = await axios.post(
+            `https://paymaster.particle.network`,
             {
-
-              "method": "pm_sponsorUserOperation",
-              "params": [
-                userOp,
-                ENTRYPOINT_ADDRESS_V06,
-              ]
-            }, {
-            params: {
-              chainId: networkConfig.chainId,
-              projectUuid: networkConfig.particleProjectId,
-              projectKey: networkConfig.particleClientKey,
+              method: "pm_sponsorUserOperation",
+              params: [userOp, ENTRYPOINT_ADDRESS_V06],
+            },
+            {
+              params: {
+                chainId: networkConfig.chainId,
+                projectUuid: networkConfig.particleProjectId,
+                projectKey: networkConfig.particleClientKey,
+              },
             }
-          }
           );
 
+          userOp.paymasterAndData =
+            paymasterSponsorData.data.result.paymasterAndData;
 
-          userOp.paymasterAndData = paymasterSponsorData.data.result.paymasterAndData;
+          userOpHash = this.getUserOpHash(
+            networkConfig.chainId,
+            userOp,
+            ENTRYPOINT_ADDRESS_V06
+          );
 
-          userOpHash = this.getUserOpHash(networkConfig.chainId, userOp, ENTRYPOINT_ADDRESS_V06);
-
-          const signedUserOp = await smartAccount.smartAccount.signUserOperation({ userOpHash, userOp });
+          const signedUserOp =
+            await smartAccount.smartAccount.signUserOperation({
+              userOpHash,
+              userOp,
+            });
 
           let txResponse;
           for (let i = 0; i < retries; i++) {
             try {
               if (networkConfig.bundlerAPI) {
-                txResponse = await axios.post(`${networkConfig.bundlerAPI}/user_operations`,
+                txResponse = await axios.post(
+                  `${networkConfig.bundlerAPI}/user_operations`,
                   {
                     user_operation: {
                       user_operation: signedUserOp,
                       user_operation_hash: userOpHash,
                       user_operation_data: [this.operationDataFromCall(f)],
                       network_id: networkConfig.chainId,
-                    }
+                    },
                   }
                 );
               } else {
-                txResponse = await axios.post(`${networkConfig.bundlerRPC}/rpc?chainId=${networkConfig.chainId}`,
+                txResponse = await axios.post(
+                  `${networkConfig.bundlerRPC}/rpc?chainId=${networkConfig.chainId}`,
                   {
-
-                    "method": "eth_sendUserOperation",
-                    "params": [
-                      signedUserOp,
-                      ENTRYPOINT_ADDRESS_V06
-                    ]
+                    method: "eth_sendUserOperation",
+                    params: [signedUserOp, ENTRYPOINT_ADDRESS_V06],
                   }
                 );
               }
@@ -732,18 +934,24 @@ class IContract {
             throw new Error(txResponse.data.error.message);
           }
 
-          const transactionHash = await this.waitForTransactionHashToBeGenerated(userOpHash, networkConfig);
+          const transactionHash =
+            await this.waitForTransactionHashToBeGenerated(
+              userOpHash,
+              networkConfig
+            );
 
-          const web3Provider = new ethers.providers.Web3Provider(smartAccount.provider)
+          const web3Provider = new ethers.providers.Web3Provider(
+            smartAccount.provider
+          );
 
           receipt = await web3Provider.waitForTransaction(transactionHash);
         }
 
-        console.log('receipt:', receipt.status, receipt.transactionHash);
+        console.log("receipt:", receipt.status, receipt.transactionHash);
       }
 
       if (receipt.logs) {
-        const events = receipt.logs.map(log => {
+        const events = receipt.logs.map((log) => {
           try {
             const event = contractInterface.parseLog(log);
             return event;
@@ -799,31 +1007,42 @@ class IContract {
     return transformedEvents;
   }
 
-  async __sendTx(f, call = false, value, callback = () => { }) {
+  async __sendTx(f, call = false, value, callback = () => {}) {
     if (this.params.isSocialLogin && !call) {
       return await this.sendGaslessTransactions(f);
     } else {
       var res;
       if (!this.acc && !call) {
         const accounts = await this.params.web3.eth.getAccounts();
-        res = await this.__metamaskCall({ f, acc: accounts[0], value, callback });
+        res = await this.__metamaskCall({
+          f,
+          acc: accounts[0],
+          value,
+          callback,
+        });
       } else if (this.acc && !call) {
         let data = f.encodeABI();
-        res = await this.params.contract.send(
-          this.acc.getAccount(),
-          data,
-          value
-        ).catch(err => { throw err; });
+        res = await this.params.contract
+          .send(this.acc.getAccount(), data, value)
+          .catch((err) => {
+            throw err;
+          });
       } else if (this.acc && call) {
-        res = await f.call({ from: this.acc.getAddress() }).catch(err => { throw err; });
+        res = await f.call({ from: this.acc.getAddress() }).catch((err) => {
+          throw err;
+        });
       } else {
-        res = await f.call().catch(err => { throw err; });
+        res = await f.call().catch((err) => {
+          throw err;
+        });
       }
 
       if (res.logs) {
-        const contractInterface = new ethers.utils.Interface(this.params.abi.abi);
+        const contractInterface = new ethers.utils.Interface(
+          this.params.abi.abi
+        );
 
-        const events = res.logs.map(log => {
+        const events = res.logs.map((log) => {
           try {
             const event = contractInterface.parseLog(log);
             return event;
@@ -837,7 +1056,7 @@ class IContract {
 
       return res;
     }
-  };
+  }
 
   async __deploy(params, callback) {
     return await this.params.contract.deploy(
@@ -847,11 +1066,13 @@ class IContract {
       params,
       callback
     );
-  };
+  }
 
   async __assert() {
     if (!this.getAddress()) {
-      throw new Error("Contract is not deployed, first deploy it and provide a contract address");
+      throw new Error(
+        "Contract is not deployed, first deploy it and provide a contract address"
+      );
     }
     /* Use ABI */
     this.params.contract.use(this.params.abi, this.getAddress());
@@ -860,15 +1081,14 @@ class IContract {
   /**
    * @function deploy
    * @description Deploy the Contract
-  */
+   */
   async deploy({ callback, params = [] }) {
     let res = await this.__deploy(params, callback);
     this.params.contractAddress = res.contractAddress;
     /* Call to Backend API */
     await this.__assert();
     return res;
-  };
-
+  }
 
   /**
    * @function setNewOwner
@@ -877,9 +1097,7 @@ class IContract {
    */
   async setNewOwner({ address }) {
     return await this.__sendTx(
-      this.params.contract
-        .getContract()
-        .methods.transferOwnership(address)
+      this.params.contract.getContract().methods.transferOwnership(address)
     );
   }
 
@@ -939,7 +1157,7 @@ class IContract {
         .getContract()
         .methods.removeOtherERC20Tokens(tokenAddress, toAddress)
     );
-  };
+  }
 
   /**
    * @function safeGuardAllTokens
@@ -948,11 +1166,9 @@ class IContract {
    */
   async safeGuardAllTokens({ toAddress }) {
     return await this.__sendTx(
-      this.params.contract
-        .getContract()
-        .methods.safeGuardAllTokens(toAddress)
+      this.params.contract.getContract().methods.safeGuardAllTokens(toAddress)
     );
-  };
+  }
 
   /**
    * @function changeTokenAddress
@@ -965,7 +1181,7 @@ class IContract {
         .getContract()
         .methods.changeTokenAddress(newTokenAddress)
     );
-  };
+  }
 
   /**
    * @function getAddress
@@ -993,8 +1209,8 @@ class IContract {
 
   async getBalance() {
     let wei = await this.web3.eth.getBalance(this.getAddress());
-    return this.web3.utils.fromWei(wei, 'ether');
-  };
+    return this.web3.utils.fromWei(wei, "ether");
+  }
 
   /**
    * @function getMyAccount
@@ -1008,7 +1224,7 @@ class IContract {
     }
 
     if (this.acc) {
-      return this.acc.getAddress()
+      return this.acc.getAddress();
     }
 
     const accounts = await this.params.web3.eth.getAccounts();
@@ -1021,7 +1237,7 @@ class IContract {
    * @description Gets contract events
    * @returns {String | undefined} address
    */
-  async getEvents(event, filter, fromBlock = null, toBlock = 'latest') {
+  async getEvents(event, filter, fromBlock = null, toBlock = "latest") {
     if (!fromBlock) {
       fromBlock = this.params.startBlock || 0;
     }
@@ -1030,14 +1246,16 @@ class IContract {
       const events = this.getContract().getPastEvents(event, {
         fromBlock,
         toBlock,
-        filter
+        filter,
       });
 
       return events;
     }
 
     // getting events via http from web3 events provide
-    let uri = `${this.params.web3EventsProvider}/events?contract=${this.contractName}&address=${this.getAddress()}&eventName=${event}`
+    let uri = `${this.params.web3EventsProvider}/events?contract=${
+      this.contractName
+    }&address=${this.getAddress()}&eventName=${event}`;
     if (filter) uri = uri.concat(`&filter=${JSON.stringify(filter)}`);
 
     const { data } = await axios.get(uri);

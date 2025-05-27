@@ -10,28 +10,31 @@ import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 contract ReferralReward is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    IERC20 public immutable token;
-    
+    IERC20 public token;
+
     mapping(uint256 => bytes32) public merkleRoots;
 
-    /* 
-    * @notice: Instead of storing mapping(uint256 => mapping(uint256 => address)), 
-    * we only store a bit (0/1) per claim.
-    * Each uint256 stores 256 claims → massive storage savings.
-    * Cheap to read (SLOAD) and write (SSTORE).
-    */
+    /*
+     * @notice: Instead of storing mapping(uint256 => mapping(uint256 => address)),
+     * we only store a bit (0/1) per claim.
+     * Each uint256 stores 256 claims → massive storage savings.
+     * Cheap to read (SLOAD) and write (SSTORE).
+     */
 
     mapping(uint256 => mapping(uint256 => uint256)) public claimedBitMap;
 
     event MerkleRootUpdated(uint256 indexed epoch, bytes32 indexed merkleRoot);
     event RewardClaimed(uint256 indexed epoch, uint256 indexed index, address indexed account, uint256 amount);
 
-    constructor(address _token) {
-        require(_token != address(0), "Invalid token address");
-        token = IERC20(_token);
-    }
+    constructor() {}
 
-    function claim(uint256 epoch, uint256 index, address account, uint256 amount, bytes32[] calldata merkleProof) external nonReentrant {
+    function claim(
+        uint256 epoch,
+        uint256 index,
+        address account,
+        uint256 amount,
+        bytes32[] calldata merkleProof
+    ) external nonReentrant {
         require(msg.sender == account, "Not authorized to claim");
         require(isClaimed(epoch, index) == false, "Already claimed");
         require(merkleRoots[epoch] != bytes32(0), "Merkle root not set");
@@ -73,6 +76,27 @@ contract ReferralReward is Ownable, ReentrancyGuard {
         claimedBitMap[epoch][wordIndex] = claimedBitMap[epoch][wordIndex] | (1 << bitIndex);
     }
 
+    function setRewardToken(address _token) external onlyOwner {
+        require(_token != address(0), "Invalid token address");
+        token = IERC20(_token);
+    }
+
+    /* @notice: Withdraw tokens from contract
+     * just in case if there is some token stuck in contract
+     */
+
+    function withdrawERC20(
+        address _token,
+        address _to,
+        uint256 _amount
+    ) external onlyOwner {
+        require(_to != address(0), "Invalid recipient");
+        IERC20(_token).safeTransfer(_to, _amount);
+    }
+
+    function withdrawETH(address payable _to) external onlyOwner {
+        require(_to != address(0), "Invalid recipient");
+        (bool success, ) = _to.call{value: address(this).balance}("");
+        require(success, "Withdraw failed");
+    }
 }
-
-

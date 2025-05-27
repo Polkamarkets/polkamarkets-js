@@ -1,4 +1,4 @@
-const referralReward = require("./interfaces").referralReward;
+const referralReward = require("../interfaces").referralReward;
 const IContract = require("./IContract");
 
 class ReferralRewardContract extends IContract {
