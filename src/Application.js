@@ -23,6 +23,7 @@ const WETH9Contract = require("./models/index").WETH9Contract;
 const ArbitrationContract = require("./models/index").ArbitrationContract;
 const ArbitrationProxyContract =
   require("./models/index").ArbitrationProxyContract;
+const ReferralRewardContract = require("./models/index").ReferralRewardContract;
 
 const Account = require("./utils/Account");
 
