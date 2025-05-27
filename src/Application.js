@@ -445,6 +445,11 @@ class Application {
     return this.web3.utils.fromWei(wei, "ether");
   }
 
+  async getOtherAccount() {
+    const accounts = await this.web3.eth.getAccounts();
+    return accounts[1];
+  }
+
   async socialLoginWithJWT(id, jwtToken) {
     throw new Error("Not implemented");
   }

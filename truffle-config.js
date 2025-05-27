@@ -38,6 +38,20 @@ module.exports = {
       networkCheckTimeout: 200000, // added: slow RPC protection (200s)
       timeoutBlocks: 200, // added
     },
+    sepolia: {
+      provider: () =>
+        new HDWalletProvider(
+          mnemonic,
+          "https://sepolia.infura.io/v3/" + INFURA_API_KEY
+        ),
+      network_id: 11155111,
+      networkCheckTimeout: 200000, // added: slow RPC protection (200s)
+      gas: 5500000,
+      gasPrice: 10000000000,
+      confirmations: 2,
+      timeoutBlocks: 200,
+      skipDryRun: true,
+    },
     gnosis: {
       provider: () =>
         new HDWalletProvider(mnemonic, "https://rpc.gnosischain.com"),
