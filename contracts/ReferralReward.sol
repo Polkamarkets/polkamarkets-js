@@ -42,6 +42,8 @@ contract ReferralReward is Ownable, ReentrancyGuard {
 
         _setClaimed(epoch, index);
 
+        token.safeTransfer(account, amount);
+
         emit RewardClaimed(epoch, index, account, amount);
     }
 
