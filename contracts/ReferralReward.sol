@@ -26,7 +26,10 @@ contract ReferralReward is Ownable, ReentrancyGuard {
     event MerkleRootUpdated(uint256 indexed epoch, bytes32 indexed merkleRoot);
     event RewardClaimed(uint256 indexed epoch, uint256 indexed index, address indexed account, uint256 amount);
 
-    constructor() {}
+    constructor(address _token) {
+        require(_token != address(0), "Invalid token address");
+        token = IERC20(_token);
+    }
 
     function claim(
         uint256 epoch,
