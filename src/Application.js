@@ -3,22 +3,29 @@ const Web3 = require("web3");
 const PolkamarketsSmartAccount = require("./models/PolkamarketsSmartAccount");
 
 const ERC20Contract = require("./models/index").ERC20Contract;
-const PredictionMarketContract = require("./models/index").PredictionMarketContract;
-const PredictionMarketV2Contract = require("./models/index").PredictionMarketV2Contract;
-const PredictionMarketV3Contract = require("./models/index").PredictionMarketV3Contract;
-const PredictionMarketV3ManagerContract = require("./models/index").PredictionMarketV3ManagerContract;
-const PredictionMarketV3ControllerContract = require("./models/index").PredictionMarketV3ControllerContract;
-const PredictionMarketV3FactoryContract = require("./models/index").PredictionMarketV3FactoryContract;
+const PredictionMarketContract =
+  require("./models/index").PredictionMarketContract;
+const PredictionMarketV2Contract =
+  require("./models/index").PredictionMarketV2Contract;
+const PredictionMarketV3Contract =
+  require("./models/index").PredictionMarketV3Contract;
+const PredictionMarketV3ManagerContract =
+  require("./models/index").PredictionMarketV3ManagerContract;
+const PredictionMarketV3ControllerContract =
+  require("./models/index").PredictionMarketV3ControllerContract;
+const PredictionMarketV3FactoryContract =
+  require("./models/index").PredictionMarketV3FactoryContract;
 const AchievementsContract = require("./models/index").AchievementsContract;
 const RealitioERC20Contract = require("./models/index").RealitioERC20Contract;
 const VotingContract = require("./models/index").VotingContract;
 const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
 const WETH9Contract = require("./models/index").WETH9Contract;
 const ArbitrationContract = require("./models/index").ArbitrationContract;
-const ArbitrationProxyContract = require("./models/index").ArbitrationProxyContract;
+const ArbitrationProxyContract =
+  require("./models/index").ArbitrationProxyContract;
+const ReferralRewardContract = require("./models/index").ReferralRewardContract;
 
-const Account = require('./utils/Account');
-
+const Account = require("./utils/Account");
 
 const networksEnum = Object.freeze({
   1: "Main",
@@ -37,7 +44,7 @@ class Application {
     isSocialLogin = false,
     socialLoginParams,
     startBlock,
-    defaultDecimals
+    defaultDecimals,
   }) {
     this.web3Provider = web3Provider;
     // evm logs http source (optional)
@@ -56,7 +63,10 @@ class Application {
     if (web3PrivateKey && !this.isSocialLogin) {
       this.start();
       this.login();
-      this.account = new Account(this.web3, this.web3.eth.accounts.privateKeyToAccount(web3PrivateKey));
+      this.account = new Account(
+        this.web3,
+        this.web3.eth.accounts.privateKeyToAccount(web3PrivateKey)
+      );
     }
   }
 
@@ -83,18 +93,25 @@ class Application {
   async login(provider = null, isConnectedWallet = null) {
     if (this.isSocialLogin) {
       if (!this.provider) {
-        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstanceIfExists()
+        this.smartAccount =
+          PolkamarketsSmartAccount.singleton.getInstanceIfExists();
       }
 
       if ((!this.smartAccount || !this.smartAccount.provider) && provider) {
         PolkamarketsSmartAccount.singleton.clearInstance();
-        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig, isConnectedWallet);
+        this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(
+          provider,
+          this.socialLoginParams.networkConfig,
+          isConnectedWallet
+        );
       }
 
       return true;
     } else {
       try {
-        if (typeof window === "undefined") { return false; }
+        if (typeof window === "undefined") {
+          return false;
+        }
         if (window.ethereum) {
           window.web3 = new Web3(window.ethereum);
           this.web3 = window.web3;
@@ -106,7 +123,7 @@ class Application {
         throw err;
       }
     }
-  };
+  }
 
   /**
    * @name isLoggedIn
@@ -117,15 +134,20 @@ class Application {
       return !!(this.smartAccount && this.smartAccount.provider);
     } else {
       try {
-        if (typeof window === "undefined" || typeof window.ethereum === "undefined") { return false; }
-        const accounts = await ethereum.request({ method: 'eth_accounts' });
+        if (
+          typeof window === "undefined" ||
+          typeof window.ethereum === "undefined"
+        ) {
+          return false;
+        }
+        const accounts = await ethereum.request({ method: "eth_accounts" });
 
         return accounts.length > 0;
       } catch (err) {
         return false;
       }
     }
-  };
+  }
 
   contractDefaultParams(contractAddress) {
     return {
@@ -136,7 +158,7 @@ class Application {
       gasPrice: this.gasPrice,
       isSocialLogin: this.isSocialLogin,
       startBlock: this.startBlock,
-      defaultDecimals: this.defaultDecimals
+      defaultDecimals: this.defaultDecimals,
     };
   }
 
@@ -152,12 +174,12 @@ class Application {
   getPredictionMarketContract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketContract({
-        ...this.contractDefaultParams(contractAddress)
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
     }
-  };
+  }
 
   /**
    * @name getPredictionMarketV2Contract
@@ -167,19 +189,22 @@ class Application {
   getPredictionMarketV2Contract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketV2Contract({
-        ...this.contractDefaultParams(contractAddress)
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
     }
-  };
+  }
 
   /**
    * @name getPredictionMarketV3Contract
    * @param {Address} ContractAddress (Opt) If it is deployed
    * @description Create a PredictionMarketV3 Contract
    */
-  getPredictionMarketV3Contract({ contractAddress = null, querierContractAddress = null } = {}) {
+  getPredictionMarketV3Contract({
+    contractAddress = null,
+    querierContractAddress = null,
+  } = {}) {
     try {
       return new PredictionMarketV3Contract({
         ...this.contractDefaultParams(contractAddress),
@@ -188,8 +213,7 @@ class Application {
     } catch (err) {
       throw err;
     }
-
-  };
+  }
   /**
    * @name getPredictionMarketV3FactoryContract
    * @param {Address} ContractAddress (Opt) If it is deployed
@@ -198,12 +222,12 @@ class Application {
   getPredictionMarketV3FactoryContract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketV3FactoryContract({
-        ...this.contractDefaultParams(contractAddress)
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
     }
-  };
+  }
 
   /**
    * @name PredictionMarketV3ControllerContract
@@ -213,12 +237,12 @@ class Application {
   getPredictionMarketV3ControllerContract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketV3ControllerContract({
-        ...this.contractDefaultParams(contractAddress)
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
     }
-  };
+  }
 
   /**
    * @name getPredictionMarketV3ManagerContract
@@ -228,12 +252,12 @@ class Application {
   getPredictionMarketV3ManagerContract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketV3ManagerContract({
-        ...this.contractDefaultParams(contractAddress)
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
     }
-  };
+  }
 
   /**
    * @name getAchievementsContract
@@ -243,7 +267,7 @@ class Application {
   getAchievementsContract({
     contractAddress = null,
     predictionMarketContractAddress = null,
-    realitioERC20ContractAddress = null
+    realitioERC20ContractAddress = null,
   } = {}) {
     try {
       return new AchievementsContract({
@@ -254,7 +278,7 @@ class Application {
     } catch (err) {
       throw err;
     }
-  };
+  }
 
   /**
    * @name getVotingContract
@@ -264,12 +288,12 @@ class Application {
   getVotingContract({ contractAddress = null } = {}) {
     try {
       return new VotingContract({
-        ...this.contractDefaultParams(contractAddress)
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
     }
-  };
+  }
 
   /**
    * @name getFantasyERC20Contract
@@ -279,12 +303,12 @@ class Application {
   getFantasyERC20Contract({ contractAddress = null } = {}) {
     try {
       return new FantasyERC20Contract({
-        ...this.contractDefaultParams(contractAddress)
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
     }
-  };
+  }
 
   /**
    * @name getRealitioERC20Contract
@@ -294,12 +318,12 @@ class Application {
   getRealitioERC20Contract({ contractAddress = null } = {}) {
     try {
       return new RealitioERC20Contract({
-        ...this.contractDefaultParams(contractAddress)
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
     }
-  };
+  }
 
   /**
    * @name getERC20Contract
@@ -309,12 +333,12 @@ class Application {
   getERC20Contract({ contractAddress = null }) {
     try {
       return new ERC20Contract({
-        ...this.contractDefaultParams(contractAddress)
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
     }
-  };
+  }
 
   /**
    * @name getWETH9Contract
@@ -324,12 +348,12 @@ class Application {
   getWETH9Contract({ contractAddress = null }) {
     try {
       return new WETH9Contract({
-        ...this.contractDefaultParams(contractAddress)
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
     }
-  };
+  }
 
   /**
    * @name getArbitrationContract
@@ -339,12 +363,12 @@ class Application {
   getArbitrationContract({ contractAddress = null }) {
     try {
       return new ArbitrationContract({
-        ...this.contractDefaultParams(contractAddress)
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
     }
-  };
+  }
 
   /**
    * @name getArbitrationProxyContract
@@ -354,12 +378,27 @@ class Application {
   getArbitrationProxyContract({ contractAddress = null }) {
     try {
       return new ArbitrationProxyContract({
-        ...this.contractDefaultParams(contractAddress)
+        ...this.contractDefaultParams(contractAddress),
       });
     } catch (err) {
       throw err;
     }
-  };
+  }
+
+  /**
+   * @name getReferralRewardContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a ReferralReward Proxy Contract
+   */
+  getReferralRewardContract({ contractAddress = null } = {}) {
+    try {
+      return new ReferralRewardContract({
+        ...this.contractDefaultParams(contractAddress),
+      });
+    } catch (err) {
+      throw err;
+    }
+  }
 
   /***********/
   /** UTILS **/
@@ -376,7 +415,7 @@ class Application {
       ? networksEnum[netId]
       : "Unknown";
     return networkName;
-  };
+  }
 
   /**
    * @name getAddress
@@ -388,12 +427,12 @@ class Application {
       if (this.smartAccount && this.smartAccount.provider) {
         return await this.smartAccount.getAddress();
       }
-      return '';
+      return "";
     } else {
       const accounts = await this.web3.eth.getAccounts();
       return accounts[0];
     }
-  };
+  }
 
   /**
    * @name getETHBalance
@@ -404,8 +443,23 @@ class Application {
     const address = await this.getAddress();
     let wei = await window.web3.eth.getBalance(address);
     return this.web3.utils.fromWei(wei, "ether");
-  };
+  }
 
+  async getOtherAccount() {
+    const accounts = await this.web3.eth.getAccounts();
+    return accounts[1];
+  }
+
+  async getRevertReason(txHash, web3) {
+    const tx = await web3.eth.getTransaction(txHash);
+    const result = await web3.eth.call(tx, tx.blockNumber);
+    if (result.startsWith("0x08c379a0")) {
+      const reason = web3.utils.toAscii("0x" + result.slice(138));
+      return reason;
+    } else {
+      return "No revert reason (might be a fallback revert)";
+    }
+  }
   async socialLoginWithJWT(id, jwtToken) {
     throw new Error("Not implemented");
   }
