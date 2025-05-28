@@ -450,6 +450,16 @@ class Application {
     return accounts[1];
   }
 
+  async getRevertReason(txHash, web3) {
+    const tx = await web3.eth.getTransaction(txHash);
+    const result = await web3.eth.call(tx, tx.blockNumber);
+    if (result.startsWith("0x08c379a0")) {
+      const reason = web3.utils.toAscii("0x" + result.slice(138));
+      return reason;
+    } else {
+      return "No revert reason (might be a fallback revert)";
+    }
+  }
   async socialLoginWithJWT(id, jwtToken) {
     throw new Error("Not implemented");
   }

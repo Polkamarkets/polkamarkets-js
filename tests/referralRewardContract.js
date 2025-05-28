@@ -105,6 +105,33 @@ context("ReferralReward Contract", async () => {
   );
 
   it(
+    "should be able to update Merkle Root for a new epoch",
+    mochaAsync(async () => {
+      const newEpoch = epoch + 1;
+
+      const res = await referralRewardContract.updateMerkleRoot({
+        epoch: newEpoch,
+        merkleRoot,
+      });
+      expect(res.status).to.equal(true);
+
+      const contractAddress = referralRewardContract.getAddress();
+      const web3 = app.web3;
+
+      const contractInstance = new web3.eth.Contract(
+        ReferralRewardAbi,
+        contractAddress
+      );
+
+      const storedRoot = await contractInstance.methods
+        .merkleRoots(newEpoch)
+        .call();
+
+      expect(storedRoot).to.equal(merkleRoot);
+    })
+  );
+
+  it(
     "should fail if non-owner tries to update Merkle Root",
     mochaAsync(async () => {
       const web3 = app.web3;
