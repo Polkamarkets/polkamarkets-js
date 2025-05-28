@@ -6,6 +6,7 @@ import keccak256 from "keccak256";
 import { mochaAsync } from "./utils";
 import { Application } from "..";
 import chai from "chai";
+const ReferralRewardAbi = require("../src/interfaces").referralReward.abi;
 
 require("dotenv").config();
 
@@ -17,6 +18,7 @@ context("ReferralReward Contract", async () => {
   let otherAccount;
   let referralRewardContract;
   let WETH9Contract;
+  let ptsERC20Contract;
 
   let epoch = 0;
   let amount = "1000000000000000000"; // 1 token in wei
@@ -34,14 +36,17 @@ context("ReferralReward Contract", async () => {
       accountAddress = await app.getAddress();
       otherAccount = await app.getOtherAccount();
 
+      console.log("accountAddress", accountAddress);
+      console.log("otherAccount", otherAccount);
+
       WETH9Contract = app.getWETH9Contract({});
       await WETH9Contract.deploy({});
       const tokenAddress = WETH9Contract.getAddress();
-      //
-      // await WETH9Contract.deposit({
-      //   value: amount,
-      //   from: accountAddress,
-      // });
+      console.log("tokenAddress", tokenAddress);
+
+      ptsERC20Contract = app.getERC20Contract({});
+      const erc20Address = ptsERC20Contract.getAddress();
+      console.log("erc20Address", erc20Address);
 
       referralRewardContract = app.getReferralRewardContract({
         tokenAddress: tokenAddress,
@@ -49,6 +54,10 @@ context("ReferralReward Contract", async () => {
       await referralRewardContract.deploy({
         params: [tokenAddress],
       });
+
+      const referralRewardAddress = referralRewardContract.getAddress();
+
+      console.log("referral reward address", referralRewardAddress);
 
       const leaf = ethers.utils.solidityKeccak256(
         ["uint256", "address", "uint256"],
@@ -74,23 +83,36 @@ context("ReferralReward Contract", async () => {
       });
       expect(res.status).to.equal(true);
 
-      // await WETH9Contract.transfer({
-      //   to: referralRewardContract.getAddress(),
-      //   amount,
-      //   from: accountAddress,
+      // ptsERC20Contract.mint({
+      //   address: referralRewardAddress,
+      //   amount: "1000",
       // });
+
+      // log the balance of the contract
+      // const balance = await ptsERC20Contract.balanceOf({
+      //   address: referralRewardAddress,
+      // });
+      // console.log("balance of erc20 in contract:", balance);
     })
   );
 
   it(
     "should fail if non-owner tries to update Merkle Root",
     mochaAsync(async () => {
-      await expect(
-        referralRewardContract.updateMerkleRoot({
-          epoch: epoch + 1,
-          merkleRoot,
+      const web3 = app.web3;
+      const contractAddress = referralRewardContract.getAddress();
+      const contractForOtherAccount = new web3.eth.Contract(
+        ReferralRewardAbi,
+        contractAddress,
+        {
           from: otherAccount,
-        })
+        }
+      );
+
+      await expect(
+        contractForOtherAccount.methods
+          .updateMerkleRoot(epoch + 1, merkleRoot)
+          .send({ from: otherAccount, gas: 500000 })
       ).to.be.rejectedWith(/revert/);
     })
   );
