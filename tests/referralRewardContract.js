@@ -18,6 +18,7 @@ context("ReferralReward Contract", async () => {
   let otherAccount;
   let referralRewardContract;
   let WETH9Contract;
+  let ERC20Contract;
   let ptsERC20Contract;
 
   let epoch = 0;
@@ -28,6 +29,7 @@ context("ReferralReward Contract", async () => {
 
   before(
     mochaAsync(async () => {
+      // #region SETUP
       app = new Application({
         web3Provider: process.env.WEB3_PROVIDER,
         web3PrivateKey: process.env.WEB3_PRIVATE_KEY,
@@ -44,21 +46,26 @@ context("ReferralReward Contract", async () => {
       const tokenAddress = WETH9Contract.getAddress();
       console.log("tokenAddress", tokenAddress);
 
-      ptsERC20Contract = app.getERC20Contract({});
-      const erc20Address = ptsERC20Contract.getAddress();
+      ERC20Contract = app.getERC20Contract({});
+      await ERC20Contract.deploy({
+        params: ["Myriad Points", "PTS"],
+      });
+      const erc20Address = ERC20Contract.getAddress();
       console.log("erc20Address", erc20Address);
 
       referralRewardContract = app.getReferralRewardContract({
-        tokenAddress: tokenAddress,
+        tokenAddress: erc20Address,
       });
       await referralRewardContract.deploy({
-        params: [tokenAddress],
+        params: [erc20Address],
       });
 
       const referralRewardAddress = referralRewardContract.getAddress();
 
       console.log("referral reward address", referralRewardAddress);
+      // #endregion SETUP
 
+      // #region MERKLE TREE
       const leaf = ethers.utils.solidityKeccak256(
         ["uint256", "address", "uint256"],
         [index, accountAddress, amount]
@@ -82,17 +89,18 @@ context("ReferralReward Contract", async () => {
         merkleRoot,
       });
       expect(res.status).to.equal(true);
+      // #endregion MERKLE TREE
 
-      // ptsERC20Contract.mint({
-      //   address: referralRewardAddress,
-      //   amount: "1000",
-      // });
-
-      // log the balance of the contract
-      // const balance = await ptsERC20Contract.balanceOf({
-      //   address: referralRewardAddress,
-      // });
-      // console.log("balance of erc20 in contract:", balance);
+      // #region MINT ERC20
+      await ERC20Contract.mint({
+        address: referralRewardAddress,
+        amount: "1000",
+      });
+      const balance = await ERC20Contract.balanceOf({
+        address: referralRewardAddress,
+      });
+      console.log("balance of erc20 in contract:", balance);
+      // #endregion MINT ERC20
     })
   );
 
