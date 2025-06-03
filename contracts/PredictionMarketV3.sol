@@ -54,6 +54,16 @@ contract PredictionMarketV3 is ReentrancyGuard {
     uint256 timestamp
   );
 
+  event Referral(
+    address indexed user,
+    uint256 indexed marketId,
+    string indexed code,
+    MarketAction action,
+    uint256 outcomeId,
+    uint256 value,
+    uint256 timestamp
+  );
+
   event MarketOutcomeShares(uint256 indexed marketId, uint256 timestamp, uint256[] outcomeShares, uint256 liquidity);
 
   event MarketOutcomePrice(uint256 indexed marketId, uint256 indexed outcomeId, uint256 value, uint256 timestamp);
@@ -72,6 +82,8 @@ contract PredictionMarketV3 is ReentrancyGuard {
     uint256 timestamp,
     bool admin
   );
+
+  event MarketPaused(address indexed user, uint256 indexed marketId, bool paused, uint256 timestamp);
 
   // ------ Events End ------
 
@@ -116,14 +128,22 @@ contract PredictionMarketV3 is ReentrancyGuard {
     IERC20 token; // ERC20 token market will use for trading
     IPredictionMarketV3Manager manager; // manager contract
     address creator; // market creator
+    bool paused; // market paused, no trading allowed
+  }
+
+  struct Fees {
+    uint256 fee; // fee % taken from every transaction
+    uint256 treasuryFee; // fee % taken from every transaction to a treasury address
+    uint256 distributorFee; // fee % taken from every transaction to a distributor address
   }
 
   struct MarketFees {
-    uint256 fee; // fee % taken from every transaction
     uint256 poolWeight; // internal var used to ensure pro-rate fee distribution
     mapping(address => uint256) claimed;
     address treasury; // address to send treasury fees to
-    uint256 treasuryFee; // fee % taken from every transaction to a treasury address
+    address distributor; // fee % taken from every transaction to a treasury address
+    Fees buyFees; // fees for buy transactions
+    Fees sellFees; // fees for sell transactions
   }
 
   struct MarketResolution {
@@ -158,9 +178,10 @@ contract PredictionMarketV3 is ReentrancyGuard {
     string question;
     string image;
     address arbitrator;
-    uint256 fee;
-    uint256 treasuryFee;
+    Fees buyFees;
+    Fees sellFees;
     address treasury;
+    address distributor;
     IRealityETH_ERC20 realitio;
     uint256 realitioTimeout;
     IPredictionMarketV3Manager manager;
@@ -197,6 +218,16 @@ contract PredictionMarketV3 is ReentrancyGuard {
     _;
   }
 
+  modifier notPaused(uint256 marketId) {
+    require(!markets[marketId].paused, "Market is paused");
+    _;
+  }
+
+  modifier paused(uint256 marketId) {
+    require(markets[marketId].paused, "Market is not paused");
+    _;
+  }
+
   modifier transitionNext(uint256 marketId) {
     _;
     nextState(marketId);
@@ -226,6 +257,13 @@ contract PredictionMarketV3 is ReentrancyGuard {
 
   // ------ Core Functions ------
 
+  /// @dev for internal use only, validates the market fees and throws if they are not valid
+  function _validateFees(Fees memory fees) private pure {
+    require(fees.fee <= MAX_FEE, "fee must be <= 5%");
+    require(fees.treasuryFee <= MAX_FEE, "treasury fee must be <= 5%");
+    require(fees.distributorFee <= MAX_FEE, "distributor fee must be <= 5%");
+  }
+
   /// @dev Creates a market, initializes the outcome shares pool and submits a question in Realitio
   function _createMarket(CreateMarketDescription memory desc) private returns (uint256) {
     uint256 marketId = marketIndex;
@@ -237,8 +275,6 @@ contract PredictionMarketV3 is ReentrancyGuard {
     require(desc.closesAt > block.timestamp, "resolution before current date");
     require(desc.arbitrator != address(0), "invalid arbitrator address");
     require(desc.outcomes > 0 && desc.outcomes <= MAX_OUTCOMES, "outcome count not between 1-32");
-    require(desc.fee <= MAX_FEE, "fee must be <= 5%");
-    require(desc.treasuryFee <= MAX_FEE, "treasury fee must be <= 5%");
     require(address(desc.realitio) != address(0), "_realitioAddress is address 0");
     require(desc.realitioTimeout > 0, "timeout must be positive");
     require(desc.manager.isAllowedToCreateMarket(desc.token, msg.sender), "not allowed to create market");
@@ -246,9 +282,15 @@ contract PredictionMarketV3 is ReentrancyGuard {
     market.token = desc.token;
     market.closesAtTimestamp = desc.closesAt;
     market.state = MarketState.open;
-    market.fees.fee = desc.fee;
-    market.fees.treasuryFee = desc.treasuryFee;
+
+    // setting up fees
+    _validateFees(desc.buyFees);
+    market.fees.buyFees = desc.buyFees;
+    _validateFees(desc.sellFees);
+    market.fees.sellFees = desc.sellFees;
+
     market.fees.treasury = desc.treasury;
+    market.fees.distributor = desc.distributor;
     // setting intial value to an integer that does not map to any outcomeId
     market.resolution.outcomeId = MAX_UINT_256;
     market.outcomeCount = desc.outcomes;
@@ -291,9 +333,10 @@ contract PredictionMarketV3 is ReentrancyGuard {
         question: desc.question,
         image: desc.image,
         arbitrator: desc.arbitrator,
-        fee: desc.fee,
-        treasuryFee: desc.treasuryFee,
+        buyFees: desc.buyFees,
+        sellFees: desc.sellFees,
         treasury: desc.treasury,
+        distributor: desc.distributor,
         realitio: desc.realitio,
         realitioTimeout: desc.realitioTimeout,
         manager: desc.manager
@@ -318,9 +361,10 @@ contract PredictionMarketV3 is ReentrancyGuard {
         question: desc.question,
         image: desc.image,
         arbitrator: desc.arbitrator,
-        fee: desc.fee,
-        treasuryFee: desc.treasuryFee,
+        buyFees: desc.buyFees,
+        sellFees: desc.sellFees,
         treasury: desc.treasury,
+        distributor: desc.distributor,
         realitio: desc.realitio,
         realitioTimeout: desc.realitioTimeout,
         manager: desc.manager
@@ -372,7 +416,7 @@ contract PredictionMarketV3 is ReentrancyGuard {
     uint256 outcomeId
   ) public view returns (uint256 outcomeTokenSellAmount) {
     uint256[] memory outcomesShares = getMarketOutcomesShares(marketId);
-    uint256 fee = getMarketFee(marketId);
+    uint256 fee = getMarketSellFee(marketId);
     uint256 amountPlusFees = (amount * ONE) / (ONE - fee);
     uint256 sellTokenPoolBalance = outcomesShares[outcomeId];
     uint256 endingOutcomeBalance = sellTokenPoolBalance * ONE;
@@ -387,13 +431,13 @@ contract PredictionMarketV3 is ReentrancyGuard {
     return amountPlusFees + endingOutcomeBalance.ceildiv(ONE) - sellTokenPoolBalance;
   }
 
-  /// @dev Buy shares of a market outcome
+  /// @dev Buy shares of a market outcome - returns gross amount of transaction (amount + fee)
   function _buy(
     uint256 marketId,
     uint256 outcomeId,
     uint256 minOutcomeSharesToBuy,
     uint256 value
-  ) private timeTransitions(marketId) atState(marketId, MarketState.open) {
+  ) private timeTransitions(marketId) atState(marketId, MarketState.open) notPaused(marketId) returns (uint256) {
     Market storage market = markets[marketId];
 
     uint256 shares = calcBuyAmount(value, marketId, outcomeId);
@@ -401,12 +445,13 @@ contract PredictionMarketV3 is ReentrancyGuard {
     require(shares > 0, "shares amount is 0");
 
     // subtracting fee from transaction value
-    uint256 feeAmount = (value * market.fees.fee) / ONE;
+    uint256 feeAmount = (value * market.fees.buyFees.fee) / ONE;
     market.fees.poolWeight = market.fees.poolWeight + feeAmount;
     uint256 valueMinusFees = value - feeAmount;
 
-    uint256 treasuryFeeAmount = (value * market.fees.treasuryFee) / ONE;
-    valueMinusFees = valueMinusFees - treasuryFeeAmount;
+    uint256 treasuryFeeAmount = (value * market.fees.buyFees.treasuryFee) / ONE;
+    uint256 distributorFeeAmount = (value * market.fees.buyFees.distributorFee) / ONE;
+    valueMinusFees = valueMinusFees - treasuryFeeAmount - distributorFeeAmount;
 
     MarketOutcome storage outcome = market.outcomes[outcomeId];
 
@@ -417,13 +462,19 @@ contract PredictionMarketV3 is ReentrancyGuard {
 
     transferOutcomeSharesfromPool(msg.sender, marketId, outcomeId, shares);
 
+    // value emmited in event includes fee (gross amount)
     emit MarketActionTx(msg.sender, MarketAction.buy, marketId, outcomeId, shares, value, block.timestamp);
     emitMarketActionEvents(marketId);
 
-    // transfering treasury fee to treasury address
+    // transfering treasury/distributor fees
     if (treasuryFeeAmount > 0) {
       market.token.safeTransfer(market.fees.treasury, treasuryFeeAmount);
     }
+    if (distributorFeeAmount > 0) {
+      market.token.safeTransfer(market.fees.distributor, distributorFeeAmount);
+    }
+
+    return value;
   }
 
   /// @dev Buy shares of a market outcome
@@ -449,13 +500,41 @@ contract PredictionMarketV3 is ReentrancyGuard {
     _buy(marketId, outcomeId, minOutcomeSharesToBuy, value);
   }
 
-  /// @dev Sell shares of a market outcome
+  function referralBuy(
+    uint256 marketId,
+    uint256 outcomeId,
+    uint256 minOutcomeSharesToBuy,
+    uint256 value,
+    string memory code
+  ) public nonReentrant {
+    Market storage market = markets[marketId];
+    market.token.safeTransferFrom(msg.sender, address(this), value);
+    _buy(marketId, outcomeId, minOutcomeSharesToBuy, value);
+
+    emit Referral(msg.sender, marketId, code, MarketAction.buy, outcomeId, value, block.timestamp);
+  }
+
+  function referralBuyWithETH(
+    uint256 marketId,
+    uint256 outcomeId,
+    uint256 minOutcomeSharesToBuy,
+    string memory code
+  ) public payable nonReentrant {
+    uint256 value = msg.value;
+    // wrapping and depositing funds
+    IWETH(WETH).deposit{value: value}();
+    _buy(marketId, outcomeId, minOutcomeSharesToBuy, value);
+
+    emit Referral(msg.sender, marketId, code, MarketAction.buy, outcomeId, msg.value, block.timestamp);
+  }
+
+  /// @dev Sell shares of a market outcome - returns gross amount of transaction (amount + fee)
   function _sell(
     uint256 marketId,
     uint256 outcomeId,
     uint256 value,
     uint256 maxOutcomeSharesToSell
-  ) private timeTransitions(marketId) atState(marketId, MarketState.open) {
+  ) private timeTransitions(marketId) atState(marketId, MarketState.open) notPaused(marketId) returns (uint256) {
     Market storage market = markets[marketId];
     MarketOutcome storage outcome = market.outcomes[outcomeId];
 
@@ -468,9 +547,9 @@ contract PredictionMarketV3 is ReentrancyGuard {
     transferOutcomeSharesToPool(msg.sender, marketId, outcomeId, shares);
 
     // adding fees to transaction value
-    uint256 fee = getMarketFee(marketId);
+    uint256 fee = getMarketSellFee(marketId);
     {
-      uint256 feeAmount = (value * market.fees.fee) / (ONE - fee);
+      uint256 feeAmount = (value * market.fees.sellFees.fee) / (ONE - fee);
       market.fees.poolWeight = market.fees.poolWeight + feeAmount;
     }
     uint256 valuePlusFees = value + (value * fee) / (ONE - fee);
@@ -480,16 +559,23 @@ contract PredictionMarketV3 is ReentrancyGuard {
     // Rebalancing market shares
     removeSharesFromMarket(marketId, valuePlusFees);
 
-    emit MarketActionTx(msg.sender, MarketAction.sell, marketId, outcomeId, shares, value, block.timestamp);
+    // value emmited in event includes fee (gross amount)
+    emit MarketActionTx(msg.sender, MarketAction.sell, marketId, outcomeId, shares, valuePlusFees, block.timestamp);
     emitMarketActionEvents(marketId);
 
     {
-      uint256 treasuryFeeAmount = (value * market.fees.treasuryFee) / (ONE - fee);
-      // transfering treasury fee to treasury address
+      uint256 treasuryFeeAmount = (value * market.fees.sellFees.treasuryFee) / (ONE - fee);
+      uint256 distributorFeeAmount = (value * market.fees.sellFees.distributorFee) / (ONE - fee);
+      // transfering treasury/distributor fees
       if (treasuryFeeAmount > 0) {
         market.token.safeTransfer(market.fees.treasury, treasuryFeeAmount);
       }
+      if (distributorFeeAmount > 0) {
+        market.token.safeTransfer(market.fees.distributor, distributorFeeAmount);
+      }
     }
+
+    return valuePlusFees;
   }
 
   function sell(
@@ -520,12 +606,46 @@ contract PredictionMarketV3 is ReentrancyGuard {
     require(sent, "Failed to send Ether");
   }
 
+  function referralSell(
+    uint256 marketId,
+    uint256 outcomeId,
+    uint256 value,
+    uint256 maxOutcomeSharesToSell,
+    string memory code
+  ) external nonReentrant {
+    uint256 valuePlusFees = _sell(marketId, outcomeId, value, maxOutcomeSharesToSell);
+    // Transferring funds to user
+    Market storage market = markets[marketId];
+    market.token.safeTransfer(msg.sender, value);
+
+    emit Referral(msg.sender, marketId, code, MarketAction.sell, outcomeId, valuePlusFees, block.timestamp);
+  }
+
+  function referralSellToETH(
+    uint256 marketId,
+    uint256 outcomeId,
+    uint256 value,
+    uint256 maxOutcomeSharesToSell,
+    string memory code
+  ) external isWETHMarket(marketId) nonReentrant {
+    Market storage market = markets[marketId];
+    require(address(market.token) == address(WETH), "market token is not WETH");
+
+    uint256 valuePlusFees = _sell(marketId, outcomeId, value, maxOutcomeSharesToSell);
+
+    IWETH(WETH).withdraw(value);
+    (bool sent, ) = payable(msg.sender).call{value: value}("");
+    require(sent, "Failed to send Ether");
+
+    emit Referral(msg.sender, marketId, code, MarketAction.sell, outcomeId, valuePlusFees, block.timestamp);
+  }
+
   /// @dev Adds liquidity to a market - external
   function _addLiquidity(
     uint256 marketId,
     uint256 value,
     uint256[] memory distribution
-  ) private timeTransitions(marketId) atState(marketId, MarketState.open) {
+  ) private timeTransitions(marketId) atState(marketId, MarketState.open) notPaused(marketId) {
     Market storage market = markets[marketId];
 
     require(value > 0, "stake has to be greater than 0.");
@@ -648,6 +768,7 @@ contract PredictionMarketV3 is ReentrancyGuard {
     private
     timeTransitions(marketId)
     atState(marketId, MarketState.open)
+    notPaused(marketId)
     returns (uint256)
   {
     Market storage market = markets[marketId];
@@ -768,7 +889,7 @@ contract PredictionMarketV3 is ReentrancyGuard {
   {
     Market storage market = markets[marketId];
 
-    require(market.manager.isAllowedToResolveMarket(market.token, msg.sender), "not allowed to resolve market");
+    require(market.manager.isAllowedToEditMarket(market.token, msg.sender), "not allowed to resolve market");
 
     market.resolution.outcomeId = outcomeId;
 
@@ -776,6 +897,37 @@ contract PredictionMarketV3 is ReentrancyGuard {
     emitMarketActionEvents(marketId);
 
     return market.resolution.outcomeId;
+  }
+
+  /// @dev pauses a market, no trading allowed
+  function adminPauseMarket(uint256 marketId) external isMarket(marketId) notPaused(marketId) nonReentrant {
+    Market storage market = markets[marketId];
+    require(market.manager.isAllowedToEditMarket(market.token, msg.sender), "not allowed to pause market");
+
+    market.paused = true;
+    emit MarketPaused(msg.sender, marketId, market.paused, block.timestamp);
+  }
+
+  /// @dev unpauses a market, trading allowed
+  function adminUnpauseMarket(uint256 marketId) external isMarket(marketId) paused(marketId) nonReentrant {
+    Market storage market = markets[marketId];
+    require(market.manager.isAllowedToEditMarket(market.token, msg.sender), "not allowed to unpause market");
+
+    market.paused = false;
+    emit MarketPaused(msg.sender, marketId, market.paused, block.timestamp);
+  }
+
+  /// @dev overrides market close date
+  function adminSetMarketCloseDate(uint256 marketId, uint256 closesAt)
+    external
+    isMarket(marketId)
+    notAtState(marketId, MarketState.resolved)
+  {
+    Market storage market = markets[marketId];
+    require(market.manager.isAllowedToEditMarket(market.token, msg.sender), "not allowed to set close date");
+
+    require(closesAt > block.timestamp, "resolution before current date");
+    market.closesAtTimestamp = closesAt;
   }
 
   /// @dev Allows holders of resolved outcome shares to claim earnings.
@@ -805,7 +957,11 @@ contract PredictionMarketV3 is ReentrancyGuard {
       block.timestamp
     );
 
-    return value;
+    uint256 treasuryFeeAmount = (value * market.fees.buyFees.treasuryFee) / ONE;
+    uint256 distributorFeeAmount = (value * market.fees.buyFees.distributorFee) / ONE;
+    uint256 valueMinusFees = value - treasuryFeeAmount - distributorFeeAmount;
+
+    return valueMinusFees;
   }
 
   function claimWinnings(uint256 marketId) external {
@@ -1176,11 +1332,11 @@ contract PredictionMarketV3 is ReentrancyGuard {
     Market storage market = markets[marketId];
 
     return (
-      market.fees.fee,
+      market.fees.buyFees.fee,
       market.resolution.questionId,
       uint256(market.resolution.questionId),
       market.token,
-      market.fees.treasuryFee,
+      market.fees.buyFees.treasuryFee,
       market.fees.treasury,
       market.resolution.realitio,
       market.resolution.realitioTimeout,
@@ -1269,7 +1425,28 @@ contract PredictionMarketV3 is ReentrancyGuard {
   function getMarketFee(uint256 marketId) public view returns (uint256) {
     Market storage market = markets[marketId];
 
-    return market.fees.fee + market.fees.treasuryFee;
+    return market.fees.buyFees.fee + market.fees.buyFees.treasuryFee + market.fees.buyFees.distributorFee;
+  }
+
+  function getMarketSellFee(uint256 marketId) public view returns (uint256) {
+    Market storage market = markets[marketId];
+
+    return market.fees.sellFees.fee + market.fees.sellFees.treasuryFee + market.fees.sellFees.distributorFee;
+  }
+
+  function getMarketFees(uint256 marketId)
+    external
+    view
+    returns (
+      Fees memory,
+      Fees memory,
+      address,
+      address
+    )
+  {
+    Market storage market = markets[marketId];
+
+    return (market.fees.buyFees, market.fees.sellFees, market.fees.treasury, market.fees.distributor);
   }
 
   // ------ Outcome Getters ------

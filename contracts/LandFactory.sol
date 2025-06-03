@@ -228,7 +228,7 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     return land.active && land.admins[user];
   }
 
-  function isAllowedToResolveMarket(IERC20 marketToken, address user) external view virtual returns (bool) {
+  function isAllowedToEditMarket(IERC20 marketToken, address user) external view virtual returns (bool) {
     Land storage land = lands[address(marketToken)];
 
     return land.active && land.admins[user];
