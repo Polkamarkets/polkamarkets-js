@@ -1506,4 +1506,10 @@ contract PredictionMarketV3 is ReentrancyGuard {
 
     return shares;
   }
+
+  function getMarketPaused(uint256 marketId) external view returns (bool) {
+    Market storage market = markets[marketId];
+
+    return market.paused;
+  }
 }

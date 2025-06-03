@@ -2,6 +2,12 @@
 pragma solidity ^0.8.26;
 
 interface IPredictionMarketV3 {
+  struct Fees {
+    uint256 fee; // fee % taken from every transaction
+    uint256 treasuryFee; // fee % taken from every transaction to a treasury address
+    uint256 distributorFee; // fee % taken from every transaction to a distributor address
+  }
+
   struct CreateMarketDescription {
     uint256 value;
     uint256 closesAt;
@@ -11,9 +17,10 @@ interface IPredictionMarketV3 {
     string question;
     string image;
     address arbitrator;
-    uint256 fee;
-    uint256 treasuryFee;
+    Fees buyFees;
+    Fees sellFees;
     address treasury;
+    address distributor;
     address realitio;
     uint256 realitioTimeout;
     address manager;
