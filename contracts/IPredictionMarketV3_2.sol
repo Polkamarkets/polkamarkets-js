@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-interface IPredictionMarketV3 {
+interface IPredictionMarketV3_2 {
   struct Fees {
     uint256 fee; // fee % taken from every transaction
     uint256 treasuryFee; // fee % taken from every transaction to a treasury address
