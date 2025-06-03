@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.26;
 
 import "./FantasyERC20.sol";
 import "./RealityETH_ERC20_Factory.sol";
@@ -72,7 +72,7 @@ contract PredictionMarketV3Controller is LandFactory {
         IPredictionMarketV3Factory(PMV3Factory).isPMControllerAdmin(address(this), user));
   }
 
-  function isAllowedToResolveMarket(IERC20 marketToken, address user) public view override returns (bool) {
+  function isAllowedToEditMarket(IERC20 marketToken, address user) public view override returns (bool) {
     return
       lands[address(marketToken)].active &&
       (lands[address(marketToken)].admins[user] ||

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Based on https://github.com/RealityETH/reality-eth-monorepo/blob/main/packages/contracts/development/contracts/RealityETH_ERC20_Factory.sol
 
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.26;
 
 // local imports
 import "./IRealityETH_ERC20.sol";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.26;
 
 import "./FantasyERC20.sol";
 import "./RealityETH_ERC20_Factory.sol";
@@ -228,7 +228,7 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     return land.active && land.admins[user];
   }
 
-  function isAllowedToResolveMarket(IERC20 marketToken, address user) external view virtual returns (bool) {
+  function isAllowedToEditMarket(IERC20 marketToken, address user) external view virtual returns (bool) {
     Land storage land = lands[address(marketToken)];
 
     return land.active && land.admins[user];
