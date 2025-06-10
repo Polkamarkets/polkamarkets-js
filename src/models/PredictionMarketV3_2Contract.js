@@ -1,4 +1,5 @@
 const predictionV3 = require("../interfaces").predictionV3_2;
+const PredictionMarketV3Contract = require("./PredictionMarketV3Contract");
 const PredictionMarketV3QuerierContract = require("./PredictionMarketV3QuerierContract");
 
 const Numbers = require('../utils/Numbers');
