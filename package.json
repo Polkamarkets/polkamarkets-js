@@ -1,6 +1,6 @@
 {
     "name": "polkamarkets-js",
-    "version": "3.1.5",
+    "version": "3.1.11",
     "description": "",
     "main": "index.js",
     "directories": {
@@ -52,6 +52,7 @@
         "web3": "1.9.0"
     },
     "devDependencies": {
+        "@types/mocha": "^10.0.10",
         "@truffle/hdwallet-provider": "^1.4.0",
         "babel-plugin-transform-runtime": "^6.23.0",
         "babel-preset-env": "^1.6.1",

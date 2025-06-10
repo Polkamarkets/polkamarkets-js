@@ -198,11 +198,21 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
       const decimals = marketDecimals[marketId];
 
       const outcomeShares = Object.fromEntries(marketData.outcomeShares.map((item, index) => {
+      const shares = Numbers.fromDecimalsNumber(item, decimals);
+      const price = this.getAverageOutcomeBuyPrice({events, marketId, outcomeId: index});
+      const voidedWinningsToClaim = marketData.voidedSharesToClaim && shares > 0;
+      const voidedWinningsClaimed = voidedWinningsToClaim && events.some((event) => {
+        return event.action === 'Claim Voided' &&
+          event.marketId === marketId &&
+          event.outcomeId === index
+        });
         return [
           index,
           {
-            shares: Numbers.fromDecimalsNumber(item, decimals),
-            price: this.getAverageOutcomeBuyPrice({events, marketId, outcomeId: index})
+            shares,
+            price,
+            voidedWinningsToClaim,
+            voidedWinningsClaimed
           }
         ];
       }));
@@ -278,13 +288,11 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
       marketsPrices = await this.querier.getMarketsPrices({ marketIds });
     }
 
-    // fetching all markets decimals asynchrounously
-    const marketDecimals = await this.getMarketsERC20Decimals({ marketIds });
-
     return marketIds.reduce((obj, marketId) => {
       const index = marketIds.indexOf(marketId);
       const marketData = marketsPrices[index];
-      const decimals = marketDecimals[marketId];
+      // market prices decimals are always 18, don't depend on the erc20 decimals
+      const decimals = 18;
 
       return {
         ...obj,
@@ -350,7 +358,7 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
       const decimals = marketDecimals[event.returnValues.marketId];
 
       return {
-        action: actions[Numbers.fromBigNumberToInteger(event.returnValues.action, 18)],
+        action: this.constructor.ACTIONS[Numbers.fromBigNumberToInteger(event.returnValues.action, 18)],
         marketId: Numbers.fromBigNumberToInteger(event.returnValues.marketId, 18),
         outcomeId: Numbers.fromBigNumberToInteger(event.returnValues.outcomeId, 18),
         shares: Numbers.fromDecimalsNumber(event.returnValues.shares, decimals),

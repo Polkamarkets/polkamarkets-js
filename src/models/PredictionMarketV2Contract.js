@@ -11,26 +11,18 @@ const ERC20Contract = require('./ERC20Contract');
 
 const realitioLib = require('@reality.eth/reality-eth-lib/formatters/question');
 
-const actions = {
-  0: 'Buy',
-  1: 'Sell',
-  2: 'Add Liquidity',
-  3: 'Remove Liquidity',
-  4: 'Claim Winnings',
-  5: 'Claim Liquidity',
-  6: 'Claim Fees',
-  7: 'Claim Voided',
-}
-
-/**
- * PredictionMarket Contract Object
- * @constructor PredictionMarketContract
- * @param {Web3} web3
- * @param {Integer} decimals
- * @param {Address} contractAddress
- */
-
 class PredictionMarketV2Contract extends IContract {
+  static ACTIONS = {
+    0: 'Buy',
+    1: 'Sell',
+    2: 'Add Liquidity',
+    3: 'Remove Liquidity',
+    4: 'Claim Winnings',
+    5: 'Claim Liquidity',
+    6: 'Claim Fees',
+    7: 'Claim Voided',
+  };
+
   constructor(params) {
     super({...params, abi: params.abi || prediction});
     this.contractName = 'predictionMarketV2';
@@ -204,22 +196,26 @@ class PredictionMarketV2Contract extends IContract {
    * @param {Integer} outcomeId
    * @returns {Integer} price
    */
-  getAverageOutcomeBuyPrice({events, marketId, outcomeId}) {
-    // filtering by marketId + outcomeId + buy action
-    events = events.filter(event => {
-      return (
-        event.action === 'Buy' &&
-        event.marketId === marketId &&
-        event.outcomeId === outcomeId
-      );
+  getAverageOutcomeBuyPrice({ events, marketId, outcomeId }) {
+    let totalShares = 0;
+    let totalAmount = 0;
+  
+    events.forEach((event) => {
+      if (event.marketId === marketId && event.outcomeId === outcomeId) {
+        if (event.action === "Buy") {
+          totalShares += event.shares;
+          totalAmount += event.value;
+        } else if (event.action === "Sell") {
+          const proportion = event.shares / totalShares;
+          totalShares -= event.shares;
+          totalAmount *= 1 - proportion;
+        }
+      }
     });
-
-    if (events.length === 0) return 0;
-
-    const totalShares = events.map(item => item.shares).reduce((prev, next) => prev + next);
-    const totalAmount = events.map(item => item.value).reduce((prev, next) => prev + next);
-
-    return totalAmount / totalShares;
+  
+    return totalShares && totalAmount
+      ? totalAmount / totalShares
+      : 0;
   }
 
   /**
@@ -411,7 +407,7 @@ class PredictionMarketV2Contract extends IContract {
       const decimals = marketDecimals[marketIds.indexOf(event.returnValues.marketId)];
 
       return {
-        action: actions[Numbers.fromBigNumberToInteger(event.returnValues.action, 18)],
+        action: this.constructor.ACTIONS[Numbers.fromBigNumberToInteger(event.returnValues.action, 18)],
         marketId: Numbers.fromBigNumberToInteger(event.returnValues.marketId, 18),
         outcomeId: Numbers.fromBigNumberToInteger(event.returnValues.outcomeId, 18),
         shares: Numbers.fromDecimalsNumber(event.returnValues.shares, decimals),
@@ -494,11 +490,11 @@ class PredictionMarketV2Contract extends IContract {
    * @return {Integer} decimals
    */
   async getMarketDecimals({marketId}) {
-    if (this.defaultDecimals) {
-      return this.defaultDecimals;
-    }
     if (this.marketDecimals && this.marketDecimals[marketId]) {
       return this.marketDecimals[marketId];
+    }
+    if (this.defaultDecimals) {
+      return this.defaultDecimals;
     }
 
     const marketAltData = await this.params.contract.getContract().methods.getMarketAltData(marketId).call();
