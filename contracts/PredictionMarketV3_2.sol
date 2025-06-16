@@ -1229,7 +1229,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
 
   // ------ Getters ------
 
-  function getUserMarketShares(uint256 marketId, address user) external view returns (uint256, uint256[] memory) {
+  function getUserMarketShares(uint256 marketId, address user) external view returns (uint256 liquidity, uint256[] memory outcomes) {
     Market storage market = markets[marketId];
     uint256[] memory outcomeShares = new uint256[](market.outcomeCount);
 
@@ -1244,11 +1244,11 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     external
     view
     returns (
-      bool,
-      bool,
-      bool,
-      bool,
-      uint256
+      bool winningsToClaim,
+      bool winningsClaimed,
+      bool liquidityToClaim,
+      bool liquidityClaimed,
+      uint256 claimableFees
     )
   {
     Market storage market = markets[marketId];
@@ -1294,12 +1294,12 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     external
     view
     returns (
-      MarketState,
-      uint256,
-      uint256,
-      uint256,
-      uint256,
-      int256
+      MarketState state,
+      uint256 closesAt,
+      uint256 liquidity,
+      uint256 balance,
+      uint256 sharesAvailable,
+      int256 resolvedOutcomeId
     )
   {
     Market storage market = markets[marketId];
@@ -1318,15 +1318,15 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     external
     view
     returns (
-      uint256,
-      bytes32,
-      uint256,
-      IERC20,
-      uint256,
-      address,
-      IRealityETH_ERC20,
-      uint256,
-      IPredictionMarketV3Manager
+      uint256 buyFee,
+      bytes32 questionId,
+      uint256 questionIdUint,
+      IERC20 token,
+      uint256 buyTreasuryFee,
+      address treasury,
+      IRealityETH_ERC20 realitio,
+      uint256 realitioTimeout,
+      IPredictionMarketV3Manager manager
     )
   {
     Market storage market = markets[marketId];
@@ -1356,7 +1356,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     return (market.resolution.questionId);
   }
 
-  function getMarketPrices(uint256 marketId) external view returns (uint256, uint256[] memory) {
+  function getMarketPrices(uint256 marketId) external view returns (uint256 liquidity, uint256[] memory outcomes) {
     Market storage market = markets[marketId];
     uint256[] memory prices = new uint256[](market.outcomeCount);
 
@@ -1367,7 +1367,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     return (getMarketLiquidityPrice(marketId), prices);
   }
 
-  function getMarketShares(uint256 marketId) external view returns (uint256, uint256[] memory) {
+  function getMarketShares(uint256 marketId) external view returns (uint256 liquidity, uint256[] memory outcomes) {
     Market storage market = markets[marketId];
     uint256[] memory outcomeShares = new uint256[](market.outcomeCount);
 
@@ -1438,10 +1438,10 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     external
     view
     returns (
-      Fees memory,
-      Fees memory,
-      address,
-      address
+      Fees memory buyFees,
+      Fees memory sellFees,
+      address treasury,
+      address distributor
     )
   {
     Market storage market = markets[marketId];
@@ -1485,9 +1485,9 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     external
     view
     returns (
-      uint256,
-      uint256,
-      uint256
+      uint256 price,
+      uint256 availableShares,
+      uint256 totalShares
     )
   {
     Market storage market = markets[marketId];
