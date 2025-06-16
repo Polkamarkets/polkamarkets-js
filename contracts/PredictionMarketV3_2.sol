@@ -14,7 +14,7 @@ library CeilDiv {
   // calculates ceil(x/y)
   function ceildiv(uint256 x, uint256 y) internal pure returns (uint256) {
     if (x > 0) return ((x - 1) / y) + 1;
-    return x / y;
+    return 0;
   }
 }
 
