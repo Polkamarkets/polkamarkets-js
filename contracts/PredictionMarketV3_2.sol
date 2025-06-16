@@ -957,11 +957,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
       block.timestamp
     );
 
-    uint256 treasuryFeeAmount = (value * market.fees.buyFees.treasuryFee) / ONE;
-    uint256 distributorFeeAmount = (value * market.fees.buyFees.distributorFee) / ONE;
-    uint256 valueMinusFees = value - treasuryFeeAmount - distributorFeeAmount;
-
-    return valueMinusFees;
+    return value;
   }
 
   function claimWinnings(uint256 marketId) external {
@@ -1422,7 +1418,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     return market.resolution.outcomeId >= market.outcomeCount;
   }
 
-  function getMarketFee(uint256 marketId) public view returns (uint256) {
+  function getMarketBuyFee(uint256 marketId) public view returns (uint256) {
     Market storage market = markets[marketId];
 
     return market.fees.buyFees.fee + market.fees.buyFees.treasuryFee + market.fees.buyFees.distributorFee;
@@ -1432,6 +1428,11 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     Market storage market = markets[marketId];
 
     return market.fees.sellFees.fee + market.fees.sellFees.treasuryFee + market.fees.sellFees.distributorFee;
+  }
+
+  // alias of getMarketBuyFee, used for compatibility
+  function getMarketFee(uint256 marketId) public view returns (uint256) {
+    return getMarketBuyFee(marketId);
   }
 
   function getMarketFees(uint256 marketId)
