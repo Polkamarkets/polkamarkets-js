@@ -393,12 +393,15 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     uint256 marketId,
     uint256 outcomeId
   ) public view returns (uint256) {
+    Market storage market = markets[marketId];
+    require(outcomeId < market.outcomeCount, "outcome is out of bounds");
+
     uint256[] memory outcomesShares = getMarketOutcomesShares(marketId);
     uint256 fee = getMarketFee(marketId);
     uint256 amountMinusFees = amount - ((amount * fee) / ONE);
     uint256 buyTokenPoolBalance = outcomesShares[outcomeId];
     uint256 endingOutcomeBalance = buyTokenPoolBalance * ONE;
-    for (uint256 i = 0; i < outcomesShares.length; ++i) {
+    for (uint256 i = 0; i < market.outcomeCount; ++i) {
       if (i != outcomeId) {
         uint256 outcomeShares = outcomesShares[i];
         endingOutcomeBalance = (endingOutcomeBalance * outcomeShares).ceildiv(outcomeShares + amountMinusFees);
@@ -415,12 +418,15 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     uint256 marketId,
     uint256 outcomeId
   ) public view returns (uint256 outcomeTokenSellAmount) {
+    Market storage market = markets[marketId];
+    require(outcomeId < market.outcomeCount, "outcome is out of bounds");
+
     uint256[] memory outcomesShares = getMarketOutcomesShares(marketId);
     uint256 fee = getMarketSellFee(marketId);
     uint256 amountPlusFees = (amount * ONE) / (ONE - fee);
     uint256 sellTokenPoolBalance = outcomesShares[outcomeId];
     uint256 endingOutcomeBalance = sellTokenPoolBalance * ONE;
-    for (uint256 i = 0; i < outcomesShares.length; ++i) {
+    for (uint256 i = 0; i < market.outcomeCount; ++i) {
       if (i != outcomeId) {
         uint256 outcomeShares = outcomesShares[i];
         endingOutcomeBalance = (endingOutcomeBalance * outcomeShares).ceildiv(outcomeShares - amountPlusFees);
