@@ -554,11 +554,12 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
 
     // adding fees to transaction value
     uint256 fee = getMarketSellFee(marketId);
+    uint256 oneMinusFee = ONE - fee;
     {
-      uint256 feeAmount = (value * market.fees.sellFees.fee) / (ONE - fee);
+      uint256 feeAmount = (value * market.fees.sellFees.fee) / oneMinusFee;
       market.fees.poolWeight = market.fees.poolWeight + feeAmount;
     }
-    uint256 valuePlusFees = value + (value * fee) / (ONE - fee);
+    uint256 valuePlusFees = value + (value * fee) / oneMinusFee;
 
     require(market.balance >= valuePlusFees, "insufficient market balance");
 
@@ -570,8 +571,8 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     emitMarketActionEvents(marketId);
 
     {
-      uint256 treasuryFeeAmount = (value * market.fees.sellFees.treasuryFee) / (ONE - fee);
-      uint256 distributorFeeAmount = (value * market.fees.sellFees.distributorFee) / (ONE - fee);
+      uint256 treasuryFeeAmount = (value * market.fees.sellFees.treasuryFee) / oneMinusFee;
+      uint256 distributorFeeAmount = (value * market.fees.sellFees.distributorFee) / oneMinusFee;
       // transfering treasury/distributor fees
       if (treasuryFeeAmount > 0) {
         market.token.safeTransfer(market.fees.treasury, treasuryFeeAmount);
@@ -943,7 +944,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     MarketOutcome storage resolvedOutcome = market.outcomes[market.resolution.outcomeId];
 
     require(resolvedOutcome.shares.holders[msg.sender] > 0, "user doesn't hold outcome shares");
-    require(resolvedOutcome.shares.claims[msg.sender] == false, "user already claimed winnings");
+    require(!resolvedOutcome.shares.claims[msg.sender], "user already claimed winnings");
 
     // 1 share => price = 1
     uint256 value = resolvedOutcome.shares.holders[msg.sender];
@@ -997,7 +998,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
 
     require(isMarketVoided(marketId), "market is not voided");
     require(outcome.shares.holders[msg.sender] > 0, "user doesn't hold outcome shares");
-    require(outcome.shares.voidedClaims[msg.sender] == false, "user already claimed shares");
+    require(!outcome.shares.voidedClaims[msg.sender], "user already claimed shares");
 
     // voided market - shares are valued at last market price
     uint256 price = getMarketOutcomePrice(marketId, outcomeId);
@@ -1045,7 +1046,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     claimFees(marketId);
 
     require(market.liquidityShares[msg.sender] > 0, "user doesn't hold shares");
-    require(market.liquidityClaims[msg.sender] == false, "user already claimed shares");
+    require(!market.liquidityClaims[msg.sender], "user already claimed shares");
 
     // value = total resolved outcome pool shares * pool share (%)
     uint256 liquidityPrice = getMarketLiquidityPrice(marketId);
