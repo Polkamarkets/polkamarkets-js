@@ -252,4 +252,12 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
 
     return land.admins[user];
   }
+
+  function getERC20RealitioAddress(IERC20 marketToken) external view virtual returns (address) {
+    Land storage land = lands[address(marketToken)];
+
+    require(land.active, "Land does not exist");
+
+    return address(land.realitio);
+  }
 }
