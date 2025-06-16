@@ -357,7 +357,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     return marketId;
   }
 
-  function createMarketWithETH(CreateMarketDescription calldata desc) external nonReentrant payable returns (uint256) {
+  function createMarketWithETH(CreateMarketDescription calldata desc) external payable nonReentrant returns (uint256) {
     require(address(desc.token) == address(WETH), "Market token is not WETH");
     require(msg.value == desc.value, "value does not match arguments");
     uint256 marketId = _createMarket(
@@ -771,7 +771,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     market.token.safeTransferFrom(msg.sender, address(this), value);
   }
 
-  function addLiquidityWithETH(uint256 marketId) external nonReentrant payable isWETHMarket(marketId) {
+  function addLiquidityWithETH(uint256 marketId) external payable nonReentrant isWETHMarket(marketId) {
     uint256 value = msg.value;
     uint256[] memory distribution = new uint256[](0);
     _addLiquidity(marketId, value, distribution);
@@ -1039,7 +1039,11 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     market.token.safeTransfer(msg.sender, value);
   }
 
-  function claimVoidedOutcomeSharesToETH(uint256 marketId, uint256 outcomeId) external nonReentrant isWETHMarket(marketId) {
+  function claimVoidedOutcomeSharesToETH(uint256 marketId, uint256 outcomeId)
+    external
+    nonReentrant
+    isWETHMarket(marketId)
+  {
     uint256 value = _claimVoidedOutcomeShares(marketId, outcomeId);
     // unwrapping and transferring user funds from voided outcome shares claimed
     IWETH(WETH).withdraw(value);
@@ -1246,7 +1250,11 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
 
   // ------ Getters ------
 
-  function getUserMarketShares(uint256 marketId, address user) external view returns (uint256 liquidity, uint256[] memory outcomes) {
+  function getUserMarketShares(uint256 marketId, address user)
+    external
+    view
+    returns (uint256 liquidity, uint256[] memory outcomes)
+  {
     Market storage market = markets[marketId];
     uint256[] memory outcomeShares = new uint256[](market.outcomeCount);
 
