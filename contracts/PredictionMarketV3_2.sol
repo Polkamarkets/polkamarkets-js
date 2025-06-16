@@ -85,6 +85,13 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
 
   event MarketPaused(address indexed user, uint256 indexed marketId, bool paused, uint256 timestamp);
 
+  event MarketCloseDateEdited(
+    address indexed user,
+    uint256 indexed marketId,
+    uint256 closesAtTimestamp,
+    uint256 timestamp
+  );
+
   // ------ Events End ------
 
   uint256 public constant MAX_UINT_256 = type(uint256).max;
@@ -928,6 +935,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
 
     require(closesAt > block.timestamp, "resolution before current date");
     market.closesAtTimestamp = closesAt;
+    emit MarketCloseDateEdited(msg.sender, marketId, closesAt, block.timestamp);
   }
 
   /// @dev Allows holders of resolved outcome shares to claim earnings.
