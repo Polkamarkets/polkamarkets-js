@@ -773,7 +773,10 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
   {
     Market storage market = markets[marketId];
 
+    // removing 100% of the liquidity is not allowed
+    require(shares < market.liquidity, "cannot remove all liquidity");
     require(market.liquidityShares[msg.sender] >= shares, "insufficient shares balance");
+
     // claiming any pending fees
     claimFees(marketId);
 
