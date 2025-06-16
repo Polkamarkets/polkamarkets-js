@@ -325,7 +325,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     return marketId;
   }
 
-  function createMarket(CreateMarketDescription calldata desc) external returns (uint256) {
+  function createMarket(CreateMarketDescription calldata desc) external nonReentrant returns (uint256) {
     uint256 marketId = _createMarket(
       CreateMarketDescription({
         value: desc.value,
@@ -350,7 +350,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     return marketId;
   }
 
-  function createMarketWithETH(CreateMarketDescription calldata desc) external payable returns (uint256) {
+  function createMarketWithETH(CreateMarketDescription calldata desc) external nonReentrant payable returns (uint256) {
     require(address(desc.token) == address(WETH), "Market token is not WETH");
     require(msg.value == desc.value, "value does not match arguments");
     uint256 marketId = _createMarket(
@@ -377,7 +377,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     return marketId;
   }
 
-  function mintAndCreateMarket(CreateMarketDescription calldata desc) external returns (uint256) {
+  function mintAndCreateMarket(CreateMarketDescription calldata desc) external nonReentrant returns (uint256) {
     // mint the amount of tokens to the user
     IFantasyERC20(address(desc.token)).mint(msg.sender, desc.value);
 
@@ -748,7 +748,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     emit MarketLiquidity(marketId, market.liquidity, liquidityPrice, block.timestamp);
   }
 
-  function addLiquidity(uint256 marketId, uint256 value) external {
+  function addLiquidity(uint256 marketId, uint256 value) external nonReentrant {
     uint256[] memory distribution = new uint256[](0);
     _addLiquidity(marketId, value, distribution);
 
@@ -756,7 +756,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     market.token.safeTransferFrom(msg.sender, address(this), value);
   }
 
-  function addLiquidityWithETH(uint256 marketId) external payable isWETHMarket(marketId) {
+  function addLiquidityWithETH(uint256 marketId) external nonReentrant payable isWETHMarket(marketId) {
     uint256 value = msg.value;
     uint256[] memory distribution = new uint256[](0);
     _addLiquidity(marketId, value, distribution);
@@ -845,14 +845,14 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     return liquidityAmount;
   }
 
-  function removeLiquidity(uint256 marketId, uint256 shares) external {
+  function removeLiquidity(uint256 marketId, uint256 shares) external nonReentrant {
     uint256 value = _removeLiquidity(marketId, shares);
     // transferring user funds from liquidity removed
     Market storage market = markets[marketId];
     market.token.safeTransfer(msg.sender, value);
   }
 
-  function removeLiquidityToETH(uint256 marketId, uint256 shares) external isWETHMarket(marketId) {
+  function removeLiquidityToETH(uint256 marketId, uint256 shares) external nonReentrant isWETHMarket(marketId) {
     uint256 value = _removeLiquidity(marketId, shares);
     // unwrapping and transferring user funds from liquidity removed
     IWETH(WETH).withdraw(value);
@@ -965,14 +965,14 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     return valueMinusFees;
   }
 
-  function claimWinnings(uint256 marketId) external {
+  function claimWinnings(uint256 marketId) external nonReentrant {
     uint256 value = _claimWinnings(marketId);
     // transferring user funds from winnings claimed
     Market storage market = markets[marketId];
     market.token.safeTransfer(msg.sender, value);
   }
 
-  function claimWinningsToETH(uint256 marketId) external isWETHMarket(marketId) {
+  function claimWinningsToETH(uint256 marketId) external nonReentrant isWETHMarket(marketId) {
     uint256 value = _claimWinnings(marketId);
     // unwrapping and transferring user funds from winnings claimed
     IWETH(WETH).withdraw(value);
@@ -1016,14 +1016,14 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     return value;
   }
 
-  function claimVoidedOutcomeShares(uint256 marketId, uint256 outcomeId) external {
+  function claimVoidedOutcomeShares(uint256 marketId, uint256 outcomeId) external nonReentrant {
     uint256 value = _claimVoidedOutcomeShares(marketId, outcomeId);
     // transferring user funds from voided outcome shares claimed
     Market storage market = markets[marketId];
     market.token.safeTransfer(msg.sender, value);
   }
 
-  function claimVoidedOutcomeSharesToETH(uint256 marketId, uint256 outcomeId) external isWETHMarket(marketId) {
+  function claimVoidedOutcomeSharesToETH(uint256 marketId, uint256 outcomeId) external nonReentrant isWETHMarket(marketId) {
     uint256 value = _claimVoidedOutcomeShares(marketId, outcomeId);
     // unwrapping and transferring user funds from voided outcome shares claimed
     IWETH(WETH).withdraw(value);
@@ -1064,14 +1064,14 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     return value;
   }
 
-  function claimLiquidity(uint256 marketId) external {
+  function claimLiquidity(uint256 marketId) external nonReentrant {
     uint256 value = _claimLiquidity(marketId);
     // transferring user funds from liquidity claimed
     Market storage market = markets[marketId];
     market.token.safeTransfer(msg.sender, value);
   }
 
-  function claimLiquidityToETH(uint256 marketId) external isWETHMarket(marketId) {
+  function claimLiquidityToETH(uint256 marketId) external nonReentrant isWETHMarket(marketId) {
     uint256 value = _claimLiquidity(marketId);
     // unwrapping and transferring user funds from liquidity claimed
     IWETH(WETH).withdraw(value);
