@@ -148,10 +148,10 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
 
   struct MarketResolution {
     bool resolved;
+    IRealityETH_ERC20 realitio;
     uint256 outcomeId;
     bytes32 questionId; // realitio questionId
     // realitio
-    IRealityETH_ERC20 realitio;
     uint256 realitioTimeout;
   }
 
@@ -171,7 +171,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
 
   struct CreateMarketDescription {
     uint256 value;
-    uint256 closesAt;
+    uint32 closesAt;
     uint256 outcomes;
     IERC20 token;
     uint256[] distribution;
@@ -183,7 +183,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     address treasury;
     address distributor;
     IRealityETH_ERC20 realitio;
-    uint256 realitioTimeout;
+    uint32 realitioTimeout;
     IPredictionMarketV3Manager manager;
   }
 
@@ -300,8 +300,8 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
       2,
       desc.question,
       desc.arbitrator,
-      uint32(desc.realitioTimeout),
-      uint32(desc.closesAt),
+      desc.realitioTimeout,
+      desc.closesAt,
       0,
       0
     );

@@ -10,7 +10,7 @@ interface IPredictionMarketV3_2 {
 
   struct CreateMarketDescription {
     uint256 value;
-    uint256 closesAt;
+    uint32 closesAt;
     uint256 outcomes;
     address token;
     uint256[] distribution;
@@ -22,7 +22,7 @@ interface IPredictionMarketV3_2 {
     address treasury;
     address distributor;
     address realitio;
-    uint256 realitioTimeout;
+    uint32 realitioTimeout;
     address manager;
   }
 
