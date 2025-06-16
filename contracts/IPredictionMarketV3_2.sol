@@ -21,7 +21,6 @@ interface IPredictionMarketV3_2 {
     Fees sellFees;
     address treasury;
     address distributor;
-    address realitio;
     uint256 realitioTimeout;
     address manager;
   }

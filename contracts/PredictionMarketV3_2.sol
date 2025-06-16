@@ -95,6 +95,8 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
 
   uint256 public constant MAX_FEE = 5 * 10**16; // 5%
 
+  uint256 public constant MINIMUM_REALITIO_TIMEOUT = 3600; // 1 hour
+
   enum MarketState {
     open,
     closed,
@@ -182,7 +184,6 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     Fees sellFees;
     address treasury;
     address distributor;
-    IRealityETH_ERC20 realitio;
     uint256 realitioTimeout;
     IPredictionMarketV3Manager manager;
   }
@@ -271,12 +272,14 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
 
     Market storage market = markets[marketId];
 
+    IRealityETH_ERC20 realitio = IRealityETH_ERC20(desc.manager.getERC20RealitioAddress(desc.token));
+
     require(desc.value > 0, "stake needs to be > 0");
     require(desc.closesAt > block.timestamp, "resolution before current date");
     require(desc.arbitrator != address(0), "invalid arbitrator address");
     require(desc.outcomes > 0 && desc.outcomes <= MAX_OUTCOMES, "outcome count not between 1-32");
-    require(address(desc.realitio) != address(0), "_realitioAddress is address 0");
-    require(desc.realitioTimeout > 0, "timeout must be positive");
+    require(address(realitio) != address(0), "_realitioAddress is address 0");
+    require(desc.realitioTimeout >= MINIMUM_REALITIO_TIMEOUT, "realitio timeout too low");
     require(desc.manager.isAllowedToCreateMarket(desc.token, msg.sender), "not allowed to create market");
 
     market.token = desc.token;
@@ -296,7 +299,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     market.outcomeCount = desc.outcomes;
 
     // creating question in realitio
-    market.resolution.questionId = desc.realitio.askQuestionERC20(
+    market.resolution.questionId = realitio.askQuestionERC20(
       2,
       desc.question,
       desc.arbitrator,
@@ -305,7 +308,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
       0,
       0
     );
-    market.resolution.realitio = desc.realitio;
+    market.resolution.realitio = realitio;
     market.resolution.realitioTimeout = desc.realitioTimeout;
     market.manager = desc.manager;
     market.creator = msg.sender;
@@ -337,7 +340,6 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
         sellFees: desc.sellFees,
         treasury: desc.treasury,
         distributor: desc.distributor,
-        realitio: desc.realitio,
         realitioTimeout: desc.realitioTimeout,
         manager: desc.manager
       })
@@ -365,7 +367,6 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
         sellFees: desc.sellFees,
         treasury: desc.treasury,
         distributor: desc.distributor,
-        realitio: desc.realitio,
         realitioTimeout: desc.realitioTimeout,
         manager: desc.manager
       })

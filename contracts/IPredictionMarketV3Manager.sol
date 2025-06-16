@@ -9,4 +9,6 @@ interface IPredictionMarketV3Manager {
   function isAllowedToEditMarket(IERC20 token, address user) external view returns (bool);
 
   function isIERC20TokenSocial(IERC20 token) external view returns (bool);
+
+  function getERC20RealitioAddress(IERC20 token) external view returns (address);
 }
