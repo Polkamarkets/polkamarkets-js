@@ -943,6 +943,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     Market storage market = markets[marketId];
     MarketOutcome storage resolvedOutcome = market.outcomes[market.resolution.outcomeId];
 
+    require(!isMarketVoided(marketId), "market is voided");
     require(resolvedOutcome.shares.holders[msg.sender] > 0, "user doesn't hold outcome shares");
     require(!resolvedOutcome.shares.claims[msg.sender], "user already claimed winnings");
 
