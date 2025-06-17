@@ -228,6 +228,13 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     return land.active && land.admins[user];
   }
 
+  // kept for legacy purposes
+  function isAllowedToResolveMarket(IERC20 marketToken, address user) external view virtual returns (bool) {
+    Land storage land = lands[address(marketToken)];
+
+    return land.active && land.admins[user];
+  }
+
   function isAllowedToEditMarket(IERC20 marketToken, address user) external view virtual returns (bool) {
     Land storage land = lands[address(marketToken)];
 
@@ -244,5 +251,13 @@ abstract contract LandFactory is Ownable, ReentrancyGuard {
     Land storage land = lands[address(marketToken)];
 
     return land.admins[user];
+  }
+
+  function getERC20RealitioAddress(IERC20 marketToken) external view virtual returns (address) {
+    Land storage land = lands[address(marketToken)];
+
+    require(land.active, "Land does not exist");
+
+    return address(land.realitio);
   }
 }

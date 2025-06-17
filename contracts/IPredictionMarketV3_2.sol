@@ -2,6 +2,12 @@
 pragma solidity ^0.8.26;
 
 interface IPredictionMarketV3_2 {
+  enum MarketState {
+    open,
+    closed,
+    resolved
+  }
+
   struct Fees {
     uint256 fee; // fee % taken from every transaction
     uint256 treasuryFee; // fee % taken from every transaction to a treasury address
@@ -10,7 +16,7 @@ interface IPredictionMarketV3_2 {
 
   struct CreateMarketDescription {
     uint256 value;
-    uint256 closesAt;
+    uint32 closesAt;
     uint256 outcomes;
     address token;
     uint256[] distribution;
@@ -21,8 +27,7 @@ interface IPredictionMarketV3_2 {
     Fees sellFees;
     address treasury;
     address distributor;
-    address realitio;
-    uint256 realitioTimeout;
+    uint32 realitioTimeout;
     address manager;
   }
 
@@ -66,11 +71,11 @@ interface IPredictionMarketV3_2 {
 
   function marketIndex() external view returns (uint256);
 
-  function createMarket(CreateMarketDescription memory desc) external returns (uint256);
+  function createMarket(CreateMarketDescription calldata desc) external returns (uint256);
 
-  function createMarketWithETH(CreateMarketDescription memory desc) external payable returns (uint256);
+  function createMarketWithETH(CreateMarketDescription calldata desc) external payable returns (uint256);
 
-  function mintAndCreateMarket(CreateMarketDescription memory desc) external returns (uint256);
+  function mintAndCreateMarket(CreateMarketDescription calldata desc) external returns (uint256);
 
   function calcBuyAmount(
     uint256 amount,
@@ -162,7 +167,7 @@ interface IPredictionMarketV3_2 {
     external
     view
     returns (
-      uint8,
+      MarketState,
       uint256,
       uint256,
       uint256,
