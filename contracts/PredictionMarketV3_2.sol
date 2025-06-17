@@ -793,9 +793,6 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     require(shares < market.liquidity, "cannot remove all liquidity");
     require(market.liquidityShares[msg.sender] >= shares, "insufficient shares balance");
 
-    // claiming any pending fees
-    claimFees(marketId);
-
     // re-balancing fees pool
     _rebalanceFeesPool(marketId, shares, MarketAction.removeLiquidity);
 
@@ -1055,9 +1052,6 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
   function _claimLiquidity(uint256 marketId) private atState(marketId, MarketState.resolved) returns (uint256) {
     Market storage market = markets[marketId];
 
-    // claiming any pending fees
-    claimFees(marketId);
-
     require(market.liquidityShares[msg.sender] > 0, "user doesn't hold shares");
     require(!market.liquidityClaims[msg.sender], "user already claimed shares");
 
@@ -1089,6 +1083,12 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     // transferring user funds from liquidity claimed
     Market storage market = markets[marketId];
     market.token.safeTransfer(msg.sender, value);
+
+    // claiming any pending fees
+    uint256 feesValue = _claimFees(marketId);
+    if (feesValue > 0) {
+      market.token.safeTransfer(msg.sender, feesValue);
+    }
   }
 
   function claimLiquidityToETH(uint256 marketId) external nonReentrant isWETHMarket(marketId) {
