@@ -42,6 +42,10 @@ class PredictionMarketV3ManagerContract extends IContract {
     return await this.params.contract.getContract().methods.isAllowedToResolveMarket(token, user).call();
   }
 
+  async isAllowedToEditMarket({ token, user }) {
+    return await this.params.contract.getContract().methods.isAllowedToEditMarket(token, user).call();
+  }
+
   async isIERC20TokenSocial({ token }) {
     return await this.params.contract.getContract().methods.isIERC20TokenSocial(token, user).call();
   }

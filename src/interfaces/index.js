@@ -7,6 +7,7 @@ let index = {
   prediction: require("../../build/contracts/PredictionMarket.json"),
   predictionV2: require("../../build/contracts/PredictionMarketV2.json"),
   predictionV3: require("../../build/contracts/PredictionMarketV3.json"),
+  predictionV3_2: require("../../build/contracts/PredictionMarketV3_2.json"),
   predictionV3Manager: require("../../build/contracts/PredictionMarketV3Manager.json"),
   predictionV3Controller: require("../../build/contracts/PredictionMarketV3Controller.json"),
   predictionMarketV3Factory: require("../../build/contracts/PredictionMarketV3Factory.json"),

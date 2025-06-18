@@ -17,6 +17,11 @@ context('Prediction Market Contract V3', async () => {
   let requiredBalanceERC20Contract;
   let tokenERC20Contract;
   let WETH9Contract;
+  let marketId;
+
+  // dummy addresses
+  const treasury = '0x0000000000000000000000000000000000000123';
+  const distributor = '0x0000000000000000000000000000000000000456';
 
   // market / outcome ids we'll make unit tests with
   let outcomeIds = [0, 1];
@@ -35,7 +40,7 @@ context('Prediction Market Contract V3', async () => {
       accountAddress = await app.getAddress();
 
       // Create Contract
-      predictionMarketContract = app.getPredictionMarketV3Contract({});
+      predictionMarketContract = app.getPredictionMarketV3_2Contract({});
       predictionMarketManagerContract = app.getPredictionMarketV3ManagerContract({});
       realitioERC20Contract = app.getRealitioERC20Contract({});
       requiredBalanceERC20Contract = app.getERC20Contract({});
@@ -118,7 +123,7 @@ context('Prediction Market Contract V3', async () => {
           outcomes: ['Yes', 'No'],
           token: tokenERC20Contract.getAddress(),
           realitioAddress: realitioERC20Contract.getAddress(),
-          realitioTimeout: 300,
+          realitioTimeout: 3600,
           PM3ManagerAddress: predictionMarketManagerContract.getAddress()
         });
         expect(res.status).to.equal(true);
@@ -143,7 +148,7 @@ context('Prediction Market Contract V3', async () => {
         value: 0.001,
         token: tokenERC20Contract.getAddress(),
         realitioAddress: realitioERC20Contract.getAddress(),
-        realitioTimeout: 300,
+        realitioTimeout: 3600,
         PM3ManagerAddress: predictionMarketManagerContract.getAddress()
       });
       expect(res.status).to.equal(true);
@@ -643,7 +648,7 @@ context('Prediction Market Contract V3', async () => {
             outcomes: ['A', 'B', 'C'],
             token: tokenERC20Contract.getAddress(),
             realitioAddress: realitioERC20Contract.getAddress(),
-            realitioTimeout: 300,
+            realitioTimeout: 3600,
             PM3ManagerAddress: predictionMarketManagerContract.getAddress()
           });
           expect(res.status).to.equal(true);
@@ -676,7 +681,7 @@ context('Prediction Market Contract V3', async () => {
             outcomes,
             token: tokenERC20Contract.getAddress(),
             realitioAddress: realitioERC20Contract.getAddress(),
-            realitioTimeout: 300,
+            realitioTimeout: 3600,
             PM3ManagerAddress: predictionMarketManagerContract.getAddress()
           });
           expect(res.status).to.equal(true);
@@ -690,6 +695,65 @@ context('Prediction Market Contract V3', async () => {
         const res = await predictionMarketContract.getMarketData({marketId});
         expect(res.outcomeIds.length).to.eql(outcomeCount);
         expect(res.outcomeIds).to.eql(outcomes);
+      }));
+
+
+      it('should trade without running out of gas', mochaAsync(async () => {
+        const marketIds = await predictionMarketContract.getMarkets();
+        marketId = marketIds[marketIds.length - 1];
+        const value = 0.002;
+
+        // adding and removing liquidity
+        const marketData = await predictionMarketContract.getMarketData({marketId});
+        try {
+          const res = await predictionMarketContract.addLiquidity({marketId, value})
+          expect(res.status).to.equal(true);
+        } catch(e) {
+          console.log(e);
+        }
+
+        const marketDataAfterAddLiquidity = await predictionMarketContract.getMarketData({marketId});
+        // liquidity should increase
+        expect(marketDataAfterAddLiquidity.liquidity).to.above(marketData.liquidity);
+
+        try {
+          const res = await predictionMarketContract.removeLiquidity({marketId, shares: value});
+          expect(res.status).to.equal(true);
+        } catch(e) {
+          console.log(e);
+        }
+
+        const marketDataAfterRemoveLiquidity = await predictionMarketContract.getMarketData({marketId});
+        // liquidity should decrease
+        expect(marketDataAfterRemoveLiquidity.liquidity).to.below(marketDataAfterAddLiquidity.liquidity);
+
+        // buying and selling
+        const outcomeId = 0;
+        const sellValue = 0.0001;
+        const minOutcomeSharesToBuy = 0.0001;
+        const maxOutcomeSharesToSell = 0.1;
+        const outcomePrices = await predictionMarketContract.getMarketPrices({marketId});
+        try {
+          const res = await predictionMarketContract.buy({marketId, outcomeId, value, minOutcomeSharesToBuy});
+          expect(res.status).to.equal(true);
+        } catch(e) {
+          console.log(e);
+        }
+
+        const outcomePricesAfterBuy = await predictionMarketContract.getMarketPrices({marketId});
+        // outcome price should increase
+        expect(outcomePricesAfterBuy.outcomes[outcomeId]).to.above(outcomePrices.outcomes[outcomeId]);
+
+        try {
+          const res = await predictionMarketContract.sell({marketId, outcomeId, value: sellValue, maxOutcomeSharesToSell});
+          expect(res.status).to.equal(true);
+        } catch(e) {
+          console.log(e);
+        }
+
+        const outcomePricesAfterSell = await predictionMarketContract.getMarketPrices({marketId});
+        // outcome price should decrease
+        expect(outcomePricesAfterSell.outcomes[outcomeId]).to.below(outcomePricesAfterBuy.outcomes[outcomeId]);
       }));
 
       it('should not create a Market with more than 32 outcomes', mochaAsync(async () => {
@@ -707,7 +771,7 @@ context('Prediction Market Contract V3', async () => {
             outcomes,
             token: tokenERC20Contract.getAddress(),
             realitioAddress: realitioERC20Contract.getAddress(),
-            realitioTimeout: 300,
+            realitioTimeout: 3600,
             PM3ManagerAddress: predictionMarketManagerContract.getAddress()
           });
           expect(res.status).to.equal(true);
@@ -738,7 +802,7 @@ context('Prediction Market Contract V3', async () => {
             outcomes: ['D', 'E', 'F'],
             token: tokenERC20Contract.getAddress(),
             realitioAddress: realitioERC20Contract.getAddress(),
-            realitioTimeout: 300,
+            realitioTimeout: 3600,
             PM3ManagerAddress: predictionMarketManagerContract.getAddress()
           });
           expect(res.status).to.equal(true);
@@ -1031,7 +1095,7 @@ context('Prediction Market Contract V3', async () => {
                 token: tokenERC20Contract.getAddress(),
                 odds,
                 realitioAddress: realitioERC20Contract.getAddress(),
-                realitioTimeout: 300,
+                realitioTimeout: 3600,
                 PM3ManagerAddress: predictionMarketManagerContract.getAddress()
               });
               expect(res.status).to.equal(true);
@@ -1075,5 +1139,75 @@ context('Prediction Market Contract V3', async () => {
         });
       }
     });
+  });
+
+  context('Buy/Sell/Claming Fees', async () => {
+    before(mochaAsync(async () => {
+      try {
+        const res = await predictionMarketContract.mintAndCreateMarket({
+          value,
+          name: `Market with 1%/2%/3% Fees`,
+          image: 'foo-bar',
+          category: 'Foo;Bar',
+          oracleAddress: '0x0000000000000000000000000000000000000001', // TODO
+          duration: moment(moment().add(1, 'month').format('YYYY-MM-DD')).unix(),
+          outcomes: ['A', 'B'],
+          token: tokenERC20Contract.getAddress(),
+          realitioAddress: realitioERC20Contract.getAddress(),
+          realitioTimeout: 3600,
+          PM3ManagerAddress: predictionMarketManagerContract.getAddress(),
+          buyFees: ['10000000000000000', '20000000000000000', '30000000000000000'],
+          sellFees: ['10000000000000000', '20000000000000000', '30000000000000000'],
+          treasury,
+          distributor
+        });
+        expect(res.status).to.equal(true);
+      } catch(e) {
+        console.log(e);
+      }
+
+      const marketIds = await predictionMarketContract.getMarkets();
+      marketId = marketIds[marketIds.length - 1];
+    }));
+
+    it('buy - should generate fees to lp/treasury/distributor', mochaAsync(async () => {
+      const outcomeId = 0;
+      const minOutcomeSharesToBuy = 0.0001;
+      const value = 0.01;
+
+      const r = await predictionMarketContract.getMarketFees({marketId});
+
+      try {
+        const res = await predictionMarketContract.buy({marketId, outcomeId, value, minOutcomeSharesToBuy});
+        expect(res.status).to.equal(true);
+      } catch(e) {
+        console.log(e);
+      }
+
+      // TODO: check LP shares
+      const treasuryBalance = await tokenERC20Contract.balanceOf({address: treasury});
+      expect(treasuryBalance).to.equal(0.0002);
+      const distributorBalance = await tokenERC20Contract.balanceOf({address: distributor});
+      expect(distributorBalance).to.equal(0.0003);
+    }));
+
+    it('sell - should generate fees to lp/treasury/distributor', mochaAsync(async () => {
+      const outcomeId = 0;
+      const maxOutcomeSharesToSell = 0.1;
+      const value = 0.00094;
+
+      try {
+        const res = await predictionMarketContract.sell({marketId, outcomeId, value, maxOutcomeSharesToSell});
+        expect(res.status).to.equal(true);
+      } catch(e) {
+        console.log(e);
+      }
+
+      // TODO: check LP shares
+      const treasuryBalance = await tokenERC20Contract.balanceOf({address: treasury});
+      expect(treasuryBalance).to.equal(0.00022);
+      const distributorBalance = await tokenERC20Contract.balanceOf({address: distributor});
+      expect(distributorBalance).to.equal(0.00033);
+    }));
   });
 });

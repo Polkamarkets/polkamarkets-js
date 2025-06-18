@@ -6,6 +6,7 @@ const ERC20Contract = require("./models/index").ERC20Contract;
 const PredictionMarketContract = require("./models/index").PredictionMarketContract;
 const PredictionMarketV2Contract = require("./models/index").PredictionMarketV2Contract;
 const PredictionMarketV3Contract = require("./models/index").PredictionMarketV3Contract;
+const PredictionMarketV3_2Contract = require("./models/index").PredictionMarketV3_2Contract;
 const PredictionMarketV3ManagerContract = require("./models/index").PredictionMarketV3ManagerContract;
 const PredictionMarketV3ControllerContract = require("./models/index").PredictionMarketV3ControllerContract;
 const PredictionMarketV3FactoryContract = require("./models/index").PredictionMarketV3FactoryContract;
@@ -188,8 +189,25 @@ class Application {
     } catch (err) {
       throw err;
     }
-
   };
+
+  /**
+   * @name getPredictionMarketV3_2Contract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PredictionMarketV3 Contract
+   */
+  getPredictionMarketV3_2Contract({ contractAddress = null, querierContractAddress = null } = {}) {
+    try {
+      return new PredictionMarketV3_2Contract({
+        ...this.contractDefaultParams(contractAddress),
+        querierContractAddress,
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+
   /**
    * @name getPredictionMarketV3FactoryContract
    * @param {Address} ContractAddress (Opt) If it is deployed
