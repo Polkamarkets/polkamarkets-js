@@ -44,6 +44,8 @@ class PredictionMarketV3_2Contract extends PredictionMarketV3Contract {
   }) {
     const decimals = await this.getTokenDecimals({ contractAddress: token });
     const valueToWei = Numbers.toSmartContractDecimals(value, decimals);
+    const buyFeesToWei = buyFees.map(fee => Numbers.toSmartContractDecimals(fee, 18));
+    const sellFeesToWei = sellFees.map(fee => Numbers.toSmartContractDecimals(fee, 18));
     const title = `${name};${description}`;
     const question = realitioLib.encodeText('single-select', title, outcomes, category);
     let distribution = [];
@@ -71,8 +73,8 @@ class PredictionMarketV3_2Contract extends PredictionMarketV3Contract {
       question,
       image,
       arbitrator: oracleAddress,
-      buyFees,
-      sellFees,
+      buyFees: buyFeesToWei,
+      sellFees: sellFeesToWei,
       treasury,
       distributor
     };
