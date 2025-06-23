@@ -57,7 +57,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
   event Referral(
     address indexed user,
     uint256 indexed marketId,
-    string indexed code,
+    string code,
     MarketAction action,
     uint256 outcomeId,
     uint256 value,
