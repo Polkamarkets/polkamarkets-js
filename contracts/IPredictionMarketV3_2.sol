@@ -1,21 +1,33 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.26;
 
-interface IPredictionMarketV3 {
+interface IPredictionMarketV3_2 {
+  enum MarketState {
+    open,
+    closed,
+    resolved
+  }
+
+  struct Fees {
+    uint256 fee; // fee % taken from every transaction
+    uint256 treasuryFee; // fee % taken from every transaction to a treasury address
+    uint256 distributorFee; // fee % taken from every transaction to a distributor address
+  }
+
   struct CreateMarketDescription {
     uint256 value;
-    uint256 closesAt;
+    uint32 closesAt;
     uint256 outcomes;
     address token;
     uint256[] distribution;
     string question;
     string image;
     address arbitrator;
-    uint256 fee;
-    uint256 treasuryFee;
+    Fees buyFees;
+    Fees sellFees;
     address treasury;
-    address realitio;
-    uint256 realitioTimeout;
+    address distributor;
+    uint32 realitioTimeout;
     address manager;
   }
 
@@ -59,11 +71,11 @@ interface IPredictionMarketV3 {
 
   function marketIndex() external view returns (uint256);
 
-  function createMarket(CreateMarketDescription memory desc) external returns (uint256);
+  function createMarket(CreateMarketDescription calldata desc) external returns (uint256);
 
-  function createMarketWithETH(CreateMarketDescription memory desc) external payable returns (uint256);
+  function createMarketWithETH(CreateMarketDescription calldata desc) external payable returns (uint256);
 
-  function mintAndCreateMarket(CreateMarketDescription memory desc) external returns (uint256);
+  function mintAndCreateMarket(CreateMarketDescription calldata desc) external returns (uint256);
 
   function calcBuyAmount(
     uint256 amount,
@@ -155,7 +167,7 @@ interface IPredictionMarketV3 {
     external
     view
     returns (
-      uint8,
+      MarketState,
       uint256,
       uint256,
       uint256,
