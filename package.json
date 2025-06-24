@@ -2,7 +2,8 @@
     "name": "polkamarkets-js",
     "version": "3.1.11",
     "description": "",
-    "main": "index.js",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
     "directories": {
         "test": "test"
     },
@@ -13,7 +14,8 @@
     "scripts": {
         "test": "npm run compile && ./node_modules/.bin/mocha ./tests/index.js --timeout 3000000 --require babel-core/register --require babel-polyfill --exit",
         "index": "babel-node ./index.js --presets es2015,stage-2",
-        "build": "npm run compile && babel ./src --out-dir lib --copy-files -d ./build",
+        "build": "npm run compile && npm run build:ts",
+        "build:ts": "tsc",
         "compile": "truffle compile",
         "postcompile": "node ./cleanContracts.js",
         "docs:api": "jsdoc2md --configure tooling/docs/jsdoc.json --files src/**/*.js > docs/README.md",
@@ -21,7 +23,12 @@
         "docs:build": "npm run docs:prepare && npm run docs:api && gitbook build",
         "docs:serve": "npm run docs:prepare && npm run docs:api && gitbook serve",
         "docs:clean": "rimraf _book",
-        "install": "( [ ! -d ./build ] && [ ! -f ./built ] && echo \"\" > ./built && npm install . && npm run build ) || echo \"Already built\""
+        "install": "( [ ! -d ./build ] && [ ! -f ./built ] && echo \"\" > ./built && npm install . && npm run build ) || echo \"Already built\"",
+        "ts:check": "tsc --noEmit",
+        "ts:build": "tsc",
+        "ts:watch": "tsc --watch",
+        "lint": "eslint 'src/**/*.{ts,js}'",
+        "format": "prettier --write 'src/**/*.{ts,js,json,md}'"
     },
     "dependencies": {
         "@metamask/safe-event-emitter": "^2.0.0",
@@ -52,23 +59,33 @@
         "web3": "1.9.0"
     },
     "devDependencies": {
-        "@types/mocha": "^10.0.10",
         "@truffle/hdwallet-provider": "^1.4.0",
+        "@types/chai": "^4.3.0",
+        "@types/lodash": "^4.14.200",
+        "@types/mocha": "^10.0.10",
+        "@types/node": "^20.0.0",
+        "@typescript-eslint/eslint-plugin": "^8.35.0",
+        "@typescript-eslint/parser": "^8.35.0",
         "babel-plugin-transform-runtime": "^6.23.0",
         "babel-preset-env": "^1.6.1",
         "babel-preset-es2015": "^6.24.1",
         "babel-register": "^6.26.0",
+        "eslint": "^9.29.0",
+        "eslint-config-prettier": "^10.1.5",
+        "eslint-plugin-prettier": "^5.5.0",
         "gitbook-cli": "^2.3.2",
         "jsdoc-babel": "^0.5.0",
         "jsdoc-md": "^8.0.0",
         "jsdoc-to-markdown": "^6.0.1",
-        "prettier": "^2.3.2",
+        "prettier": "^3.6.0",
         "prettier-plugin-solidity": "^1.0.0-beta.14",
         "should": "^7.1.0",
         "solc": "^0.6.0",
         "supertest": "^1.0.0",
         "truffle-contract-size": "^2.0.1",
-        "truffle-plugin-verify": "^0.5.15"
+        "truffle-plugin-verify": "^0.5.15",
+        "ts-morph": "^26.0.0",
+        "typescript": "^5.0.0"
     },
     "babel": {
         "presets": [
