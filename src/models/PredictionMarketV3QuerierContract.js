@@ -20,6 +20,10 @@ class PredictionMarketV3QuerierContract extends IContract {
     return await this.params.contract.getContract().methods.getUserAllMarketsData(user).call();
   }
 
+  async getMarketUsersData({ marketId, users }) {
+    return await this.params.contract.getContract().methods.getMarketUsersData(marketId, users).call();
+  }
+
   async getMarketPrices({ marketId }) {
     return await this.params.contract.getContract().methods.getMarketPrices(marketId).call();
   }
