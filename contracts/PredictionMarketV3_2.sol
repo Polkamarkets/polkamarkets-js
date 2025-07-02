@@ -533,7 +533,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     uint256 outcomeId,
     uint256 minOutcomeSharesToBuy,
     string memory code
-  ) public payable nonReentrant {
+  ) public payable isWETHMarket(marketId) nonReentrant {
     uint256 value = msg.value;
     // wrapping and depositing funds
     IWETH(WETH).deposit{value: value}();
