@@ -215,6 +215,11 @@ contract PredictionMarketV3_3 is ReentrancyGuard, Ownable {
     bool paused;
   }
 
+  struct MarketOutcomeSharesUpdateDescription {
+    uint256 sharesTotal;
+    uint256 sharesAvailable;
+  }
+
   struct MarketFeesHolderUpdateDescription {
     address holder;
     uint256 amount;
@@ -1617,6 +1622,17 @@ contract PredictionMarketV3_3 is ReentrancyGuard, Ownable {
     market.fees.sellFees = update.sellFees;
   }
 
+  function updateMarketOutcomeShares(uint256 marketId, uint256 outcomeId, MarketOutcomeSharesUpdateDescription memory update)
+    external
+    onlyOwner
+  {
+    Market storage market = markets[marketId];
+    MarketOutcome storage outcome = market.outcomes[outcomeId];
+
+    outcome.shares.total = update.sharesTotal;
+    outcome.shares.available = update.sharesAvailable;
+  }
+
   function updateMarketFeesHolders(uint256 marketId, MarketFeesHolderUpdateDescription[] memory updates)
     external
     onlyOwner
@@ -1656,7 +1672,7 @@ contract PredictionMarketV3_3 is ReentrancyGuard, Ownable {
     }
   }
 
-  function emitMarketActionTxEvents(uint256 marketId, MarketActionTxEvent[] memory events) external onlyOwner {
+  function emitMarketActionTxEvents(MarketActionTxEvent[] memory events) external onlyOwner {
     for (uint256 i = 0; i < events.length; i++) {
       MarketActionTxEvent memory marketActionTxEvent = events[i];
       emit MarketActionTx(
