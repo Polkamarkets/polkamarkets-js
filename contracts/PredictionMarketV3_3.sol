@@ -215,7 +215,9 @@ contract PredictionMarketV3_3 is ReentrancyGuard, Ownable {
     bool paused;
   }
 
-  struct MarketOutcomeSharesUpdateDescription {
+  struct MarketOutcomeUpdateDescription {
+    uint256 id;
+    uint256 marketId;
     uint256 sharesTotal;
     uint256 sharesAvailable;
   }
@@ -1622,13 +1624,15 @@ contract PredictionMarketV3_3 is ReentrancyGuard, Ownable {
     market.fees.sellFees = update.sellFees;
   }
 
-  function updateMarketOutcomeShares(uint256 marketId, uint256 outcomeId, MarketOutcomeSharesUpdateDescription memory update)
+  function updateMarketOutcome(uint256 marketId, uint256 outcomeId, MarketOutcomeUpdateDescription memory update)
     external
     onlyOwner
   {
     Market storage market = markets[marketId];
     MarketOutcome storage outcome = market.outcomes[outcomeId];
 
+    outcome.id = update.id;
+    outcome.marketId = marketId;
     outcome.shares.total = update.sharesTotal;
     outcome.shares.available = update.sharesAvailable;
   }
@@ -1669,6 +1673,8 @@ contract PredictionMarketV3_3 is ReentrancyGuard, Ownable {
     for (uint256 i = 0; i < updates.length; i++) {
       MarketOutcomeHolderUpdateDescription memory update = updates[i];
       outcome.shares.holders[update.holder] = update.amount;
+      outcome.shares.claims[update.holder] = update.claim;
+      outcome.shares.voidedClaims[update.holder] = update.voidedClaim;
     }
   }
 
