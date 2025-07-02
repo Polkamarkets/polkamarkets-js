@@ -96,6 +96,16 @@ contract PredictionMarketV3Querier {
     return userMarketsData;
   }
 
+  function getMarketUsersData(uint256 marketId, address[] calldata users) external view returns (UserMarketData[] memory) {
+    UserMarketData[] memory marketsUserData = new UserMarketData[](users.length);
+
+    for (uint256 i = 0; i < users.length; i++) {
+      marketsUserData[i] = getUserMarketData(marketId, users[i]);
+    }
+
+    return marketsUserData;
+  }
+
   function getMarketsPrices(uint256[] calldata marketIds) external view returns (MarketPrices[] memory) {
     MarketPrices[] memory marketPrices = new MarketPrices[](marketIds.length);
 
