@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 // openzeppelin imports
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 // local imports
 import "./IFantasyERC20.sol";
@@ -29,7 +30,7 @@ interface IWETH {
 }
 
 /// @title Market Contract Factory
-contract PredictionMarketV3_2 is ReentrancyGuard {
+contract PredictionMarketV3_3 is ReentrancyGuard, Ownable {
   using SafeERC20 for IERC20;
   using CeilDiv for uint256;
 
@@ -195,6 +196,53 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     IPredictionMarketV3Manager manager;
   }
 
+  struct MarketUpdateDescription {
+    uint256 closesAtTimestamp;
+    uint256 balance;
+    uint256 liquidity;
+    uint256 sharesAvailable;
+    MarketState state;
+    MarketResolution resolution;
+    uint256 feesPoolWeight;
+    address feesTreasury;
+    address feesDistributor;
+    Fees buyFees;
+    Fees sellFees;
+    uint256 outcomeCount;
+    IERC20 token;
+    IPredictionMarketV3Manager manager;
+    address creator;
+    bool paused;
+  }
+
+  struct MarketFeesHolderUpdateDescription {
+    address holder;
+    uint256 amount;
+  }
+
+  struct MarketOutcomeHolderUpdateDescription {
+    address holder;
+    uint256 amount;
+    bool claim;
+    bool voidedClaim;
+  }
+
+  struct MarketLiquidityHolderUpdateDescription {
+    address holder;
+    uint256 amount;
+    bool claim;
+  }
+
+  struct MarketActionTxEvent {
+    address user;
+    MarketAction action;
+    uint256 marketId;
+    uint256 outcomeId;
+    uint256 shares;
+    uint256 value;
+    uint256 timestamp;
+  }
+
   uint256[] marketIds;
   mapping(uint256 => Market) markets;
   uint256 public marketIndex;
@@ -256,6 +304,7 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
 
   /// @dev protocol is immutable and has no ownership
   constructor(IWETH _WETH) {
+    _transferOwnership(msg.sender);
     WETH = _WETH;
   }
 
@@ -1541,5 +1590,84 @@ contract PredictionMarketV3_2 is ReentrancyGuard {
     Market storage market = markets[marketId];
 
     return market.paused;
+  }
+
+  // admin functions that can edit internal market variables
+  function setOwner(address newOwner) external onlyOwner {
+    _transferOwnership(newOwner);
+  }
+
+  function updateMarket(uint256 marketId, MarketUpdateDescription memory update) external onlyOwner {
+    Market storage market = markets[marketId];
+    market.closesAtTimestamp = update.closesAtTimestamp;
+    market.balance = update.balance;
+    market.liquidity = update.liquidity;
+    market.sharesAvailable = update.sharesAvailable;
+    market.state = update.state;
+    market.resolution = update.resolution;
+    market.outcomeCount = update.outcomeCount;
+    market.token = update.token;
+    market.manager = update.manager;
+    market.creator = update.creator;
+    market.paused = update.paused;
+    market.fees.poolWeight = update.feesPoolWeight;
+    market.fees.treasury = update.feesTreasury;
+    market.fees.distributor = update.feesDistributor;
+    market.fees.buyFees = update.buyFees;
+    market.fees.sellFees = update.sellFees;
+  }
+
+  function updateMarketFeesHolders(uint256 marketId, MarketFeesHolderUpdateDescription[] memory updates)
+    external
+    onlyOwner
+  {
+    Market storage market = markets[marketId];
+
+    for (uint256 i = 0; i < updates.length; i++) {
+      MarketFeesHolderUpdateDescription memory update = updates[i];
+      market.fees.claimed[update.holder] = update.amount;
+    }
+  }
+
+  function updateMarketLiquidityHolders(uint256 marketId, MarketLiquidityHolderUpdateDescription[] memory updates)
+    external
+    onlyOwner
+  {
+    Market storage market = markets[marketId];
+
+    for (uint256 i = 0; i < updates.length; i++) {
+      MarketLiquidityHolderUpdateDescription memory update = updates[i];
+      market.liquidityShares[update.holder] = update.amount;
+      market.liquidityClaims[update.holder] = update.claim;
+    }
+  }
+
+  function updateMarketOutcomeHolders(
+    uint256 marketId,
+    uint256 outcomeId,
+    MarketOutcomeHolderUpdateDescription[] memory updates
+  ) external onlyOwner {
+    Market storage market = markets[marketId];
+    MarketOutcome storage outcome = market.outcomes[outcomeId];
+
+    for (uint256 i = 0; i < updates.length; i++) {
+      MarketOutcomeHolderUpdateDescription memory update = updates[i];
+      outcome.shares.holders[update.holder] = update.amount;
+    }
+  }
+
+  function emitMarketActionTxEvents(uint256 marketId, MarketActionTxEvent[] memory events) external onlyOwner {
+    for (uint256 i = 0; i < events.length; i++) {
+      MarketActionTxEvent memory marketActionTxEvent = events[i];
+      emit MarketActionTx(
+        marketActionTxEvent.user,
+        marketActionTxEvent.action,
+        marketActionTxEvent.marketId,
+        marketActionTxEvent.outcomeId,
+        marketActionTxEvent.shares,
+        marketActionTxEvent.value,
+        marketActionTxEvent.timestamp
+      );
+    }
   }
 }
