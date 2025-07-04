@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-// openzeppelin imports
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+// openzeppelin upgradeable imports
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+// openzeppelin non-upgradeable imports (for interfaces)
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
 // local imports
 import "./IFantasyERC20.sol";
@@ -30,7 +36,7 @@ interface IWETH {
 }
 
 /// @title Market Contract Factory
-contract PredictionMarketV3_3 is ReentrancyGuard, Ownable {
+contract PredictionMarketV3_3 is Initializable, ReentrancyGuardUpgradeable, OwnableUpgradeable, UUPSUpgradeable {
   using SafeERC20 for IERC20;
   using CeilDiv for uint256;
 
@@ -255,7 +261,14 @@ contract PredictionMarketV3_3 is ReentrancyGuard, Ownable {
   uint256 public marketIndex;
 
   // weth configs
-  IWETH public immutable WETH;
+  IWETH public WETH;
+
+  // ------ Storage Gap ------
+
+  /// @dev This empty reserved space is put in place to allow future versions to add new
+  /// variables without shifting down storage in the inheritance chain.
+  /// See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+  uint256[49] private __gap;
 
   // ------ Modifiers ------
 
@@ -309,9 +322,17 @@ contract PredictionMarketV3_3 is ReentrancyGuard, Ownable {
 
   // ------ Modifiers End ------
 
-  /// @dev protocol is immutable and has no ownership
-  constructor(IWETH _WETH) {
-    _transferOwnership(msg.sender);
+  /// @custom:oz-upgrades-unsafe-allow constructor
+  constructor() {
+    _disableInitializers();
+  }
+
+  /// @dev Initialize the contract - replaces constructor for upgradeable contracts
+  function initialize(IWETH _WETH) public initializer {
+    __ReentrancyGuard_init();
+    __Ownable_init();
+    __UUPSUpgradeable_init();
+
     WETH = _WETH;
   }
 
@@ -1600,10 +1621,6 @@ contract PredictionMarketV3_3 is ReentrancyGuard, Ownable {
   }
 
   // admin functions that can edit internal market variables
-  function setOwner(address newOwner) external onlyOwner {
-    _transferOwnership(newOwner);
-  }
-
   function updateMarket(uint256 marketId, MarketUpdateDescription memory update) external onlyOwner {
     Market storage market = markets[marketId];
     market.closesAtTimestamp = update.closesAtTimestamp;
@@ -1692,4 +1709,9 @@ contract PredictionMarketV3_3 is ReentrancyGuard, Ownable {
       );
     }
   }
+
+  // ------ Upgrade Authorization ------
+
+  /// @dev Function that should revert when `msg.sender` is not authorized to upgrade the contract
+  function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
