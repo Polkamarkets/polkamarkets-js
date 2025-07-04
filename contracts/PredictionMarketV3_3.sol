@@ -1632,7 +1632,6 @@ contract PredictionMarketV3_3 is Initializable, ReentrancyGuardUpgradeable, Owna
     market.liquidity = update.liquidity;
     market.sharesAvailable = update.sharesAvailable;
     market.state = update.state;
-    market.resolution = update.resolution;
     market.outcomeCount = update.outcomeCount;
     market.token = update.token;
     market.manager = update.manager;
@@ -1650,10 +1649,11 @@ contract PredictionMarketV3_3 is Initializable, ReentrancyGuardUpgradeable, Owna
     market.resolution = update.resolution;
   }
 
-  function updateMarketOutcome(uint256 marketId, uint256 outcomeId, MarketOutcomeUpdateDescription memory update)
-    external
-    onlyOwner
-  {
+  function updateMarketOutcome(
+    uint256 marketId,
+    uint256 outcomeId,
+    MarketOutcomeUpdateDescription memory update
+  ) external onlyOwner {
     Market storage market = markets[marketId];
     MarketOutcome storage outcome = market.outcomes[outcomeId];
 
