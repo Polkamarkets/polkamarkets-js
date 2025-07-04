@@ -1645,6 +1645,11 @@ contract PredictionMarketV3_3 is Initializable, ReentrancyGuardUpgradeable, Owna
     market.fees.sellFees = update.sellFees;
   }
 
+  function updateMarketResolution(uint256 marketId, MarketUpdateDescription memory update) external onlyOwner {
+    Market storage market = markets[marketId];
+    market.resolution = update.resolution;
+  }
+
   function updateMarketOutcome(uint256 marketId, uint256 outcomeId, MarketOutcomeUpdateDescription memory update)
     external
     onlyOwner
@@ -1702,6 +1707,10 @@ contract PredictionMarketV3_3 is Initializable, ReentrancyGuardUpgradeable, Owna
   function setAllowedManager(address manager, bool allowed) external onlyOwner {
     allowedManagers[manager] = allowed;
     emit AllowedManagerSet(manager, allowed);
+  }
+
+  function withdraw(address token, uint256 amount) external onlyOwner {
+    IERC20(token).safeTransfer(msg.sender, amount);
   }
 
   // ------ Upgrade Authorization ------
