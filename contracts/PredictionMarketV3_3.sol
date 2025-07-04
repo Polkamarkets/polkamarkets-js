@@ -99,6 +99,8 @@ contract PredictionMarketV3_3 is Initializable, ReentrancyGuardUpgradeable, Owna
     uint256 timestamp
   );
 
+  event AllowedManagerSet(address indexed manager, bool allowed);
+
   // ------ Events End ------
 
   uint256 private constant MAX_UINT_256 = type(uint256).max;
@@ -259,6 +261,7 @@ contract PredictionMarketV3_3 is Initializable, ReentrancyGuardUpgradeable, Owna
   uint256[] marketIds;
   mapping(uint256 => Market) markets;
   uint256 public marketIndex;
+  mapping(address => bool) public allowedManagers;
 
   // weth configs
   IWETH public WETH;
@@ -364,6 +367,7 @@ contract PredictionMarketV3_3 is Initializable, ReentrancyGuardUpgradeable, Owna
     require(desc.outcomes > 0 && desc.outcomes <= MAX_OUTCOMES, "outcome count not between 1-32");
     require(address(realitio) != address(0), "_realitioAddress is address 0");
     require(desc.realitioTimeout >= MINIMUM_REALITIO_TIMEOUT, "realitio timeout too low");
+    require(allowedManagers[address(desc.manager)], "Manager not allowed");
     require(desc.manager.isAllowedToCreateMarket(desc.token, msg.sender), "not allowed to create market");
 
     market.token = desc.token;
@@ -1695,19 +1699,9 @@ contract PredictionMarketV3_3 is Initializable, ReentrancyGuardUpgradeable, Owna
     }
   }
 
-  function emitMarketActionTxEvents(MarketActionTxEvent[] memory events) external onlyOwner {
-    for (uint256 i = 0; i < events.length; i++) {
-      MarketActionTxEvent memory marketActionTxEvent = events[i];
-      emit MarketActionTx(
-        marketActionTxEvent.user,
-        marketActionTxEvent.action,
-        marketActionTxEvent.marketId,
-        marketActionTxEvent.outcomeId,
-        marketActionTxEvent.shares,
-        marketActionTxEvent.value,
-        marketActionTxEvent.timestamp
-      );
-    }
+  function setAllowedManager(address manager, bool allowed) external onlyOwner {
+    allowedManagers[manager] = allowed;
+    emit AllowedManagerSet(manager, allowed);
   }
 
   // ------ Upgrade Authorization ------
