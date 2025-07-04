@@ -165,11 +165,12 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
     let events = [];
     try {
       events = await Promise.all([
-        ...legacyContracts.map(contract => this.getActions({ user, contract })),
+        ...legacyContracts.map(contractAddress => this.getActions({ user, contractAddress })),
         this.getActions({ user }),
-      ]).then(results => results.flat()).sort((a, b) => a.blockNumber - b.blockNumber);
+      ]).then(results => results.flat().sort((a, b) => a.blockNumber - b.blockNumber));
     } catch (err) {
       // should be non-blocking
+      console.error("Error getting actions", err);
     }
 
     const chunkSize = 250;
@@ -345,12 +346,12 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
     return Object.fromEntries(marketIds.map((marketId, index) => [marketId, marketsDecimals[index]]));
   }
 
-  async getActions({ user }) {
+  async getActions({ user, contractAddress }) {
     if (!this.querier) {
       return super.getActions({ user });
     }
 
-    const events = await this.getEvents('MarketActionTx', { user });
+    const events = await this.getEvents('MarketActionTx', { user }, null, null, contractAddress);
 
     // fetching decimals for each market (unique)
     const marketIds = events.map(event => event.returnValues.marketId).filter((x, i, a) => a.indexOf(x) == i);
