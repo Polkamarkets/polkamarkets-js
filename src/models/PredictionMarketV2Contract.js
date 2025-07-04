@@ -199,7 +199,7 @@ class PredictionMarketV2Contract extends IContract {
   getAverageOutcomeBuyPrice({ events, marketId, outcomeId }) {
     let totalShares = 0;
     let totalAmount = 0;
-  
+
     events.forEach((event) => {
       if (event.marketId === marketId && event.outcomeId === outcomeId) {
         if (event.action === "Buy") {
@@ -212,7 +212,7 @@ class PredictionMarketV2Contract extends IContract {
         }
       }
     });
-  
+
     return totalShares && totalAmount
       ? totalAmount / totalShares
       : 0;
@@ -273,12 +273,15 @@ class PredictionMarketV2Contract extends IContract {
    * @param {Address} user
    * @returns {Array} Outcome Shares
    */
-  async getPortfolio({ user }) {
+  async getPortfolio({ user, legacyContracts = [] }) {
     const allMarketIds = await this.getMarkets();
     let userMarketIds;
     let events = [];
     try {
-      events = await this.getActions({ user });
+      events = await Promise.all([
+        ...legacyContracts.map(contract => this.getActions({ user, contract })),
+        this.getActions({ user }),
+      ]).then(results => results.flat()).sort((a, b) => a.blockNumber - b.blockNumber);
       userMarketIds = events.map(e => e.marketId).filter((x, i, a) => a.indexOf(x) == i);
     } catch (err) {
       // defaulting to allMarketIds if query fails
@@ -395,8 +398,8 @@ class PredictionMarketV2Contract extends IContract {
     return this.getActions({ user: account });
   }
 
-  async getActions({ user }) {
-    const events = await this.getEvents('MarketActionTx', { user });
+  async getActions({ user, contractAddress }) {
+    const events = await this.getEvents('MarketActionTx', { user }, null, null, contractAddress);
 
     // fetching decimals for each market (unique)
     const marketIds = events.map(event => event.returnValues.marketId).filter((x, i, a) => a.indexOf(x) == i);

@@ -1021,13 +1021,14 @@ class IContract {
    * @description Gets contract events
    * @returns {String | undefined} address
    */
-  async getEvents(event, filter, fromBlock = null, toBlock = 'latest') {
+  async getEvents(event, filter, fromBlock = null, toBlock = 'latest', contractAddress = null) {
     if (!fromBlock) {
       fromBlock = this.params.startBlock || 0;
     }
 
     if (!this.params.web3EventsProvider) {
-      const events = this.getContract().getPastEvents(event, {
+      const contract = contractAddress ? new Contract(this.params.web3, this.params.abi, contractAddress) : this.getContract();
+      const events = contract.getPastEvents(event, {
         fromBlock,
         toBlock,
         filter
@@ -1037,7 +1038,7 @@ class IContract {
     }
 
     // getting events via http from web3 events provide
-    let uri = `${this.params.web3EventsProvider}/events?contract=${this.contractName}&address=${this.getAddress()}&eventName=${event}`
+    let uri = `${this.params.web3EventsProvider}/events?contract=${this.contractName}&address=${contractAddress || this.getAddress()}&eventName=${event}`
     if (filter) uri = uri.concat(`&filter=${JSON.stringify(filter)}`);
 
     const { data } = await axios.get(uri);

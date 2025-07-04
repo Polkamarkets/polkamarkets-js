@@ -157,14 +157,17 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
     );
   };
 
-  async getPortfolio({ user }) {
+  async getPortfolio({ user, legacyContracts = [] }) {
     if (!this.querier) {
-      return super.getPortfolio({ user });
+      return super.getPortfolio({ user, legacyContracts });
     }
 
     let events = [];
     try {
-      events = await this.getActions({ user });
+      events = await Promise.all([
+        ...legacyContracts.map(contract => this.getActions({ user, contract })),
+        this.getActions({ user }),
+      ]).then(results => results.flat()).sort((a, b) => a.blockNumber - b.blockNumber);
     } catch (err) {
       // should be non-blocking
     }
