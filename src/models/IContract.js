@@ -1027,7 +1027,7 @@ class IContract {
     }
 
     if (!this.params.web3EventsProvider) {
-      const contract = contractAddress ? new Contract(this.params.web3, this.params.abi, contractAddress) : this.getContract();
+      const contract = contractAddress ? new Contract(this.params.web3, this.params.abi, contractAddress).getContract() : this.getContract();
       const events = contract.getPastEvents(event, {
         fromBlock,
         toBlock,
