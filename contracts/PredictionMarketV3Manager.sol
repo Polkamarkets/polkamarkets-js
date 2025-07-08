@@ -39,7 +39,7 @@ contract PredictionMarketV3Manager is LandFactory {
     string memory symbol,
     uint256 tokenAmountToClaim,
     IERC20 tokenToAnswer
-  ) external override returns (FantasyERC20) {
+  ) external override nonReentrant returns (FantasyERC20) {
     return _createLand(name, symbol, tokenAmountToClaim, tokenToAnswer, address(0), address(0));
   }
 }
