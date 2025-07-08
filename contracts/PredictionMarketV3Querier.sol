@@ -4,11 +4,11 @@ pragma solidity ^0.8.26;
 // openzeppelin imports
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 // local imports
-import "./IPredictionMarketV3_2.sol";
+import "./IPredictionMarketV3_4.sol";
 
 /// @title Market Contract Factory
 contract PredictionMarketV3Querier {
-  IPredictionMarketV3_2 public immutable PredictionMarketV3;
+  IPredictionMarketV3_4 public immutable PredictionMarketV3;
 
   struct UserMarketData {
     uint256 liquidityShares;
@@ -26,7 +26,7 @@ contract PredictionMarketV3Querier {
   }
 
   /// @dev protocol is immutable and has no ownership
-  constructor(IPredictionMarketV3_2 _PredictionMarketV3) {
+  constructor(IPredictionMarketV3_4 _PredictionMarketV3) {
     PredictionMarketV3 = _PredictionMarketV3;
   }
 

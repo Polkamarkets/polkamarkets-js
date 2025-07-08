@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-interface IPredictionMarketV3_2 {
+interface IPredictionMarketV3_4 {
   enum MarketState {
     open,
     closed,

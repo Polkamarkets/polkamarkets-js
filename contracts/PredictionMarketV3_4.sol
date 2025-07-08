@@ -36,7 +36,7 @@ interface IWETH {
 }
 
 /// @title Market Contract Factory
-contract PredictionMarketV3_3 is Initializable, ReentrancyGuardUpgradeable, OwnableUpgradeable, UUPSUpgradeable {
+contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, OwnableUpgradeable, UUPSUpgradeable {
   using SafeERC20 for IERC20;
   using CeilDiv for uint256;
 
@@ -1624,85 +1624,7 @@ contract PredictionMarketV3_3 is Initializable, ReentrancyGuardUpgradeable, Owna
     return market.paused;
   }
 
-  // admin functions that can edit internal market variables
-  function updateMarket(uint256 marketId, MarketUpdateDescription memory update) external onlyOwner {
-    Market storage market = markets[marketId];
-    market.closesAtTimestamp = update.closesAtTimestamp;
-    market.balance = update.balance;
-    market.liquidity = update.liquidity;
-    market.sharesAvailable = update.sharesAvailable;
-    market.state = update.state;
-    market.outcomeCount = update.outcomeCount;
-    market.token = update.token;
-    market.manager = update.manager;
-    market.creator = update.creator;
-    market.paused = update.paused;
-    market.fees.poolWeight = update.feesPoolWeight;
-    market.fees.treasury = update.feesTreasury;
-    market.fees.distributor = update.feesDistributor;
-    market.fees.buyFees = update.buyFees;
-    market.fees.sellFees = update.sellFees;
-  }
-
-  function updateMarketResolution(uint256 marketId, MarketUpdateDescription memory update) external onlyOwner {
-    Market storage market = markets[marketId];
-    market.resolution = update.resolution;
-  }
-
-  function updateMarketOutcome(
-    uint256 marketId,
-    uint256 outcomeId,
-    MarketOutcomeUpdateDescription memory update
-  ) external onlyOwner {
-    Market storage market = markets[marketId];
-    MarketOutcome storage outcome = market.outcomes[outcomeId];
-
-    outcome.id = update.id;
-    outcome.marketId = marketId;
-    outcome.shares.total = update.sharesTotal;
-    outcome.shares.available = update.sharesAvailable;
-  }
-
-  function updateMarketFeesHolders(uint256 marketId, MarketFeesHolderUpdateDescription[] memory updates)
-    external
-    onlyOwner
-  {
-    Market storage market = markets[marketId];
-
-    for (uint256 i = 0; i < updates.length; i++) {
-      MarketFeesHolderUpdateDescription memory update = updates[i];
-      market.fees.claimed[update.holder] = update.amount;
-    }
-  }
-
-  function updateMarketLiquidityHolders(uint256 marketId, MarketLiquidityHolderUpdateDescription[] memory updates)
-    external
-    onlyOwner
-  {
-    Market storage market = markets[marketId];
-
-    for (uint256 i = 0; i < updates.length; i++) {
-      MarketLiquidityHolderUpdateDescription memory update = updates[i];
-      market.liquidityShares[update.holder] = update.amount;
-      market.liquidityClaims[update.holder] = update.claim;
-    }
-  }
-
-  function updateMarketOutcomeHolders(
-    uint256 marketId,
-    uint256 outcomeId,
-    MarketOutcomeHolderUpdateDescription[] memory updates
-  ) external onlyOwner {
-    Market storage market = markets[marketId];
-    MarketOutcome storage outcome = market.outcomes[outcomeId];
-
-    for (uint256 i = 0; i < updates.length; i++) {
-      MarketOutcomeHolderUpdateDescription memory update = updates[i];
-      outcome.shares.holders[update.holder] = update.amount;
-      outcome.shares.claims[update.holder] = update.claim;
-      outcome.shares.voidedClaims[update.holder] = update.voidedClaim;
-    }
-  }
+  // ------ Ownable Setters ------
 
   function setAllowedManager(address manager, bool allowed) external onlyOwner {
     allowedManagers[manager] = allowed;
