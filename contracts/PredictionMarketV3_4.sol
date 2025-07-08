@@ -101,6 +101,8 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
 
   event AllowedManagerSet(address indexed manager, bool allowed);
 
+  event Paused(bool paused, address indexed user);
+
   // ------ Events End ------
 
   uint256 private constant MAX_UINT_256 = type(uint256).max;
@@ -266,12 +268,14 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   // weth configs
   IWETH public WETH;
 
+  bool public paused;
+
   // ------ Storage Gap ------
 
   /// @dev This empty reserved space is put in place to allow future versions to add new
   /// variables without shifting down storage in the inheritance chain.
   /// See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
-  uint256[49] private __gap;
+  uint256[48] private __gap;
 
   // ------ Modifiers ------
 
@@ -297,12 +301,23 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     _;
   }
 
-  modifier notPaused(uint256 marketId) {
+  modifier whenNotPaused() {
+    require(!paused, "Contract is paused");
+    _;
+  }
+
+  modifier whenPaused() {
+    require(paused, "Contract is not paused");
+    _;
+  }
+
+  modifier marketNotPaused(uint256 marketId) {
+    require(!paused, "Contract is paused");
     require(!markets[marketId].paused, "Market is paused");
     _;
   }
 
-  modifier paused(uint256 marketId) {
+  modifier marketPaused(uint256 marketId) {
     require(markets[marketId].paused, "Market is not paused");
     _;
   }
@@ -532,7 +547,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     uint256 outcomeId,
     uint256 minOutcomeSharesToBuy,
     uint256 value
-  ) private timeTransitions(marketId) atState(marketId, MarketState.open) notPaused(marketId) returns (uint256) {
+  ) private timeTransitions(marketId) atState(marketId, MarketState.open) marketNotPaused(marketId) returns (uint256) {
     Market storage market = markets[marketId];
 
     uint256 shares = calcBuyAmount(value, marketId, outcomeId);
@@ -629,7 +644,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     uint256 outcomeId,
     uint256 value,
     uint256 maxOutcomeSharesToSell
-  ) private timeTransitions(marketId) atState(marketId, MarketState.open) notPaused(marketId) returns (uint256) {
+  ) private timeTransitions(marketId) atState(marketId, MarketState.open) marketNotPaused(marketId) returns (uint256) {
     Market storage market = markets[marketId];
     MarketOutcome storage outcome = market.outcomes[outcomeId];
 
@@ -741,7 +756,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     uint256 marketId,
     uint256 value,
     uint256[] memory distribution
-  ) private timeTransitions(marketId) atState(marketId, MarketState.open) notPaused(marketId) {
+  ) private timeTransitions(marketId) atState(marketId, MarketState.open) marketNotPaused(marketId) {
     Market storage market = markets[marketId];
 
     require(value > 0, "stake has to be greater than 0.");
@@ -865,7 +880,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     private
     timeTransitions(marketId)
     atState(marketId, MarketState.open)
-    notPaused(marketId)
+    marketNotPaused(marketId)
     returns (uint256)
   {
     Market storage market = markets[marketId];
@@ -997,7 +1012,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   }
 
   /// @dev pauses a market, no trading allowed
-  function adminPauseMarket(uint256 marketId) external isMarket(marketId) notPaused(marketId) nonReentrant {
+  function adminPauseMarket(uint256 marketId) external isMarket(marketId) marketNotPaused(marketId) nonReentrant {
     Market storage market = markets[marketId];
     require(market.manager.isAllowedToEditMarket(market.token, msg.sender), "not allowed to pause market");
 
@@ -1006,7 +1021,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   }
 
   /// @dev unpauses a market, trading allowed
-  function adminUnpauseMarket(uint256 marketId) external isMarket(marketId) paused(marketId) nonReentrant {
+  function adminUnpauseMarket(uint256 marketId) external isMarket(marketId) marketPaused(marketId) nonReentrant {
     Market storage market = markets[marketId];
     require(market.manager.isAllowedToEditMarket(market.token, msg.sender), "not allowed to unpause market");
 
@@ -1029,7 +1044,12 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   }
 
   /// @dev Allows holders of resolved outcome shares to claim earnings.
-  function _claimWinnings(uint256 marketId) private atState(marketId, MarketState.resolved) returns (uint256) {
+  function _claimWinnings(uint256 marketId)
+    private
+    atState(marketId, MarketState.resolved)
+    marketNotPaused(marketId)
+    returns (uint256)
+  {
     Market storage market = markets[marketId];
     MarketOutcome storage resolvedOutcome = market.outcomes[market.resolution.outcomeId];
 
@@ -1078,6 +1098,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   function _claimVoidedOutcomeShares(uint256 marketId, uint256 outcomeId)
     private
     atState(marketId, MarketState.resolved)
+    marketNotPaused(marketId)
     returns (uint256)
   {
     Market storage market = markets[marketId];
@@ -1130,7 +1151,12 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   }
 
   /// @dev Allows liquidity providers to claim earnings from liquidity providing.
-  function _claimLiquidity(uint256 marketId) private atState(marketId, MarketState.resolved) returns (uint256) {
+  function _claimLiquidity(uint256 marketId)
+    private
+    atState(marketId, MarketState.resolved)
+    marketNotPaused(marketId)
+    returns (uint256)
+  {
     Market storage market = markets[marketId];
 
     require(market.liquidityShares[msg.sender] > 0, "user doesn't hold shares");
@@ -1181,7 +1207,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   }
 
   /// @dev Allows liquidity providers to claim their fees share from fees pool
-  function _claimFees(uint256 marketId) private returns (uint256) {
+  function _claimFees(uint256 marketId) private marketNotPaused(marketId) returns (uint256) {
     Market storage market = markets[marketId];
 
     uint256 claimableFees = getUserClaimableFees(marketId, msg.sender);
@@ -1633,6 +1659,16 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
 
   function withdraw(address token, uint256 amount) external onlyOwner {
     IERC20(token).safeTransfer(msg.sender, amount);
+  }
+
+  function pause() external onlyOwner whenNotPaused {
+    paused = true;
+    emit Paused(true, msg.sender);
+  }
+
+  function unpause() external onlyOwner whenPaused {
+    paused = false;
+    emit Paused(false, msg.sender);
   }
 
   // ------ Upgrade Authorization ------
