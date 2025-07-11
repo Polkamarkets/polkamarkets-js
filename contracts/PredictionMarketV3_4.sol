@@ -206,60 +206,6 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     IPredictionMarketV3Manager manager;
   }
 
-  struct MarketUpdateDescription {
-    uint256 closesAtTimestamp;
-    uint256 balance;
-    uint256 liquidity;
-    uint256 sharesAvailable;
-    MarketState state;
-    MarketResolution resolution;
-    uint256 feesPoolWeight;
-    address feesTreasury;
-    address feesDistributor;
-    Fees buyFees;
-    Fees sellFees;
-    uint256 outcomeCount;
-    IERC20 token;
-    IPredictionMarketV3Manager manager;
-    address creator;
-    bool paused;
-  }
-
-  struct MarketOutcomeUpdateDescription {
-    uint256 id;
-    uint256 marketId;
-    uint256 sharesTotal;
-    uint256 sharesAvailable;
-  }
-
-  struct MarketFeesHolderUpdateDescription {
-    address holder;
-    uint256 amount;
-  }
-
-  struct MarketOutcomeHolderUpdateDescription {
-    address holder;
-    uint256 amount;
-    bool claim;
-    bool voidedClaim;
-  }
-
-  struct MarketLiquidityHolderUpdateDescription {
-    address holder;
-    uint256 amount;
-    bool claim;
-  }
-
-  struct MarketActionTxEvent {
-    address user;
-    MarketAction action;
-    uint256 marketId;
-    uint256 outcomeId;
-    uint256 shares;
-    uint256 value;
-    uint256 timestamp;
-  }
-
   uint256[] marketIds;
   mapping(uint256 => Market) markets;
   uint256 public marketIndex;
