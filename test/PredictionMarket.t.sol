@@ -7,7 +7,7 @@ import "forge-std/console.sol";
 // Contract imports
 import "../contracts/PredictionMarketV3_4.sol";
 import "../contracts/PredictionMarketV3Manager.sol";
-import "../contracts/WETH9.sol";
+import "../contracts/WETH.sol";
 import "../contracts/FantasyERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
@@ -21,7 +21,7 @@ contract PredictionMarketV3Test is Test {
     RealityETH_ERC20_v3_0 public realitio;
     ERC20PresetMinterPauser public tokenERC20;
     ERC20PresetMinterPauser public managerTokenERC20;
-    WETH9 public weth;
+    WETH public weth;
 
     address public user;
     address public treasury = address(0x123);
@@ -43,8 +43,7 @@ contract PredictionMarketV3Test is Test {
         user = address(this);
 
         // Deploy contracts
-        weth = new WETH9();
-        // Deploy erc20
+        weth = new WETH();
         tokenERC20 = new ERC20PresetMinterPauser("Test Token", "TEST");
         managerTokenERC20 = new ERC20PresetMinterPauser("Manager Token", "MTEST");
         realitio = new RealityETH_ERC20_v3_0();
