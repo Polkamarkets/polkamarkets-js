@@ -8,7 +8,6 @@ import "forge-std/console.sol";
 import "../contracts/PredictionMarketV3_4.sol";
 import "../contracts/PredictionMarketV3Manager.sol";
 import "../contracts/WETH.sol";
-import "../contracts/FantasyERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
 import {RealityETH_ERC20_v3_0} from "@reality.eth/contracts/development/contracts/RealityETH_ERC20-3.0.sol";
@@ -39,6 +38,9 @@ contract PredictionMarketV3Test is Test {
         address token
     );
 
+    // Allow test contract to receive ETH
+    receive() external payable {}
+
     function setUp() public {
         user = address(this);
 
@@ -61,7 +63,7 @@ contract PredictionMarketV3Test is Test {
         manager = new PredictionMarketV3Manager(address(predictionMarket), IERC20(address(managerTokenERC20)), 1 ether, address(realitio));
         managerTokenERC20.mint(user, 1000 ether);
         managerTokenERC20.approve(address(manager), type(uint256).max);
-        manager.createLand(FantasyERC20(address(tokenERC20)), IERC20(address(managerTokenERC20)));
+        manager.createLand(IERC20(address(tokenERC20)), IERC20(address(managerTokenERC20)));
 
         // Allow manager in prediction market
         predictionMarket.setAllowedManager(address(manager), true);
@@ -422,7 +424,7 @@ contract PredictionMarketV3Test is Test {
             manager: IPredictionMarketV3Manager(address(manager))
         });
 
-        vm.expectRevert("outcome count not between 1-32");
+        vm.expectRevert(bytes("!oc"));
         predictionMarket.createMarket(desc);
     }
 
@@ -617,6 +619,65 @@ contract PredictionMarketV3Test is Test {
 
         // market balance should be back to 0 after all claims are made
         assertEq(balanceAfterAction, 0);
+    }
+
+    function testWETHMarket() public {
+        // creating weth land
+        manager.createLand(IERC20(address(weth)), IERC20(address(managerTokenERC20)));
+
+        weth.deposit{value: 1 ether}();
+        weth.approve(address(predictionMarket), 1 ether);
+
+        // creating test market and weth market
+        uint256 marketId = _createTestMarket();
+
+        PredictionMarketV3_4.CreateMarketDescription memory desc = PredictionMarketV3_4.CreateMarketDescription({
+            value: VALUE,
+            closesAt: uint32(block.timestamp + 30 days),
+            outcomes: 2,
+            token: IERC20(address(weth)),
+            distribution: new uint256[](0),
+            question: "WETH market",
+            image: "foo-bar",
+            arbitrator: address(0x1),
+            buyFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            sellFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            treasury: treasury,
+            distributor: distributor,
+            realitioTimeout: 3600,
+            manager: IPredictionMarketV3Manager(address(manager))
+        });
+
+        uint256 wethMarketId = predictionMarket.createMarket(desc);
+        uint256 ethBalance = address(user).balance;
+        uint256 wethBalance = weth.balanceOf(user);
+        uint256 wethPmBalance = weth.balanceOf(address(predictionMarket));
+
+        // buying and selling weth markets should be successful
+        predictionMarket.buyWithETH{value: VALUE}(wethMarketId, 0, 0.0001 ether);
+        uint256 ethBalanceAfterBuy = address(user).balance;
+        uint256 wethBalanceAfterBuy = weth.balanceOf(address(user));
+        uint256 wethPmBalanceAfterBuy = weth.balanceOf(address(predictionMarket));
+        // user should have spent ETH, not WETH
+        assertEq(ethBalanceAfterBuy, ethBalance - VALUE);
+        assertEq(wethBalanceAfterBuy, wethBalance);
+        assertEq(wethPmBalanceAfterBuy, wethPmBalance + VALUE);
+
+        predictionMarket.sellToETH(wethMarketId, 0, VALUE / 10, 0.1 ether);
+        uint256 ethBalanceAfterSell = address(user).balance;
+        uint256 wethBalanceAfterSell = weth.balanceOf(user);
+        uint256 wethPmBalanceAfterSell = weth.balanceOf(address(predictionMarket));
+        assertEq(ethBalanceAfterSell, ethBalanceAfterBuy + VALUE / 10);
+        assertEq(wethBalanceAfterSell, wethBalanceAfterBuy);
+        assertEq(wethPmBalanceAfterSell, wethPmBalanceAfterBuy - VALUE / 10);
+
+        // should revert if using buyWithETH on non-weth market
+        vm.expectRevert(bytes("!w"));
+        predictionMarket.buyWithETH{value: VALUE}(marketId, 0, 0.0001 ether);
+
+        // should revert if using sellToETH on non-weth market
+        vm.expectRevert(bytes("!w"));
+        predictionMarket.sellToETH(marketId, 0, VALUE / 10, 1 ether);
     }
 
     function testContractUpgradeability() public {
