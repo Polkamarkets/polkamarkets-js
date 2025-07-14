@@ -1,0 +1,563 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+import "forge-std/Test.sol";
+import "forge-std/console.sol";
+
+// Contract imports
+import "../contracts/PredictionMarketV3_4.sol";
+import "../contracts/PredictionMarketV3Manager.sol";
+import "../contracts/WETH9.sol";
+import "../contracts/FantasyERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+
+// Mock RealityERC20 contract for testing
+contract MockRealityERC20 {
+    function askQuestionERC20(
+        uint256 template_id,
+        string memory question,
+        address arbitrator,
+        uint32 timeout,
+        uint32 opening_ts,
+        uint256 nonce,
+        uint256 tokens
+    ) external pure returns (bytes32) {
+        return keccak256(abi.encodePacked(template_id, question, arbitrator, timeout, opening_ts, nonce, tokens));
+    }
+}
+
+// Mock Manager contract for testing
+contract MockPredictionMarketV3Manager {
+    mapping(IERC20 => address) public realitioAddresses;
+    mapping(IERC20 => mapping(address => uint256)) public requiredBalance;
+    mapping(IERC20 => uint256) public requiredBalanceAmount;
+
+    constructor() {}
+
+    function setERC20RealitioAddress(IERC20 token, address realitio) external {
+        realitioAddresses[token] = realitio;
+    }
+
+    function getERC20RealitioAddress(IERC20 token) external view returns (address) {
+        return realitioAddresses[token];
+    }
+
+    function isAllowedToCreateMarket(IERC20 token, address user) external view returns (bool) {
+        return requiredBalance[token][user] >= requiredBalanceAmount[token];
+    }
+
+    function setRequiredBalance(IERC20 token, address user, uint256 amount) external {
+        requiredBalance[token][user] = amount;
+    }
+
+    function setRequiredBalanceAmount(IERC20 token, uint256 amount) external {
+        requiredBalanceAmount[token] = amount;
+    }
+}
+
+contract PredictionMarketV3Test is Test {
+    address public pmv34Implementation;
+    PredictionMarketV3_4 public predictionMarket;
+    MockPredictionMarketV3Manager public manager;
+    MockRealityERC20 public realitio;
+    ERC20PresetMinterPauser public tokenERC20;
+    ERC20 public requiredBalanceERC20;
+    WETH9 public weth;
+
+    address public user;
+    address public treasury = address(0x123);
+    address public distributor = address(0x456);
+
+    uint256 public constant INITIAL_BALANCE = 1000 ether;
+    uint256 public constant VALUE = 0.01 ether;
+
+    event MarketCreated(
+        address indexed user,
+        uint256 indexed marketId,
+        uint256 outcomes,
+        string question,
+        string image,
+        address token
+    );
+
+    function setUp() public {
+        user = address(this);
+
+        // Deploy contracts
+        weth = new WETH9();
+        requiredBalanceERC20 = new ERC20("Polkamarkets", "POLK");
+        realitio = new MockRealityERC20();
+        manager = new MockPredictionMarketV3Manager();
+
+        // Deploy prediction market
+        pmv34Implementation = address(new PredictionMarketV3_4());
+        bytes memory initData = abi.encodeCall(PredictionMarketV3_4.initialize, IWETH(address(weth)));
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(pmv34Implementation),
+            initData
+        );
+        predictionMarket = PredictionMarketV3_4(payable(address(proxy)));
+
+        // Deploy fantasy token
+        tokenERC20 = new ERC20PresetMinterPauser("Test Token", "TEST");
+
+        // Setup manager
+        manager.setERC20RealitioAddress(IERC20(address(tokenERC20)), address(realitio));
+        manager.setRequiredBalanceAmount(IERC20(address(tokenERC20)), 1 ether);
+        manager.setRequiredBalance(IERC20(address(tokenERC20)), user, 1000 ether);
+
+        // Allow manager in prediction market
+        predictionMarket.setAllowedManager(address(manager), true);
+
+        // Setup tokens
+        tokenERC20.mint(user, 1000 ether);
+        tokenERC20.approve(address(predictionMarket), type(uint256).max);
+
+        // Fund user with ETH for WETH tests
+        vm.deal(user, INITIAL_BALANCE);
+    }
+
+    function testContractDeployment() public {
+        assertTrue(address(predictionMarket) != address(0));
+        assertTrue(address(manager) != address(0));
+        assertTrue(address(realitio) != address(0));
+        assertTrue(address(tokenERC20) != address(0));
+        assertTrue(address(weth) != address(0));
+
+        assertEq(address(predictionMarket.WETH()), address(weth));
+    }
+
+    function testCreateMarket() public {
+        PredictionMarketV3_4.CreateMarketDescription memory desc = PredictionMarketV3_4.CreateMarketDescription({
+            value: VALUE,
+            closesAt: uint32(block.timestamp + 30 days),
+            outcomes: 2,
+            token: IERC20(address(tokenERC20)),
+            distribution: new uint256[](0),
+            question: "Will BTC price close above 100k$ in 30 days?",
+            image: "foo-bar",
+            arbitrator: address(0x1),
+            buyFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            sellFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            treasury: treasury,
+            distributor: distributor,
+            realitioTimeout: 3600,
+            manager: IPredictionMarketV3Manager(address(manager))
+        });
+
+        vm.expectEmit(true, true, false, false);
+        emit MarketCreated(user, 0, 2, desc.question, desc.image, address(tokenERC20));
+
+        uint256 marketId = predictionMarket.createMarket(desc);
+
+        assertEq(marketId, 0);
+
+        uint256[] memory markets = predictionMarket.getMarkets();
+        assertEq(markets.length, 1);
+        assertEq(markets[0], 0);
+    }
+
+    function testCreateMultipleMarkets() public {
+        // First market
+        PredictionMarketV3_4.CreateMarketDescription memory desc1 = PredictionMarketV3_4.CreateMarketDescription({
+            value: VALUE,
+            closesAt: uint32(block.timestamp + 30 days),
+            outcomes: 2,
+            token: IERC20(address(tokenERC20)),
+            distribution: new uint256[](0),
+            question: "Will BTC price close above 100k$ in 30 days?",
+            image: "foo-bar",
+            arbitrator: address(0x1),
+            buyFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            sellFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            treasury: treasury,
+            distributor: distributor,
+            realitioTimeout: 3600,
+            manager: IPredictionMarketV3Manager(address(manager))
+        });
+
+        // Second market
+        PredictionMarketV3_4.CreateMarketDescription memory desc2 = desc1;
+        desc2.question = "Will ETH price close above 10k$ in 30 days?";
+        desc2.value = 0.001 ether;
+
+        uint256 marketId1 = predictionMarket.createMarket(desc1);
+        uint256 marketId2 = predictionMarket.createMarket(desc2);
+
+        assertEq(marketId1, 0);
+        assertEq(marketId2, 1);
+
+        uint256[] memory markets = predictionMarket.getMarkets();
+        assertEq(markets.length, 2);
+    }
+
+    function testGetMarketData() public {
+        uint256 marketId = _createTestMarket();
+
+        (
+            PredictionMarketV3_4.MarketState state,
+            uint256 closesAt,
+            uint256 liquidity,
+            uint256 balance,
+            uint256 sharesAvailable,
+            int256 resolvedOutcomeId
+        ) = predictionMarket.getMarketData(marketId);
+
+        assertEq(uint256(state), uint256(PredictionMarketV3_4.MarketState.open));
+        assertGt(closesAt, block.timestamp);
+        assertEq(liquidity, VALUE);
+        assertGt(balance, 0);
+        assertGt(sharesAvailable, 0);
+        assertEq(resolvedOutcomeId, -1);
+    }
+
+    function testGetMarketPrices() public {
+        uint256 marketId = _createTestMarket();
+
+        (uint256 liquidityPrice, uint256[] memory outcomes) = predictionMarket.getMarketPrices(marketId);
+
+        assertGt(liquidityPrice, 0);
+        assertEq(outcomes.length, 2);
+
+        // In a balanced market, each outcome should have 0.5 price
+        assertEq(outcomes[0], 0.5 ether);
+        assertEq(outcomes[1], 0.5 ether);
+
+        // Prices should sum to 1
+        assertEq(outcomes[0] + outcomes[1], 1 ether);
+    }
+
+    function testGetMarketShares() public {
+        uint256 marketId = _createTestMarket();
+
+        (uint256 liquidityShares, uint256[] memory outcomeShares) = predictionMarket.getMarketShares(marketId);
+
+        assertGt(liquidityShares, 0);
+        assertEq(outcomeShares.length, 2);
+
+        // Each outcome should have equal shares in balanced market
+        assertEq(outcomeShares[0], VALUE);
+        assertEq(outcomeShares[1], VALUE);
+
+        // Outcome shares should sum to value * 2
+        assertEq(outcomeShares[0] + outcomeShares[1], VALUE * 2);
+    }
+
+    function testAddLiquidityBalancedMarket() public {
+        uint256 marketId = _createTestMarket();
+
+        // Get initial state
+        (uint256 initialLiquidityShares,) = predictionMarket.getUserMarketShares(marketId, user);
+        (,, uint256 initialLiquidity,,,) = predictionMarket.getMarketData(marketId);
+        (uint256 initialLiquidityPrice, uint256[] memory initialPrices) = predictionMarket.getMarketPrices(marketId);
+
+        // Add liquidity
+        predictionMarket.addLiquidity(marketId, VALUE);
+
+        // Check new state
+        (uint256 newLiquidityShares,) = predictionMarket.getUserMarketShares(marketId, user);
+        (,, uint256 newLiquidity,,,) = predictionMarket.getMarketData(marketId);
+        (uint256 newLiquidityPrice, uint256[] memory newPrices) = predictionMarket.getMarketPrices(marketId);
+
+        assertEq(newLiquidity, initialLiquidity + VALUE);
+        assertEq(newLiquidityShares, initialLiquidityShares + VALUE);
+
+        // Prices should remain the same in balanced market
+        assertEq(newLiquidityPrice, initialLiquidityPrice);
+        assertEq(newPrices[0], initialPrices[0]);
+        assertEq(newPrices[1], initialPrices[1]);
+    }
+
+    function testRemoveLiquidityBalancedMarket() public {
+        uint256 marketId = _createTestMarket();
+
+        // Add some liquidity first
+        predictionMarket.addLiquidity(marketId, VALUE);
+
+        // Get state after adding liquidity
+        (uint256 liquidityShares,) = predictionMarket.getUserMarketShares(marketId, user);
+        (,, uint256 liquidity,,,) = predictionMarket.getMarketData(marketId);
+        (uint256 liquidityPrice, uint256[] memory prices) = predictionMarket.getMarketPrices(marketId);
+        uint256 initialBalance = tokenERC20.balanceOf(user);
+
+        // Remove liquidity
+        predictionMarket.removeLiquidity(marketId, VALUE);
+
+        // Check new state
+        (uint256 newLiquidityShares,) = predictionMarket.getUserMarketShares(marketId, user);
+        (,, uint256 newLiquidity,,,) = predictionMarket.getMarketData(marketId);
+        (uint256 newLiquidityPrice, uint256[] memory newPrices) = predictionMarket.getMarketPrices(marketId);
+        uint256 newBalance = tokenERC20.balanceOf(user);
+
+        assertEq(newLiquidity, liquidity - VALUE);
+        assertEq(newLiquidityShares, liquidityShares - VALUE);
+        assertGt(newBalance, initialBalance); // User should receive tokens back
+
+        // Prices should remain the same in balanced market
+        assertEq(newLiquidityPrice, liquidityPrice);
+        assertEq(newPrices[0], prices[0]);
+        assertEq(newPrices[1], prices[1]);
+    }
+
+    function testBuyOutcomeShares() public {
+        uint256 marketId = _createTestMarket();
+        uint256 outcomeId = 0;
+        uint256 minShares = 0.015 ether;
+
+        // Get initial state
+        (uint256 initialPrice0, uint256 initialPrice1) = _getOutcomePrices(marketId);
+        (,uint256[] memory initialShares) = predictionMarket.getMarketShares(marketId);
+        (,uint256[] memory userInitialShares) = predictionMarket.getUserMarketShares(marketId, user);
+        uint256 initialBalance = tokenERC20.balanceOf(address(predictionMarket));
+
+        // Buy outcome shares
+        predictionMarket.buy(marketId, outcomeId, minShares, VALUE);
+
+        // Check new state
+        (uint256 newPrice0, uint256 newPrice1) = _getOutcomePrices(marketId);
+        (,uint256[] memory newShares) = predictionMarket.getMarketShares(marketId);
+        (,uint256[] memory userNewShares) = predictionMarket.getUserMarketShares(marketId, user);
+        uint256 newBalance = tokenERC20.balanceOf(address(predictionMarket));
+
+        // Outcome 0 price should increase
+        assertGt(newPrice0, initialPrice0);
+        // Outcome 1 price should decrease
+        assertLt(newPrice1, initialPrice1);
+        // Prices should still sum to 1
+        assertEq(newPrice0 + newPrice1, 1 ether);
+
+        // User should have outcome shares
+        assertGt(userNewShares[outcomeId], userInitialShares[outcomeId]);
+
+        // Contract balance should increase
+        assertGt(newBalance, initialBalance);
+    }
+
+    function testSellOutcomeShares() public {
+        uint256 marketId = _createTestMarket();
+        uint256 outcomeId = 0;
+        uint256 minShares = 0.015 ether;
+        uint256 maxShares = 0.015 ether;
+
+        // First buy some shares
+        predictionMarket.buy(marketId, outcomeId, minShares, VALUE);
+
+        // Get state after buying
+        (uint256 priceAfterBuy0, uint256 priceAfterBuy1) = _getOutcomePrices(marketId);
+        uint256 balanceAfterBuy = tokenERC20.balanceOf(address(predictionMarket));
+
+        // Sell outcome shares
+        predictionMarket.sell(marketId, outcomeId, VALUE, maxShares);
+
+        // Check new state
+        (uint256 priceAfterSell0, uint256 priceAfterSell1) = _getOutcomePrices(marketId);
+        uint256 balanceAfterSell = tokenERC20.balanceOf(address(predictionMarket));
+
+        // Outcome 0 price should decrease compared to after buy
+        assertLt(priceAfterSell0, priceAfterBuy0);
+        // Outcome 1 price should increase compared to after buy
+        assertGt(priceAfterSell1, priceAfterBuy1);
+        // Prices should still sum to 1
+        assertEq(priceAfterSell0 + priceAfterSell1, 1 ether);
+
+        // Contract balance should decrease
+        assertLt(balanceAfterSell, balanceAfterBuy);
+    }
+
+    function testCreateMarketWithThreeOutcomes() public {
+        PredictionMarketV3_4.CreateMarketDescription memory desc = PredictionMarketV3_4.CreateMarketDescription({
+            value: VALUE,
+            closesAt: uint32(block.timestamp + 30 days),
+            outcomes: 3,
+            token: IERC20(address(tokenERC20)),
+            distribution: new uint256[](0),
+            question: "Market with 3 outcomes",
+            image: "foo-bar",
+            arbitrator: address(0x1),
+            buyFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            sellFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            treasury: treasury,
+            distributor: distributor,
+            realitioTimeout: 3600,
+            manager: IPredictionMarketV3Manager(address(manager))
+        });
+
+        uint256 marketId = predictionMarket.createMarket(desc);
+
+        uint256[] memory outcomeIds = predictionMarket.getMarketOutcomeIds(marketId);
+        assertEq(outcomeIds.length, 3);
+        assertEq(outcomeIds[0], 0);
+        assertEq(outcomeIds[1], 1);
+        assertEq(outcomeIds[2], 2);
+
+        // Check that prices sum to 1
+        (,uint256[] memory prices) = predictionMarket.getMarketPrices(marketId);
+        assertEq(prices.length, 3);
+        assert(1 ether - (prices[0] + prices[1] + prices[2]) <= 0.000000000000000001 ether);
+    }
+
+    function testCreateMarketWith32Outcomes() public {
+        PredictionMarketV3_4.CreateMarketDescription memory desc = PredictionMarketV3_4.CreateMarketDescription({
+            value: VALUE,
+            closesAt: uint32(block.timestamp + 30 days),
+            outcomes: 32,
+            token: IERC20(address(tokenERC20)),
+            distribution: new uint256[](0),
+            question: "Market with 32 outcomes",
+            image: "foo-bar",
+            arbitrator: address(0x1),
+            buyFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            sellFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            treasury: treasury,
+            distributor: distributor,
+            realitioTimeout: 3600,
+            manager: IPredictionMarketV3Manager(address(manager))
+        });
+
+        uint256 marketId = predictionMarket.createMarket(desc);
+
+        uint256[] memory outcomeIds = predictionMarket.getMarketOutcomeIds(marketId);
+        assertEq(outcomeIds.length, 32);
+
+        // Check that prices sum to 1
+        (,uint256[] memory prices) = predictionMarket.getMarketPrices(marketId);
+        assertEq(prices.length, 32);
+
+        uint256 totalPrice = 0;
+        for (uint256 i = 0; i < prices.length; i++) {
+            totalPrice += prices[i];
+        }
+        assertEq(totalPrice, 1 ether);
+    }
+
+    function testCannotCreateMarketWithMoreThan32Outcomes() public {
+        PredictionMarketV3_4.CreateMarketDescription memory desc = PredictionMarketV3_4.CreateMarketDescription({
+            value: VALUE,
+            closesAt: uint32(block.timestamp + 30 days),
+            outcomes: 33,
+            token: IERC20(address(tokenERC20)),
+            distribution: new uint256[](0),
+            question: "Market with 33 outcomes",
+            image: "foo-bar",
+            arbitrator: address(0x1),
+            buyFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            sellFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            treasury: treasury,
+            distributor: distributor,
+            realitioTimeout: 3600,
+            manager: IPredictionMarketV3Manager(address(manager))
+        });
+
+        vm.expectRevert("outcome count not between 1-32");
+        predictionMarket.createMarket(desc);
+    }
+
+    function testCreateMarketWithFees() public {
+        uint256 buyFee = 0.01 ether; // 1%
+        uint256 treasuryFee = 0.02 ether; // 2%
+        uint256 distributorFee = 0.03 ether; // 3%
+
+        PredictionMarketV3_4.CreateMarketDescription memory desc = PredictionMarketV3_4.CreateMarketDescription({
+            value: VALUE,
+            closesAt: uint32(block.timestamp + 30 days),
+            outcomes: 2,
+            token: IERC20(address(tokenERC20)),
+            distribution: new uint256[](0),
+            question: "Market with 1%/2%/3% Fees",
+            image: "foo-bar",
+            arbitrator: address(0x1),
+            buyFees: PredictionMarketV3_4.Fees({
+                fee: buyFee,
+                treasuryFee: treasuryFee,
+                distributorFee: distributorFee
+            }),
+            sellFees: PredictionMarketV3_4.Fees({
+                fee: buyFee,
+                treasuryFee: treasuryFee,
+                distributorFee: distributorFee
+            }),
+            treasury: treasury,
+            distributor: distributor,
+            realitioTimeout: 3600,
+            manager: IPredictionMarketV3Manager(address(manager))
+        });
+
+        uint256 marketId = predictionMarket.createMarket(desc);
+
+        // Test buying with fees
+        uint256 treasuryInitialBalance = tokenERC20.balanceOf(treasury);
+        uint256 distributorInitialBalance = tokenERC20.balanceOf(distributor);
+
+        predictionMarket.buy(marketId, 0, 0.0001 ether, VALUE);
+
+        uint256 treasuryNewBalance = tokenERC20.balanceOf(treasury);
+        uint256 distributorNewBalance = tokenERC20.balanceOf(distributor);
+
+        // Treasury should receive treasury fee
+        assertGt(treasuryNewBalance, treasuryInitialBalance);
+        // Distributor should receive distributor fee
+        assertGt(distributorNewBalance, distributorInitialBalance);
+    }
+
+    function testMarketWithDistributedProbabilities() public {
+        // Test market with 40% / 60% odds
+        uint256[] memory distribution = new uint256[](2);
+        distribution[0] = 0.6 ether * VALUE; // 60% of liquidity to outcome 0
+        distribution[1] = 0.4 ether * VALUE; // 40% of liquidity to outcome 1
+
+        PredictionMarketV3_4.CreateMarketDescription memory desc = PredictionMarketV3_4.CreateMarketDescription({
+            value: VALUE,
+            closesAt: uint32(block.timestamp + 30 days),
+            outcomes: 2,
+            token: IERC20(address(tokenERC20)),
+            distribution: distribution,
+            question: "Market with 40%/60% odds",
+            image: "foo-bar",
+            arbitrator: address(0x1),
+            buyFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            sellFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            treasury: treasury,
+            distributor: distributor,
+            realitioTimeout: 3600,
+            manager: IPredictionMarketV3Manager(address(manager))
+        });
+
+        uint256 marketId = predictionMarket.createMarket(desc);
+
+        (,uint256[] memory prices) = predictionMarket.getMarketPrices(marketId);
+
+        // Prices should reflect the distribution
+        // The outcome with more liquidity should have lower price
+        assertLt(prices[0], prices[1]); // outcome 0 has more liquidity, so lower price
+        assertEq(prices[0] + prices[1], 1 ether); // should still sum to 1
+    }
+
+    // Helper functions
+    function _createTestMarket() internal returns (uint256) {
+        PredictionMarketV3_4.CreateMarketDescription memory desc = PredictionMarketV3_4.CreateMarketDescription({
+            value: VALUE,
+            closesAt: uint32(block.timestamp + 30 days),
+            outcomes: 2,
+            token: IERC20(address(tokenERC20)),
+            distribution: new uint256[](0),
+            question: "Test Market",
+            image: "test-image",
+            arbitrator: address(0x1),
+            buyFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            sellFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            treasury: treasury,
+            distributor: distributor,
+            realitioTimeout: 3600,
+            manager: IPredictionMarketV3Manager(address(manager))
+        });
+
+        return predictionMarket.createMarket(desc);
+    }
+
+    function _getOutcomePrices(uint256 marketId) internal view returns (uint256, uint256) {
+        (,uint256[] memory prices) = predictionMarket.getMarketPrices(marketId);
+        return (prices[0], prices[1]);
+    }
+}
