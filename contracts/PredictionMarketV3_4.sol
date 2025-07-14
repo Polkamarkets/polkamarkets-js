@@ -269,7 +269,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   }
 
   modifier isWETHMarket(uint256 marketId) {
-    require(address(WETH) != address(0));
+    require(address(WETH) != address(0), "w0");
     require(address(markets[marketId].token) == address(WETH), "!w");
     _;
   }
