@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import "./FantasyERC20.sol";
 import "./RealityETH_ERC20_Factory.sol";
 import "./IPredictionMarketV3Factory.sol";
 import "./LandFactory.sol";
@@ -45,7 +44,7 @@ contract PredictionMarketV3Controller is LandFactory {
     string memory symbol,
     uint256 tokenAmountToClaim,
     IERC20 tokenToAnswer
-  ) external override returns (FantasyERC20) {
+  ) external override returns (IERC20) {
     require(
       IPredictionMarketV3Factory(PMV3Factory).isPMControllerAdmin(address(this), msg.sender),
       "Not allowed to create land"

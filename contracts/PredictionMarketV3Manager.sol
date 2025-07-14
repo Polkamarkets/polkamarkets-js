@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import "./FantasyERC20.sol";
 import "./RealityETH_ERC20_Factory.sol";
 import "./LandFactory.sol";
 
@@ -32,14 +31,14 @@ contract PredictionMarketV3Manager is LandFactory {
   }
 
   // lockAmount is the amount of tokens that the user needs to lock to create a land
-  // by locking the amount the factory will create a fantasyERC20 token and store it in the contract
+  // by locking the amount the factory will create an erc20 token and store it in the contract
   // the user will be the admin of the land
   function createLand(
     string memory name,
     string memory symbol,
     uint256 tokenAmountToClaim,
     IERC20 tokenToAnswer
-  ) external override nonReentrant returns (FantasyERC20) {
+  ) external override nonReentrant returns (IERC20) {
     return _createLand(name, symbol, tokenAmountToClaim, tokenToAnswer, address(0), address(0));
   }
 }
