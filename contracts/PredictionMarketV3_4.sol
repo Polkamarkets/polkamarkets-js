@@ -3,7 +3,6 @@ pragma solidity ^0.8.26;
 
 // openzeppelin upgradeable imports
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -16,6 +15,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./IFantasyERC20.sol";
 import "./IRealityETH_ERC20.sol";
 import "./IPredictionMarketV3Manager.sol";
+import "./IWETH.sol";
 
 library CeilDiv {
   // calculates ceil(x/y)
@@ -23,16 +23,6 @@ library CeilDiv {
     if (x > 0) return ((x - 1) / y) + 1;
     return 0;
   }
-}
-
-interface IWETH {
-  function deposit() external payable;
-
-  function transfer(address to, uint256 value) external returns (bool);
-
-  function withdraw(uint256) external;
-
-  function approve(address guy, uint256 wad) external returns (bool);
 }
 
 /// @title Market Contract Factory
