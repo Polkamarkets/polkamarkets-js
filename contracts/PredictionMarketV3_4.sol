@@ -226,7 +226,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   // ------ Modifiers ------
 
   modifier isMarket(uint256 marketId) {
-    require(marketId < marketIndex, "Market not found");
+    require(marketId < marketIndex, "!m");
     _;
   }
 
@@ -238,33 +238,33 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   }
 
   modifier atState(uint256 marketId, MarketState state) {
-    require(markets[marketId].state == state, "Market in incorrect state");
+    require(markets[marketId].state == state, "!ms");
     _;
   }
 
   modifier notAtState(uint256 marketId, MarketState state) {
-    require(markets[marketId].state != state, "Market in incorrect state");
+    require(markets[marketId].state != state, "!ms");
     _;
   }
 
   modifier whenNotPaused() {
-    require(!paused, "Contract is paused");
+    require(!paused, "!p");
     _;
   }
 
   modifier whenPaused() {
-    require(paused, "Contract is not paused");
+    require(paused, "!p");
     _;
   }
 
   modifier marketNotPaused(uint256 marketId) {
-    require(!paused, "Contract is paused");
-    require(!markets[marketId].paused, "Market is paused");
+    require(!paused, "p");
+    require(!markets[marketId].paused, "mp");
     _;
   }
 
   modifier marketPaused(uint256 marketId) {
-    require(markets[marketId].paused, "Market is not paused");
+    require(markets[marketId].paused, "!mp");
     _;
   }
 
@@ -279,8 +279,8 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   }
 
   modifier isWETHMarket(uint256 marketId) {
-    require(address(WETH) != address(0), "WETH address is address 0");
-    require(address(markets[marketId].token) == address(WETH), "Market token is not WETH");
+    require(address(WETH) != address(0));
+    require(address(markets[marketId].token) == address(WETH), "!w");
     _;
   }
 
@@ -308,9 +308,9 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
 
   /// @dev for internal use only, validates the market fees and throws if they are not valid
   function _validateFees(Fees memory fees) private pure {
-    require(fees.fee <= MAX_FEE, "fee must be <= 5%");
-    require(fees.treasuryFee <= MAX_FEE, "treasury fee must be <= 5%");
-    require(fees.distributorFee <= MAX_FEE, "distributor fee must be <= 5%");
+    require(fees.fee <= MAX_FEE, "f>5");
+    require(fees.treasuryFee <= MAX_FEE, "tf>5");
+    require(fees.distributorFee <= MAX_FEE, "df>5");
   }
 
   /// @dev Creates a market, initializes the outcome shares pool and submits a question in Realitio
@@ -322,14 +322,14 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
 
     IRealityETH_ERC20 realitio = IRealityETH_ERC20(desc.manager.getERC20RealitioAddress(desc.token));
 
-    require(desc.value > 0, "stake needs to be > 0");
-    require(desc.closesAt > block.timestamp, "resolution before current date");
-    require(desc.arbitrator != address(0), "invalid arbitrator address");
-    require(desc.outcomes > 0 && desc.outcomes <= MAX_OUTCOMES, "outcome count not between 1-32");
-    require(address(realitio) != address(0), "_realitioAddress is address 0");
-    require(desc.realitioTimeout >= MINIMUM_REALITIO_TIMEOUT, "realitio timeout too low");
-    require(allowedManagers[address(desc.manager)], "Manager not allowed");
-    require(desc.manager.isAllowedToCreateMarket(desc.token, msg.sender), "not allowed to create market");
+    require(desc.value > 0, "v0");
+    require(desc.closesAt > block.timestamp, "c<n");
+    require(desc.arbitrator != address(0), "a0");
+    require(desc.outcomes > 0 && desc.outcomes <= MAX_OUTCOMES, "!oc");
+    require(address(realitio) != address(0), "r0");
+    require(desc.realitioTimeout >= MINIMUM_REALITIO_TIMEOUT, "rt<1h");
+    require(allowedManagers[address(desc.manager)], "!am");
+    require(desc.manager.isAllowedToCreateMarket(desc.token, msg.sender), "m!=a");
 
     market.token = desc.token;
     market.closesAtTimestamp = desc.closesAt;
@@ -440,7 +440,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     uint256 outcomeId
   ) public view returns (uint256) {
     Market storage market = markets[marketId];
-    require(outcomeId < market.outcomeCount, "outcome is out of bounds");
+    require(outcomeId < market.outcomeCount, "!o");
 
     uint256[] memory outcomesShares = getMarketOutcomesShares(marketId);
     uint256 fee = getMarketFee(marketId);
@@ -453,7 +453,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
         endingOutcomeBalance = (endingOutcomeBalance * outcomeShares).ceildiv(outcomeShares + amountMinusFees);
       }
     }
-    require(endingOutcomeBalance > 0, "must have non-zero balances");
+    require(endingOutcomeBalance > 0, "b0");
 
     return buyTokenPoolBalance + amountMinusFees - (endingOutcomeBalance.ceildiv(ONE));
   }
@@ -465,7 +465,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     uint256 outcomeId
   ) public view returns (uint256) {
     Market storage market = markets[marketId];
-    require(outcomeId < market.outcomeCount, "outcome is out of bounds");
+    require(outcomeId < market.outcomeCount, "!o");
 
     uint256[] memory outcomesShares = getMarketOutcomesShares(marketId);
     uint256 fee = getMarketSellFee(marketId);
@@ -478,7 +478,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
         endingOutcomeBalance = (endingOutcomeBalance * outcomeShares).ceildiv(outcomeShares - amountPlusFees);
       }
     }
-    require(endingOutcomeBalance > 0, "must have non-zero balances");
+    require(endingOutcomeBalance > 0, "b0");
 
     return amountPlusFees + endingOutcomeBalance.ceildiv(ONE) - sellTokenPoolBalance;
   }
@@ -493,8 +493,8 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     Market storage market = markets[marketId];
 
     uint256 shares = calcBuyAmount(value, marketId, outcomeId);
-    require(shares >= minOutcomeSharesToBuy, "minimum buy amount not reached");
-    require(shares > 0, "shares amount is 0");
+    require(shares >= minOutcomeSharesToBuy, "s<m");
+    require(shares > 0, "s0");
 
     // subtracting fee from transaction value
     uint256 feeAmount = (value * market.fees.buyFees.fee) / ONE;
@@ -510,7 +510,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     // Funding market shares with received funds
     _addSharesToMarket(marketId, valueMinusFees);
 
-    require(outcome.shares.available >= shares, "shares pool balance is too low");
+    require(outcome.shares.available >= shares, "s<sp");
 
     _transferOutcomeSharesfromPool(msg.sender, marketId, outcomeId, shares);
 
@@ -592,9 +592,9 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
 
     uint256 shares = calcSellAmount(value, marketId, outcomeId);
 
-    require(shares <= maxOutcomeSharesToSell, "maximum sell amount exceeded");
-    require(shares > 0, "shares amount is 0");
-    require(outcome.shares.holders[msg.sender] >= shares, "insufficient shares balance");
+    require(shares <= maxOutcomeSharesToSell, "s>m");
+    require(shares > 0, "s0");
+    require(outcome.shares.holders[msg.sender] >= shares, "s>h");
 
     _transferOutcomeSharesToPool(msg.sender, marketId, outcomeId, shares);
 
@@ -607,7 +607,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     }
     uint256 valuePlusFees = value + (value * fee) / oneMinusFee;
 
-    require(market.balance >= valuePlusFees, "insufficient market balance");
+    require(market.balance >= valuePlusFees, "b<v");
 
     // Rebalancing market shares
     _removeSharesFromMarket(marketId, valuePlusFees);
@@ -650,13 +650,13 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     uint256 maxOutcomeSharesToSell
   ) external isWETHMarket(marketId) nonReentrant {
     Market storage market = markets[marketId];
-    require(address(market.token) == address(WETH), "market token is not WETH");
+    require(address(market.token) == address(WETH), "!w");
 
     _sell(marketId, outcomeId, value, maxOutcomeSharesToSell);
 
     IWETH(WETH).withdraw(value);
     (bool sent, ) = payable(msg.sender).call{value: value}("");
-    require(sent, "Failed to send Ether");
+    require(sent, "!s");
   }
 
   function referralSell(
@@ -701,7 +701,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   ) private timeTransitions(marketId) atState(marketId, MarketState.open) marketNotPaused(marketId) {
     Market storage market = markets[marketId];
 
-    require(value > 0, "stake has to be greater than 0.");
+    require(value > 0, "v0");
 
     uint256 liquidityAmount;
 
@@ -710,7 +710,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     uint256 poolWeight = 0;
 
     if (market.liquidity > 0) {
-      require(distribution.length == 0, "market already funded");
+      require(distribution.length == 0, "!d");
 
       // part of the liquidity is exchanged for outcome shares if market is not balanced
       for (uint256 i; i < market.outcomeCount; ++i) {
@@ -731,7 +731,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
       uint256 distributionLength = distribution.length;
       // funding market with no liquidity
       if (distributionLength > 0) {
-        require(distributionLength == market.outcomeCount, "distribution length not matching");
+        require(distributionLength == market.outcomeCount, "d!=oc");
 
         uint256 maxHint = 0;
         for (uint256 i; i < distributionLength; ++i) {
@@ -741,7 +741,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
 
         for (uint256 i; i < distributionLength; ++i) {
           uint256 remaining = (value * distribution[i]) / maxHint;
-          require(remaining > 0, "must hint a valid distribution");
+          require(remaining > 0, "!d");
           sendBackAmounts[i] = value - remaining;
         }
       }
@@ -828,8 +828,8 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     Market storage market = markets[marketId];
 
     // removing 100% of the liquidity is not allowed
-    require(shares < market.liquidity, "cannot remove all liquidity");
-    require(market.liquidityShares[msg.sender] >= shares, "insufficient shares balance");
+    require(shares < market.liquidity, "s>l");
+    require(market.liquidityShares[msg.sender] >= shares, "s>h");
 
     // re-balancing fees pool
     _rebalanceFeesPool(marketId, shares, MarketAction.removeLiquidity);
@@ -985,15 +985,15 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     Market storage market = markets[marketId];
     MarketOutcome storage resolvedOutcome = market.outcomes[market.resolution.outcomeId];
 
-    require(!isMarketVoided(marketId), "market is voided");
-    require(resolvedOutcome.shares.holders[msg.sender] > 0, "user doesn't hold outcome shares");
-    require(!resolvedOutcome.shares.claims[msg.sender], "user already claimed winnings");
+    require(!isMarketVoided(marketId), "mv");
+    require(resolvedOutcome.shares.holders[msg.sender] > 0, "!h");
+    require(!resolvedOutcome.shares.claims[msg.sender], "!c");
 
     // 1 share => price = 1
     value = resolvedOutcome.shares.holders[msg.sender];
 
     // assuring market has enough funds
-    require(market.balance >= value, "insufficient market balance");
+    require(market.balance >= value, "b<v");
 
     market.balance = market.balance - value;
     resolvedOutcome.shares.claims[msg.sender] = true;
@@ -1034,16 +1034,16 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     Market storage market = markets[marketId];
     MarketOutcome storage outcome = market.outcomes[outcomeId];
 
-    require(isMarketVoided(marketId), "market is not voided");
-    require(outcome.shares.holders[msg.sender] > 0, "user doesn't hold outcome shares");
-    require(!outcome.shares.voidedClaims[msg.sender], "user already claimed shares");
+    require(isMarketVoided(marketId), "!mv");
+    require(outcome.shares.holders[msg.sender] > 0, "!h");
+    require(!outcome.shares.voidedClaims[msg.sender], "!c");
 
     // voided market - shares are valued at last market price
     uint256 price = getMarketOutcomePrice(marketId, outcomeId);
     value = (price * outcome.shares.holders[msg.sender]) / ONE;
 
     // assuring market has enough funds
-    require(market.balance >= value, "insufficient market balance");
+    require(market.balance >= value, "b<v");
 
     market.balance = market.balance - value;
     outcome.shares.voidedClaims[msg.sender] = true;
@@ -1089,15 +1089,15 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   {
     Market storage market = markets[marketId];
 
-    require(market.liquidityShares[msg.sender] > 0, "user doesn't hold shares");
-    require(!market.liquidityClaims[msg.sender], "user already claimed shares");
+    require(market.liquidityShares[msg.sender] > 0, "!h");
+    require(!market.liquidityClaims[msg.sender], "!c");
 
     // value = total resolved outcome pool shares * pool share (%)
     uint256 liquidityPrice = getMarketLiquidityPrice(marketId);
     value = (liquidityPrice * market.liquidityShares[msg.sender]) / ONE;
 
     // assuring market has enough funds
-    require(market.balance >= value, "insufficient market balance");
+    require(market.balance >= value, "b<v");
 
     market.balance = market.balance - value;
     market.liquidityClaims[msg.sender] = true;
