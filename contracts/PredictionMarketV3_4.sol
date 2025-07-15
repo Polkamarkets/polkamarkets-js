@@ -275,9 +275,9 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   }
 
   /// @dev Initialize the contract - replaces constructor for upgradeable contracts
-  function initialize(IWETH _WETH) public initializer {
+  function initialize(IWETH _WETH, address initialOwner) public initializer {
     __ReentrancyGuard_init();
-    __Ownable_init(msg.sender);
+    __Ownable_init(initialOwner);
     __UUPSUpgradeable_init();
 
     WETH = _WETH;

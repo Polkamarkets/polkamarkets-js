@@ -22,8 +22,9 @@ contract PredictionMarketV3Manager is LandFactory {
     address _PMV3,
     IERC20 _token,
     uint256 _lockAmount,
-    address _realitioLibraryAddress
-  ) Ownable(msg.sender) {
+    address _realitioLibraryAddress,
+    address initialOwner
+  ) Ownable(initialOwner) {
     PMV3 = _PMV3;
     token = _token;
     lockAmount = _lockAmount;

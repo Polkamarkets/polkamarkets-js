@@ -30,8 +30,9 @@ contract PredictionMarketV3Controller is LandFactory {
   constructor(
     address _PMV3,
     address _realitioLibraryAddress,
-    address _PMV3Factory
-  ) Ownable(msg.sender) {
+    address _PMV3Factory,
+    address initialOwner
+  ) Ownable(initialOwner) {
     require(_PMV3Factory != address(0), "PMV3Factory address cannot be 0 address");
 
     PMV3 = _PMV3;

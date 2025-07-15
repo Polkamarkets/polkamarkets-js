@@ -70,7 +70,10 @@ contract PredictionMarketManagerTest is Test {
 
         // Deploy prediction market implementation
         pmv34Implementation = address(new PredictionMarketV3_4());
-        bytes memory initData = abi.encodeCall(PredictionMarketV3_4.initialize, IWETH(address(0)));
+        bytes memory initData = abi.encodeCall(
+            PredictionMarketV3_4.initialize,
+            (IWETH(address(0)), deployer)
+        );
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(pmv34Implementation),
             initData
@@ -82,7 +85,8 @@ contract PredictionMarketManagerTest is Test {
             address(predictionMarket),
             IERC20(address(pmmToken)),
             LOCK_AMOUNT,
-            address(realitio)
+            address(realitio),
+            deployer
         );
 
         // Allow manager in prediction market

@@ -51,7 +51,10 @@ contract PredictionMarketTest is Test {
 
         // Deploy prediction market
         pmv34Implementation = address(new PredictionMarketV3_4());
-        bytes memory initData = abi.encodeCall(PredictionMarketV3_4.initialize, IWETH(address(weth)));
+        bytes memory initData = abi.encodeCall(
+            PredictionMarketV3_4.initialize,
+            (IWETH(address(weth)), user)
+        );
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(pmv34Implementation),
             initData
@@ -59,7 +62,13 @@ contract PredictionMarketTest is Test {
         predictionMarket = PredictionMarketV3_4(payable(address(proxy)));
 
         // Setup manager
-        manager = new PredictionMarketV3Manager(address(predictionMarket), IERC20(address(managerTokenERC20)), 1 ether, address(realitio));
+        manager = new PredictionMarketV3Manager(
+            address(predictionMarket),
+            IERC20(address(managerTokenERC20)),
+            1 ether,
+            address(realitio),
+            user
+        );
         managerTokenERC20.mint(user, 1000 ether);
         managerTokenERC20.approve(address(manager), type(uint256).max);
         manager.createLand(IERC20(address(tokenERC20)), IERC20(address(managerTokenERC20)));
