@@ -385,38 +385,11 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     desc.token.safeTransferFrom(msg.sender, address(this), desc.value);
   }
 
-  function createMarketWithETH(CreateMarketDescription calldata desc) external payable nonReentrant returns (uint256) {
-    require(address(desc.token) == address(WETH), "Market token is not WETH");
-    require(msg.value == desc.value, "value does not match arguments");
-    uint256 marketId = _createMarket(
-      CreateMarketDescription({
-        value: desc.value,
-        closesAt: desc.closesAt,
-        outcomes: desc.outcomes,
-        token: desc.token,
-        distribution: desc.distribution,
-        question: desc.question,
-        image: desc.image,
-        arbitrator: desc.arbitrator,
-        buyFees: desc.buyFees,
-        sellFees: desc.sellFees,
-        treasury: desc.treasury,
-        distributor: desc.distributor,
-        realitioTimeout: desc.realitioTimeout,
-        manager: desc.manager
-      })
-    );
-    // transferring funds
-    IWETH(WETH).deposit{value: msg.value}();
-
-    return marketId;
-  }
-
-  function mintAndCreateMarket(CreateMarketDescription calldata desc) external nonReentrant returns (uint256) {
+  function mintAndCreateMarket(CreateMarketDescription calldata desc) external nonReentrant returns (uint256 marketId) {
     // mint the amount of tokens to the user
     IFantasyERC20(address(desc.token)).mint(msg.sender, desc.value);
 
-    uint256 marketId = _createMarket(desc);
+    marketId = _createMarket(desc);
     // transferring funds
     desc.token.safeTransferFrom(msg.sender, address(this), desc.value);
 
@@ -556,20 +529,6 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     emit Referral(msg.sender, marketId, code, MarketAction.buy, outcomeId, value, block.timestamp);
   }
 
-  function referralBuyWithETH(
-    uint256 marketId,
-    uint256 outcomeId,
-    uint256 minOutcomeSharesToBuy,
-    string memory code
-  ) public payable isWETHMarket(marketId) nonReentrant {
-    uint256 value = msg.value;
-    // wrapping and depositing funds
-    IWETH(WETH).deposit{value: value}();
-    _buy(marketId, outcomeId, minOutcomeSharesToBuy, value);
-
-    emit Referral(msg.sender, marketId, code, MarketAction.buy, outcomeId, msg.value, block.timestamp);
-  }
-
   /// @dev Sell shares of a market outcome - returns gross amount of transaction (amount + fee)
   function _sell(
     uint256 marketId,
@@ -639,9 +598,6 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     uint256 value,
     uint256 maxOutcomeSharesToSell
   ) external isWETHMarket(marketId) nonReentrant {
-    Market storage market = markets[marketId];
-    require(address(market.token) == address(WETH), "!w");
-
     _sell(marketId, outcomeId, value, maxOutcomeSharesToSell);
 
     IWETH(WETH).withdraw(value);
@@ -660,25 +616,6 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     // Transferring funds to user
     Market storage market = markets[marketId];
     market.token.safeTransfer(msg.sender, value);
-
-    emit Referral(msg.sender, marketId, code, MarketAction.sell, outcomeId, valuePlusFees, block.timestamp);
-  }
-
-  function referralSellToETH(
-    uint256 marketId,
-    uint256 outcomeId,
-    uint256 value,
-    uint256 maxOutcomeSharesToSell,
-    string memory code
-  ) external isWETHMarket(marketId) nonReentrant {
-    Market storage market = markets[marketId];
-    require(address(market.token) == address(WETH), "market token is not WETH");
-
-    uint256 valuePlusFees = _sell(marketId, outcomeId, value, maxOutcomeSharesToSell);
-
-    IWETH(WETH).withdraw(value);
-    (bool sent, ) = payable(msg.sender).call{value: value}("");
-    require(sent, "Failed to send Ether");
 
     emit Referral(msg.sender, marketId, code, MarketAction.sell, outcomeId, valuePlusFees, block.timestamp);
   }
@@ -797,14 +734,6 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
 
     Market storage market = markets[marketId];
     market.token.safeTransferFrom(msg.sender, address(this), value);
-  }
-
-  function addLiquidityWithETH(uint256 marketId) external payable nonReentrant isWETHMarket(marketId) {
-    uint256 value = msg.value;
-    uint256[] memory distribution = new uint256[](0);
-    _addLiquidity(marketId, value, distribution);
-    // wrapping and depositing funds
-    IWETH(WETH).deposit{value: value}();
   }
 
   /// @dev Removes liquidity to a market - external
@@ -1006,14 +935,6 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     market.token.safeTransfer(msg.sender, value);
   }
 
-  function claimWinningsToETH(uint256 marketId) external nonReentrant isWETHMarket(marketId) {
-    uint256 value = _claimWinnings(marketId);
-    // unwrapping and transferring user funds from winnings claimed
-    IWETH(WETH).withdraw(value);
-    (bool sent, ) = payable(msg.sender).call{value: value}("");
-    require(sent, "Failed to send Ether");
-  }
-
   /// @dev Allows holders of voided outcome shares to claim balance back.
   function _claimVoidedOutcomeShares(uint256 marketId, uint256 outcomeId)
     private
@@ -1056,18 +977,6 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     // transferring user funds from voided outcome shares claimed
     Market storage market = markets[marketId];
     market.token.safeTransfer(msg.sender, value);
-  }
-
-  function claimVoidedOutcomeSharesToETH(uint256 marketId, uint256 outcomeId)
-    external
-    nonReentrant
-    isWETHMarket(marketId)
-  {
-    uint256 value = _claimVoidedOutcomeShares(marketId, outcomeId);
-    // unwrapping and transferring user funds from voided outcome shares claimed
-    IWETH(WETH).withdraw(value);
-    (bool sent, ) = payable(msg.sender).call{value: value}("");
-    require(sent, "Failed to send Ether");
   }
 
   /// @dev Allows liquidity providers to claim earnings from liquidity providing.
@@ -1142,14 +1051,6 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     // transferring user funds from fees claimed
     Market storage market = markets[marketId];
     market.token.safeTransfer(msg.sender, value);
-  }
-
-  function claimFeesToETH(uint256 marketId) public isWETHMarket(marketId) nonReentrant {
-    uint256 value = _claimFees(marketId);
-    // unwrapping and transferring user funds from fees claimed
-    IWETH(WETH).withdraw(value);
-    (bool sent, ) = payable(msg.sender).call{value: value}("");
-    require(sent, "Failed to send Ether");
   }
 
   /// @dev Rebalances the fees pool. Needed in every AddLiquidity / RemoveLiquidity call
