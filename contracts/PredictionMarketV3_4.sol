@@ -206,13 +206,6 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
 
   bool public paused;
 
-  // ------ Storage Gap ------
-
-  /// @dev This empty reserved space is put in place to allow future versions to add new
-  /// variables without shifting down storage in the inheritance chain.
-  /// See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
-  uint256[48] private __gap;
-
   // ------ Modifiers ------
 
   modifier isMarket(uint256 marketId) {
