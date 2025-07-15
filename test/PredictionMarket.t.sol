@@ -8,8 +8,7 @@ import "forge-std/console.sol";
 import "../contracts/PredictionMarketV3_4.sol";
 import "../contracts/PredictionMarketV3Manager.sol";
 import "../contracts/WETH.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
+import "../contracts/ERC20MinterPauser.sol";
 import {RealityETH_ERC20_v3_0} from "@reality.eth/contracts/development/contracts/RealityETH_ERC20-3.0.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
@@ -18,8 +17,8 @@ contract PredictionMarketV3Test is Test {
     PredictionMarketV3_4 public predictionMarket;
     PredictionMarketV3Manager public manager;
     RealityETH_ERC20_v3_0 public realitio;
-    ERC20PresetMinterPauser public tokenERC20;
-    ERC20PresetMinterPauser public managerTokenERC20;
+    ERC20MinterPauser public tokenERC20;
+    ERC20MinterPauser public managerTokenERC20;
     WETH public weth;
 
     address public user;
@@ -46,8 +45,8 @@ contract PredictionMarketV3Test is Test {
 
         // Deploy contracts
         weth = new WETH();
-        tokenERC20 = new ERC20PresetMinterPauser("Test Token", "TEST");
-        managerTokenERC20 = new ERC20PresetMinterPauser("Manager Token", "MTEST");
+        tokenERC20 = new ERC20MinterPauser("Test Token", "TEST");
+        managerTokenERC20 = new ERC20MinterPauser("Manager Token", "MTEST");
         realitio = new RealityETH_ERC20_v3_0();
 
         // Deploy prediction market
@@ -689,7 +688,7 @@ contract PredictionMarketV3Test is Test {
         address newImplementation = address(new PredictionMarketV3_4());
 
         // Upgrade proxy to new implementation
-        predictionMarket.upgradeTo(newImplementation);
+        predictionMarket.upgradeToAndCall(newImplementation, bytes(""));
 
         // Ensuring data persists on new implementation
         uint256 tokenBalance = tokenERC20.balanceOf(address(predictionMarket));

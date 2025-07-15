@@ -7,7 +7,7 @@ import "./LandFactory.sol";
 
 // openzeppelin ownable contract import
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract PredictionMarketV3Controller is LandFactory {
   address public immutable PMV3Factory; // PredictionMarketFactory contract
@@ -31,7 +31,7 @@ contract PredictionMarketV3Controller is LandFactory {
     address _PMV3,
     address _realitioLibraryAddress,
     address _PMV3Factory
-  ) {
+  ) Ownable(msg.sender) {
     require(_PMV3Factory != address(0), "PMV3Factory address cannot be 0 address");
 
     PMV3 = _PMV3;

@@ -5,7 +5,7 @@ import "./PredictionMarketV3Controller.sol";
 
 // openzeppelin ownable contract import
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 
 contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
@@ -42,7 +42,7 @@ contract PredictionMarketV3Factory is Ownable, ReentrancyGuard {
     uint256 _lockAmount,
     address _PMV3LibraryAddress,
     address _realitioLibraryAddress
-  ) {
+  ) Ownable(msg.sender) {
     token = _token;
     lockAmount = _lockAmount;
     PMV3LibraryAddress = _PMV3LibraryAddress;

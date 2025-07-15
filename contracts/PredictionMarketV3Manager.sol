@@ -6,7 +6,7 @@ import "./LandFactory.sol";
 
 // openzeppelin ownable contract import
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract PredictionMarketV3Manager is LandFactory {
   // inherited variables from LandFactory
@@ -23,7 +23,7 @@ contract PredictionMarketV3Manager is LandFactory {
     IERC20 _token,
     uint256 _lockAmount,
     address _realitioLibraryAddress
-  ) {
+  ) Ownable(msg.sender) {
     PMV3 = _PMV3;
     token = _token;
     lockAmount = _lockAmount;

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 // openzeppelin upgradeable imports
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -284,7 +284,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   /// @dev Initialize the contract - replaces constructor for upgradeable contracts
   function initialize(IWETH _WETH) public initializer {
     __ReentrancyGuard_init();
-    __Ownable_init();
+    __Ownable_init(msg.sender);
     __UUPSUpgradeable_init();
 
     WETH = _WETH;
