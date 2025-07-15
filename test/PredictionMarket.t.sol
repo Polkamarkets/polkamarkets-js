@@ -688,6 +688,15 @@ contract PredictionMarketTest is Test {
         predictionMarket.sellToETH(marketId, 0, VALUE / 10, 1 ether);
     }
 
+    function testFailContractUpgradeability() public {
+        // Deploy new implementation
+        address newImplementation = address(new PredictionMarketV3_4());
+
+        // trying to upgrade as non-admin
+        vm.prank(address(0x987));
+        predictionMarket.upgradeToAndCall(newImplementation, bytes(""));
+    }
+
     function testContractUpgradeability() public {
         // Creating market on old implementation
         uint256 marketId = _createTestMarket();
