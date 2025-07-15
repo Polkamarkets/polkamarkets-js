@@ -12,7 +12,7 @@ import "../contracts/ERC20MinterPauser.sol";
 import {RealityETH_ERC20_v3_0} from "@reality.eth/contracts/development/contracts/RealityETH_ERC20-3.0.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-contract PredictionMarketV3Test is Test {
+contract PredictionMarketTest is Test {
     address public pmv34Implementation;
     PredictionMarketV3_4 public predictionMarket;
     PredictionMarketV3Manager public manager;
