@@ -35,17 +35,19 @@ contract FantasyERC20 is ERC20MinterPauser {
   }
 
   /// @dev Validates if the transfer is from or to the tokenManager, blocking it otherwise
-  function _transfer(
+  function _update(
     address from,
     address to,
     uint256 amount
   ) internal override {
-    require(
-      from == tokenManager || to == tokenManager,
-      "FantasyERC20: token transfer not allowed between the addresses"
-    );
+    if (from != address(0) && to != address(0)) {
+      require(
+        from == tokenManager || to == tokenManager,
+        "FantasyERC20: token transfer not allowed between the addresses"
+      );
+    }
 
-    super._transfer(from, to, amount);
+    super._update(from, to, amount);
   }
 
   /// @dev Allows user to claim the amount of tokens by minting them
