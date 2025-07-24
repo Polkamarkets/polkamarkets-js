@@ -54,6 +54,8 @@ contract PredictionMarketManagerTest is Test {
         address token
     );
 
+    event LockAmountUpdated(address indexed user, address indexed token, uint256 amountLocked);
+
     // Allow test contract to receive ETH
     receive() external payable {}
 
@@ -372,6 +374,9 @@ contract PredictionMarketManagerTest is Test {
     }
 
     function testUpdateLockAmount() public {
+        vm.expectEmit(true, true, true, true);
+        emit LockAmountUpdated(deployer, address(pmmToken), NEW_LOCK_AMOUNT);
+
         uint256 currentLockAmount = manager.lockAmount();
         assertEq(currentLockAmount, LOCK_AMOUNT);
 
