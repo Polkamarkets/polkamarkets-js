@@ -3,7 +3,7 @@ pragma solidity ^0.8.26;
 
 // openzeppelin upgradeable imports
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
@@ -26,7 +26,7 @@ library CeilDiv {
 }
 
 /// @title Market Contract Factory
-contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, OwnableUpgradeable, UUPSUpgradeable {
+contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Ownable2StepUpgradeable, UUPSUpgradeable {
   using SafeERC20 for IERC20;
   using CeilDiv for uint256;
 
