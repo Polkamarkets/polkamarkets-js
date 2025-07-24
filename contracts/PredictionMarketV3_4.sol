@@ -157,7 +157,6 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   }
 
   struct MarketResolution {
-    bool resolved;
     IRealityETH_ERC20 realitio;
     uint256 outcomeId;
     bytes32 questionId; // realitio questionId
