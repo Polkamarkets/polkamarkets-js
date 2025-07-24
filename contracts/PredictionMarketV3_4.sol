@@ -380,13 +380,9 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
 
   function mintAndCreateMarket(CreateMarketDescription calldata desc) external nonReentrant returns (uint256 marketId) {
     // mint the amount of tokens to the user
-    IFantasyERC20(address(desc.token)).mint(msg.sender, desc.value);
+    IFantasyERC20(address(desc.token)).mint(address(this), desc.value);
 
-    marketId = _createMarket(desc);
-    // transferring funds
-    desc.token.safeTransferFrom(msg.sender, address(this), desc.value);
-
-    return marketId;
+    return _createMarket(desc);
   }
 
   /// @dev Calculates the number of shares bought with "amount" balance

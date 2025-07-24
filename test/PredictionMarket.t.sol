@@ -171,6 +171,48 @@ contract PredictionMarketTest is Test {
         assertEq(markets.length, 2);
     }
 
+    function testMintAndCreateMarket() public {
+        // creating land
+        uint256 amountToClaim = 1 ether;
+        IERC20 landTokenERC20 = manager.createLand("Test Land", "TEST", amountToClaim, IERC20(address(managerTokenERC20)));
+
+        PredictionMarketV3_4.CreateMarketDescription memory desc = PredictionMarketV3_4.CreateMarketDescription({
+            value: VALUE,
+            closesAt: uint32(block.timestamp + 30 days),
+            outcomes: 2,
+            token: IERC20(address(landTokenERC20)),
+            distribution: new uint256[](0),
+            question: "Will BTC price close above 100k$ in 30 days?",
+            image: "foo-bar",
+            arbitrator: address(0x1),
+            buyFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            sellFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            treasury: treasury,
+            distributor: distributor,
+            realitioTimeout: 3600,
+            manager: IPredictionMarketV3Manager(address(manager))
+        });
+
+
+        uint256 marketId = predictionMarket.mintAndCreateMarket(desc);
+        assertEq(marketId, 0);
+        uint256[] memory markets = predictionMarket.getMarkets();
+        assertEq(markets.length, 1);
+        assertEq(markets[0], 0);
+
+        // checking the balance of the land token in the market
+        assertEq(landTokenERC20.balanceOf(address(predictionMarket)), VALUE);
+
+        // placing a prediction
+        FantasyERC20(address(landTokenERC20)).claimAndApproveTokens();
+        assertEq(landTokenERC20.balanceOf(user), amountToClaim);
+        predictionMarket.buy(marketId, 0, 0.015 ether, VALUE);
+
+        // checkings balance of land token in the market / user
+        assertEq(landTokenERC20.balanceOf(address(predictionMarket)), VALUE * 2);
+        assertEq(landTokenERC20.balanceOf(user), amountToClaim - VALUE);
+    }
+
     function testGetMarketData() public {
         uint256 marketId = _createTestMarket();
 
