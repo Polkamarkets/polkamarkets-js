@@ -11,6 +11,7 @@ import "../contracts/WETH.sol";
 import "../contracts/ERC20MinterPauser.sol";
 import {RealityETH_ERC20_v3_0} from "@reality.eth/contracts/development/contracts/RealityETH_ERC20-3.0.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract PredictionMarketTest is Test {
     address public pmv34Implementation;
@@ -686,6 +687,55 @@ contract PredictionMarketTest is Test {
         // should revert if using sellToETH on non-weth market
         vm.expectRevert(bytes("!w"));
         predictionMarket.sellToETH(marketId, 0, VALUE / 10, 1 ether);
+    }
+
+    function testOwnership() public {
+        // transfering ownership as admin
+        address admin1 = makeAddr("admin1");
+        address admin2 = makeAddr("admin2");
+        assertEq(predictionMarket.owner(), user);
+        assertEq(predictionMarket.pendingOwner(), address(0));
+
+        // trying to transfer ownership as non-admin
+        vm.prank(admin1);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, admin1));
+        predictionMarket.transferOwnership(admin1);
+        vm.stopPrank();
+
+        // transferring ownership to admin1
+        vm.prank(user);
+        predictionMarket.transferOwnership(admin1);
+        // ensuring admin is current user until 2-step is complete
+        assertEq(predictionMarket.owner(), user);
+        assertEq(predictionMarket.pendingOwner(), admin1);
+        vm.stopPrank();
+
+        // accepting ownership as admin1
+        vm.prank(address(admin1));
+        predictionMarket.acceptOwnership();
+        vm.stopPrank();
+
+        assertEq(predictionMarket.owner(), admin1);
+        assertEq(predictionMarket.pendingOwner(), address(0));
+
+        // trying to transfer ownership as non-admin
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user));
+        predictionMarket.transferOwnership(address(admin2));
+        vm.stopPrank();
+
+        // transferring ownership as admin1
+        vm.prank(admin1);
+        predictionMarket.transferOwnership(address(admin2));
+        assertEq(predictionMarket.owner(), admin1);
+        assertEq(predictionMarket.pendingOwner(), address(admin2));
+        vm.stopPrank();
+        vm.prank(address(admin2));
+        predictionMarket.acceptOwnership();
+        vm.stopPrank();
+
+        assertEq(predictionMarket.owner(), admin2);
+        assertEq(predictionMarket.pendingOwner(), address(0));
     }
 
     function testFailContractUpgradeability() public {
