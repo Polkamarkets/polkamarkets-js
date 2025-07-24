@@ -308,7 +308,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     require(desc.value > 0, "v0");
     require(desc.closesAt > block.timestamp, "c<n");
     require(desc.arbitrator != address(0), "a0");
-    require(desc.outcomes > 0 && desc.outcomes <= MAX_OUTCOMES, "!oc");
+    require(desc.outcomes >= 2 && desc.outcomes <= MAX_OUTCOMES, "!oc");
     require(address(realitio) != address(0), "r0");
     require(desc.realitioTimeout >= MINIMUM_REALITIO_TIMEOUT, "rt<1h");
     require(allowedManagers[address(desc.manager)], "!am");
