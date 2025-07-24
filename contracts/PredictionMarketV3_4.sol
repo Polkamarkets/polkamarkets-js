@@ -431,6 +431,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     for (uint256 i; i < market.outcomeCount; ++i) {
       if (i != outcomeId) {
         uint256 outcomeShares = outcomesShares[i];
+        require(outcomeShares > amountPlusFees, "!sa");
         endingOutcomeBalance = (endingOutcomeBalance * outcomeShares).ceildiv(outcomeShares - amountPlusFees);
       }
     }
