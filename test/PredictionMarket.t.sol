@@ -232,7 +232,7 @@ contract PredictionMarketTest is Test {
         (uint256 initialLiquidityPrice, uint256[] memory initialPrices) = predictionMarket.getMarketPrices(marketId);
 
         // Add liquidity
-        predictionMarket.addLiquidity(marketId, VALUE);
+        predictionMarket.addLiquidity(marketId, VALUE, 0);
 
         // Check new state
         (uint256 newLiquidityShares,) = predictionMarket.getUserMarketShares(marketId, user);
@@ -251,8 +251,13 @@ contract PredictionMarketTest is Test {
     function testRemoveLiquidityBalancedMarket() public {
         uint256 marketId = _createTestMarket();
 
+        // Testing addLiquidity slippage
+        uint256 minSharesIn = VALUE + 1;
+        vm.expectRevert(bytes("s<l"));
+        predictionMarket.addLiquidity(marketId, VALUE, minSharesIn);
+
         // Add some liquidity first
-        predictionMarket.addLiquidity(marketId, VALUE);
+        predictionMarket.addLiquidity(marketId, VALUE, VALUE);
 
         // Get state after adding liquidity
         (uint256 liquidityShares,) = predictionMarket.getUserMarketShares(marketId, user);
@@ -260,8 +265,13 @@ contract PredictionMarketTest is Test {
         (uint256 liquidityPrice, uint256[] memory prices) = predictionMarket.getMarketPrices(marketId);
         uint256 initialBalance = tokenERC20.balanceOf(user);
 
+        // Testing removeLiquidity slippage
+        uint256 minValueOut = VALUE + 1;
+        vm.expectRevert(bytes("v<l"));
+        predictionMarket.removeLiquidity(marketId, VALUE, minValueOut);
+
         // Remove liquidity
-        predictionMarket.removeLiquidity(marketId, VALUE);
+        predictionMarket.removeLiquidity(marketId, VALUE, VALUE);
 
         // Check new state
         (uint256 newLiquidityShares,) = predictionMarket.getUserMarketShares(marketId, user);
