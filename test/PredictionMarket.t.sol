@@ -37,6 +37,8 @@ contract PredictionMarketTest is Test {
         address token
     );
 
+    event Withdrawal(address indexed user, address indexed token, uint256 amount, uint256 timestamp);
+
     // Allow test contract to receive ETH
     receive() external payable {}
 
@@ -69,7 +71,7 @@ contract PredictionMarketTest is Test {
             address(realitio),
             user
         );
-        managerTokenERC20.mint(user, 1000 ether);
+        managerTokenERC20.mint(user, INITIAL_BALANCE);
         managerTokenERC20.approve(address(manager), type(uint256).max);
         manager.createLand(IERC20(address(tokenERC20)), IERC20(address(managerTokenERC20)));
 
@@ -77,7 +79,7 @@ contract PredictionMarketTest is Test {
         predictionMarket.setAllowedManager(address(manager), true);
 
         // Setup tokens
-        tokenERC20.mint(user, 1000 ether);
+        tokenERC20.mint(user, INITIAL_BALANCE);
         tokenERC20.approve(address(predictionMarket), type(uint256).max);
 
         // Fund user with ETH for WETH tests
@@ -722,5 +724,21 @@ contract PredictionMarketTest is Test {
         assertEq(newMarketId, 1);
         assertEq(predictionMarket.getMarkets().length, 2);
         assertEq(newTokenBalance, VALUE * 3);
+    }
+
+    function testWithdrawal() public {
+        uint256 amountToWithdraw = 0.0001 ether;
+
+        uint256 marketId = _createTestMarket();
+        predictionMarket.buy(marketId, 0, 0, VALUE);
+
+        vm.expectEmit(true, true, true, false);
+        emit Withdrawal(user, address(tokenERC20), amountToWithdraw, block.timestamp);
+
+        uint256 balanceBeforeWithdraw = tokenERC20.balanceOf(user);
+        predictionMarket.withdraw(address(tokenERC20), amountToWithdraw);
+        uint256 balanceAfterWithdraw = tokenERC20.balanceOf(user);
+
+        assertEq(balanceAfterWithdraw, balanceBeforeWithdraw + amountToWithdraw);
     }
 }
