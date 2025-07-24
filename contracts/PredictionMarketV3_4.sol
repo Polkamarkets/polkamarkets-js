@@ -148,7 +148,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   }
 
   struct MarketFees {
-    uint256 poolWeight; // internal var used to ensure pro-rate fee distribution
+    uint256 feeAccumulator; // internal var used to ensure pro-rate fee distribution
     mapping(address user => uint256 claimed) claimed;
     address treasury; // address to send treasury fees to
     address distributor; // fee % taken from every transaction to a treasury address
@@ -454,7 +454,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
 
     // subtracting fee from transaction value
     uint256 feeAmount = (value * market.fees.buyFees.fee) / ONE;
-    market.fees.poolWeight += feeAmount;
+    market.fees.feeAccumulator += feeAmount;
     uint256 valueMinusFees = value - feeAmount;
 
     uint256 treasuryFeeAmount = (value * market.fees.buyFees.treasuryFee) / ONE;
@@ -545,7 +545,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     uint256 oneMinusFee = ONE - fee;
     {
       uint256 feeAmount = (value * market.fees.sellFees.fee) / oneMinusFee;
-      market.fees.poolWeight += feeAmount;
+      market.fees.feeAccumulator += feeAmount;
     }
     uint256 valuePlusFees = value + (value * fee) / oneMinusFee;
 
@@ -627,7 +627,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
 
     uint256[] memory outcomesShares = getMarketOutcomesShares(marketId);
     uint256[] memory sendBackAmounts = new uint256[](market.outcomeCount);
-    uint256 poolWeight = 0;
+    uint256 baseShares = 0;
 
     if (market.liquidity > 0) {
       require(distribution.length == 0, "!d");
@@ -635,15 +635,15 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
       // part of the liquidity is exchanged for outcome shares if market is not balanced
       for (uint256 i; i < market.outcomeCount; ++i) {
         uint256 outcomeShares = outcomesShares[i];
-        if (poolWeight < outcomeShares) poolWeight = outcomeShares;
+        if (baseShares < outcomeShares) baseShares = outcomeShares;
       }
 
       for (uint256 i; i < market.outcomeCount; ++i) {
-        uint256 remaining = (value * outcomesShares[i]) / poolWeight;
+        uint256 remaining = (value * outcomesShares[i]) / baseShares;
         sendBackAmounts[i] = value - remaining;
       }
 
-      liquidityAmount = (value * market.liquidity) / poolWeight;
+      liquidityAmount = (value * market.liquidity) / baseShares;
 
       // re-balancing fees pool
       _rebalanceFeesPool(marketId, liquidityAmount, MarketAction.addLiquidity);
@@ -748,15 +748,15 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
 
     uint256[] memory outcomesShares = getMarketOutcomesShares(marketId);
     uint256[] memory sendAmounts = new uint256[](market.outcomeCount);
-    uint256 poolWeight = MAX_UINT_256;
+    uint256 baseShares = MAX_UINT_256;
 
     // part of the liquidity is exchanged for outcome shares if market is not balanced
     for (uint256 i; i < market.outcomeCount; ++i) {
       uint256 outcomeShares = outcomesShares[i];
-      if (poolWeight > outcomeShares) poolWeight = outcomeShares;
+      if (baseShares > outcomeShares) baseShares = outcomeShares;
     }
 
-    uint256 liquidityAmount = (shares * poolWeight) / market.liquidity;
+    uint256 liquidityAmount = (shares * baseShares) / market.liquidity;
 
     for (uint256 i; i < market.outcomeCount; ++i) {
       sendAmounts[i] = (outcomesShares[i] * shares) / market.liquidity;
@@ -1054,14 +1054,14 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   ) private {
     Market storage market = markets[marketId];
 
-    uint256 poolWeight = (liquidityShares * market.fees.poolWeight) / market.liquidity;
+    uint256 feeAccumulator = (liquidityShares * market.fees.feeAccumulator) / market.liquidity;
 
     if (action == MarketAction.addLiquidity) {
-      market.fees.poolWeight += poolWeight;
-      market.fees.claimed[msg.sender] += poolWeight;
+      market.fees.feeAccumulator += feeAccumulator;
+      market.fees.claimed[msg.sender] += feeAccumulator;
     } else {
-      market.fees.poolWeight -= poolWeight;
-      market.fees.claimed[msg.sender] = market.fees.claimed[msg.sender] - poolWeight;
+      market.fees.feeAccumulator -= feeAccumulator;
+      market.fees.claimed[msg.sender] = market.fees.claimed[msg.sender] - feeAccumulator;
     }
   }
 
@@ -1212,7 +1212,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   function getUserClaimableFees(uint256 marketId, address user) public view returns (uint256) {
     Market storage market = markets[marketId];
 
-    uint256 rawAmount = (market.fees.poolWeight * market.liquidityShares[user]) / market.liquidity;
+    uint256 rawAmount = (market.fees.feeAccumulator * market.liquidityShares[user]) / market.liquidity;
 
     // No fees left to claim
     if (market.fees.claimed[user] > rawAmount) return 0;
