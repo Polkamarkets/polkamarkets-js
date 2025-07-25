@@ -214,7 +214,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   }
 
   modifier timeTransitions(uint256 marketId) {
-    if (block.timestamp > markets[marketId].closesAtTimestamp && markets[marketId].state == MarketState.open) {
+    if (block.timestamp >= markets[marketId].closesAtTimestamp && markets[marketId].state == MarketState.open) {
       _nextState(marketId);
     }
     _;
