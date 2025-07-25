@@ -93,6 +93,8 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
 
   event Paused(bool paused, address indexed user);
 
+  event Withdrawal(address indexed user, address indexed token, uint256 amount, uint256 timestamp);
+
   // ------ Events End ------
 
   uint256 private constant MAX_UINT_256 = type(uint256).max;
@@ -1470,6 +1472,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
 
   function withdraw(address token, uint256 amount) external onlyOwner {
     IERC20(token).safeTransfer(msg.sender, amount);
+    emit Withdrawal(msg.sender, token, amount, block.timestamp);
   }
 
   function pause() external onlyOwner whenNotPaused {
