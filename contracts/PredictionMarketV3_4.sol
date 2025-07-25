@@ -1347,9 +1347,11 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
   function getMarketResolvedOutcome(uint256 marketId) public view returns (int256) {
     Market storage market = markets[marketId];
 
-    // returning -1 if market still not resolved
+    // returning -3 if market still not resolved
     if (market.state != MarketState.resolved) {
-      return -1;
+      // -1 is used by reality.eth by convention to indicate an invalid market
+      // -2 is used by reality.eth by convention to indicate a market answered too soon
+      return -3;
     }
 
     return int256(market.resolution.outcomeId);

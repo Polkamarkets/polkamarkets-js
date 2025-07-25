@@ -189,7 +189,7 @@ contract PredictionMarketTest is Test {
         assertEq(liquidity, VALUE);
         assertGt(balance, 0);
         assertGt(sharesAvailable, 0);
-        assertEq(resolvedOutcomeId, -1);
+        assertEq(resolvedOutcomeId, -3);
     }
 
     function testGetMarketPrices() public {
