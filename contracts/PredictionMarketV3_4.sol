@@ -614,7 +614,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     uint256 marketId,
     uint256 value,
     uint256[] memory distribution
-  ) private timeTransitions(marketId) atState(marketId, MarketState.open) marketNotPaused(marketId) {
+  ) private timeTransitions(marketId) atState(marketId, MarketState.open) marketNotPaused(marketId) returns (uint256) {
     Market storage market = markets[marketId];
 
     require(value > 0, "v0");
@@ -715,11 +715,14 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
       block.timestamp
     );
     emit MarketLiquidity(marketId, market.liquidity, liquidityPrice, block.timestamp);
+
+    return liquidityAmount;
   }
 
-  function addLiquidity(uint256 marketId, uint256 value) external nonReentrant {
+  function addLiquidity(uint256 marketId, uint256 value, uint256 minSharesIn) external nonReentrant {
     uint256[] memory distribution = new uint256[](0);
-    _addLiquidity(marketId, value, distribution);
+    uint256 liquidityAmount = _addLiquidity(marketId, value, distribution);
+    require(liquidityAmount >= minSharesIn, "s<l");
 
     Market storage market = markets[marketId];
     market.token.safeTransferFrom(msg.sender, address(this), value);
@@ -806,8 +809,9 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     return liquidityAmount;
   }
 
-  function removeLiquidity(uint256 marketId, uint256 shares) external nonReentrant {
+  function removeLiquidity(uint256 marketId, uint256 shares, uint256 minValueOut) external nonReentrant {
     uint256 value = _removeLiquidity(marketId, shares);
+    require(value >= minValueOut, "v<l");
     // transferring user funds from liquidity removed
     Market storage market = markets[marketId];
     market.token.safeTransfer(msg.sender, value);
