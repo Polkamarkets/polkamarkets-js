@@ -526,6 +526,33 @@ contract PredictionMarketTest is Test {
         assertEq(prices[0] + prices[1], 1 ether); // should still sum to 1
     }
 
+   function testSellOverflowIssues() public {
+        uint256 marketId = _createTestMarket();
+
+        address alice = makeAddr("Alice");
+        address bob = makeAddr("Bob");
+
+        deal(address(tokenERC20), alice, 10 ether);
+        deal(address(tokenERC20), bob, 1 ether);
+
+        // Buy outcome shares
+        vm.startPrank(alice);
+        tokenERC20.approve(address(predictionMarket), type(uint256).max);
+        predictionMarket.buy(marketId, 0, 0, 10e18);
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        tokenERC20.approve(address(predictionMarket), type(uint256).max);
+        predictionMarket.buy(marketId, 1, 0, 0.003e18);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        vm.expectRevert(bytes("!sa"));
+        // alice cannot sell the total position for the specified amount
+        predictionMarket.sell(marketId, 0, 3.5e16, type(uint256).max);
+        vm.stopPrank();
+    }
+
     // Helper functions
     function _createTestMarket() internal returns (uint256) {
         uint256 marketIndex = predictionMarket.marketIndex();
