@@ -11,7 +11,7 @@
         "url": "https://github.com/Polkamarkets/polkamarkets-js.git"
     },
     "scripts": {
-        "build": "forge build --via-ir"
+        "build": "forge build --via-ir && node scripts/copy-abis.js"
     },
     "dependencies": {
         "@metamask/safe-event-emitter": "^2.0.0",
