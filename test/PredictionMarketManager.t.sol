@@ -11,6 +11,8 @@ import "../contracts/FantasyERC20.sol";
 import "../contracts/ERC20MinterPauser.sol";
 import {RealityETH_ERC20_v3_0} from "@reality.eth/contracts/development/contracts/RealityETH_ERC20-3.0.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
 contract PredictionMarketManagerTest is Test {
     address public pmv34Implementation;
@@ -235,7 +237,7 @@ contract PredictionMarketManagerTest is Test {
         assertFalse(newIsAdmin);
     }
 
-    function testFailAddAdminToLandIfNotAdmin() public {
+    function testAddAdminToLandIfNotAdmin() public {
         // Create land first
         IERC20 createdLandToken = manager.createLand(
             "Token",
@@ -246,6 +248,7 @@ contract PredictionMarketManagerTest is Test {
 
         // Try to add admin as non-admin user
         vm.prank(user1);
+        vm.expectRevert("Not admin of the land");
         manager.addAdminToLand(createdLandToken, user2);
     }
 
@@ -283,7 +286,7 @@ contract PredictionMarketManagerTest is Test {
         manager.removeAdminFromLand(createdLandToken, user1);
     }
 
-    function testFailDisableLandIfNotAdmin() public {
+    function testDisableLandIfNotAdmin() public {
         // Create land first
         IERC20 createdLandToken = manager.createLand(
             "Token",
@@ -294,6 +297,7 @@ contract PredictionMarketManagerTest is Test {
 
         // Try to disable land as non-admin user
         vm.prank(user1);
+        vm.expectRevert("Not admin of the land");
         manager.disableLand(createdLandToken);
     }
 
@@ -323,7 +327,7 @@ contract PredictionMarketManagerTest is Test {
         assertFalse(manager.isIERC20TokenSocial(createdLandToken));
     }
 
-    function testFailDisableLandIfAlreadyDisabled() public {
+    function testDisableLandIfAlreadyDisabled() public {
         // Create land first
         IERC20 createdLandToken = manager.createLand(
             "Token",
@@ -336,6 +340,7 @@ contract PredictionMarketManagerTest is Test {
         manager.disableLand(createdLandToken);
 
         // Try to disable again
+        vm.expectRevert("Land is not active");
         manager.disableLand(createdLandToken);
     }
 
@@ -368,8 +373,9 @@ contract PredictionMarketManagerTest is Test {
         assertTrue(manager.isIERC20TokenSocial(createdLandToken));
     }
 
-    function testFailUpdateLockAmountIfNotOwner() public {
+    function testUpdateLockAmountIfNotOwner() public {
         vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
         manager.updateLockAmount(NEW_LOCK_AMOUNT);
     }
 
@@ -386,7 +392,7 @@ contract PredictionMarketManagerTest is Test {
         assertEq(newLockAmount, NEW_LOCK_AMOUNT);
     }
 
-    function testFailUnlockOffsetFromLandIfNotAdmin() public {
+    function testUnlockOffsetFromLandIfNotAdmin() public {
         // Create land first
         IERC20 createdLandToken = manager.createLand(
             "Token",
@@ -400,6 +406,7 @@ contract PredictionMarketManagerTest is Test {
 
         // Try to unlock offset as non-admin user
         vm.prank(user1);
+        vm.expectRevert("Not admin of the land");
         manager.unlockOffsetFromLand(createdLandToken);
     }
 
@@ -427,7 +434,7 @@ contract PredictionMarketManagerTest is Test {
         assertEq(newPmmTokenBalance, currentPmmTokenBalance + LOCK_AMOUNT - NEW_LOCK_AMOUNT);
     }
 
-    function testFailCreateMarketIfNotAdmin() public {
+    function testCreateMarketIfNotAdmin() public {
         // Create land first
         IERC20 createdLandToken = manager.createLand(
             "Token",
@@ -459,6 +466,7 @@ contract PredictionMarketManagerTest is Test {
         });
 
         vm.prank(user1);
+        vm.expectRevert(bytes("m!=a"));
         predictionMarket.createMarket(desc);
     }
 
@@ -598,7 +606,7 @@ contract PredictionMarketManagerTest is Test {
         assertGt(amountTransferred, 0); // Just check that some tokens were transferred
     }
 
-    function testFailBuySharesWhenLandDisabled() public {
+    function testBuySharesWhenLandDisabled() public {
         // Create land and market first
         IERC20 createdLandToken = manager.createLand(
             "Token",
@@ -634,6 +642,7 @@ contract PredictionMarketManagerTest is Test {
         uint256 minOutcomeSharesToBuy = 0.015 ether;
 
         // This should fail because land is disabled
+        vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
         predictionMarket.buy(createdMarketId, outcomeId, VALUE, minOutcomeSharesToBuy);
     }
 
@@ -682,7 +691,7 @@ contract PredictionMarketManagerTest is Test {
         assertGt(amountTransferred, 0); // Just check that some tokens were transferred
     }
 
-    function testFailResolveMarketIfNotAdmin() public {
+    function testResolveMarketIfNotAdmin() public {
         // Create land and market first
         IERC20 createdLandToken = manager.createLand(
             "Token",
@@ -714,6 +723,7 @@ contract PredictionMarketManagerTest is Test {
 
         // Try to resolve market as non-admin
         vm.prank(user1);
+        vm.expectRevert("not allowed to resolve market");
         predictionMarket.adminResolveMarketOutcome(createdMarketId, 1);
     }
 
@@ -881,7 +891,7 @@ contract PredictionMarketManagerTest is Test {
         assertTrue(hasClaimedAfter);
     }
 
-    function testFailClaimTokensTwice() public {
+    function testClaimTokensTwice() public {
         IERC20 createdLandToken = manager.createLand(
             "Token",
             "TOKEN",
@@ -893,6 +903,7 @@ contract PredictionMarketManagerTest is Test {
 
         fantasyToken.claimTokens();
         // This should fail
+        vm.expectRevert("FantasyERC20: address already claimed the tokens");
         fantasyToken.claimTokens();
     }
 }

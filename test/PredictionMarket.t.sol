@@ -867,12 +867,14 @@ contract PredictionMarketTest is Test {
         assertEq(predictionMarket.pendingOwner(), address(0));
     }
 
-    function testFailContractUpgradeability() public {
+    function testRevertContractUpgradeability() public {
+        address notAdmin = makeAddr("notAdmin");
         // Deploy new implementation
         address newImplementation = address(new PredictionMarketV3_4());
 
         // trying to upgrade as non-admin
-        vm.prank(address(0x987));
+        vm.prank(address(notAdmin));
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notAdmin));
         predictionMarket.upgradeToAndCall(newImplementation, bytes(""));
     }
 
