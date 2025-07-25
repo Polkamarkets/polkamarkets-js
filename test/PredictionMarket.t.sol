@@ -349,6 +349,54 @@ contract PredictionMarketTest is Test {
         assertLt(balanceAfterSell, balanceAfterBuy);
     }
 
+    function testBuyAfterMarketCloses() public {
+        // Create market that closes in 1 hour
+        uint32 closeTime = uint32(block.timestamp + 3600);
+
+        PredictionMarketV3_4.CreateMarketDescription memory desc = PredictionMarketV3_4.CreateMarketDescription({
+            value: VALUE,
+            closesAt: closeTime,
+            outcomes: 2,
+            token: IERC20(address(tokenERC20)),
+            distribution: new uint256[](0),
+            question: "PoC Market State Issue",
+            image: "test",
+            arbitrator: address(0x1),
+            buyFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            sellFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+            treasury: treasury,
+            distributor: distributor,
+            realitioTimeout: 3600,
+            manager: IPredictionMarketV3Manager(address(manager))
+        });
+
+        uint256 marketId = predictionMarket.createMarket(desc);
+
+        // Verify market is initially open
+        (PredictionMarketV3_4.MarketState state, uint256 closesAt,,,,) = predictionMarket.getMarketData(marketId);
+        assertEq(uint256(state), uint256(PredictionMarketV3_4.MarketState.open));
+        assertEq(closesAt, closeTime);
+
+        // TIME WARP: Move 2 hours into the future (1 hour past close time)
+        vm.warp(block.timestamp + 7200);
+
+        (state,,,,,) = predictionMarket.getMarketData(marketId);
+
+        assertTrue(block.timestamp > closesAt, "We are past close time");
+        assertEq(uint256(state), uint256(PredictionMarketV3_4.MarketState.closed), "Market in closed state");
+        assertEq(uint256(predictionMarket.getMarketState(marketId)), uint256(PredictionMarketV3_4.MarketState.closed));
+
+        // ATTEMPT TO TRADE: This should fail due to modifier ordering issue
+        address trader = makeAddr("trader");
+        deal(address(tokenERC20), trader, 1 ether);
+
+        vm.startPrank(trader);
+        tokenERC20.approve(address(predictionMarket), type(uint256).max);
+        vm.expectRevert(bytes("!ms")); // Market state error
+        predictionMarket.buy(marketId, 0, 0, 0.1 ether);
+        vm.stopPrank();
+    }
+
     function testCreateMarketWithThreeOutcomes() public {
         PredictionMarketV3_4.CreateMarketDescription memory desc = PredictionMarketV3_4.CreateMarketDescription({
             value: VALUE,

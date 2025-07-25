@@ -1240,7 +1240,7 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     Market storage market = markets[marketId];
 
     return (
-      market.state,
+      getMarketState(marketId),
       market.closesAtTimestamp,
       market.liquidity,
       market.balance,
@@ -1277,6 +1277,17 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
       market.resolution.realitioTimeout,
       market.manager
     );
+  }
+
+  function getMarketState(uint256 marketId) public view returns (MarketState) {
+    Market storage market = markets[marketId];
+
+    // closed should override open state if market is open and past close time
+    if (market.state == MarketState.open && block.timestamp >= market.closesAtTimestamp) {
+      return MarketState.closed;
+    }
+
+    return market.state;
   }
 
   function getMarketCreator(uint256 marketId) external view returns (address) {
