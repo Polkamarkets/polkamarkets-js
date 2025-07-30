@@ -5,6 +5,7 @@ pragma solidity ^0.8.26;
 
 // local imports
 import "./IRealityETH_ERC20.sol";
+import "./Proxy.sol";
 
 // definining interface this way instead of IERC20 to avoid conflicts
 interface IRealityETH_IERC20 {
@@ -25,16 +26,8 @@ contract RealityETH_ERC20_Factory {
 
   /// @notice Returns the address of a proxy based on the specified address
   /// @dev based on https://github.com/optionality/clone-factory
-  function _deployProxy(address _target)
-  internal returns (address result) {
-     bytes20 targetBytes = bytes20(_target);
-     assembly {
-         let clone := mload(0x40)
-         mstore(clone, 0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000)
-         mstore(add(clone, 0x14), targetBytes)
-         mstore(add(clone, 0x28), 0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000)
-         result := create(0, clone, 0x37)
-     }
+  function _deployProxy(address _target) internal returns (address clone) {
+    return address(new Proxy(_target));
   }
 
   function createInstance(address _token) external {

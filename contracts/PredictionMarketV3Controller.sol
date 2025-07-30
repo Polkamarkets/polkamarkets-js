@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import "./FantasyERC20.sol";
 import "./RealityETH_ERC20_Factory.sol";
 import "./IPredictionMarketV3Factory.sol";
 import "./LandFactory.sol";
 
 // openzeppelin ownable contract import
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract PredictionMarketV3Controller is LandFactory {
   address public immutable PMV3Factory; // PredictionMarketFactory contract
@@ -31,8 +30,9 @@ contract PredictionMarketV3Controller is LandFactory {
   constructor(
     address _PMV3,
     address _realitioLibraryAddress,
-    address _PMV3Factory
-  ) {
+    address _PMV3Factory,
+    address initialOwner
+  ) Ownable(initialOwner) {
     require(_PMV3Factory != address(0), "PMV3Factory address cannot be 0 address");
 
     PMV3 = _PMV3;
@@ -45,7 +45,7 @@ contract PredictionMarketV3Controller is LandFactory {
     string memory symbol,
     uint256 tokenAmountToClaim,
     IERC20 tokenToAnswer
-  ) external override returns (FantasyERC20) {
+  ) external override returns (IERC20) {
     require(
       IPredictionMarketV3Factory(PMV3Factory).isPMControllerAdmin(address(this), msg.sender),
       "Not allowed to create land"

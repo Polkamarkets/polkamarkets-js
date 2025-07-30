@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
+import "./ERC20MinterPauser.sol";
 import "./IPredictionMarketV3Factory.sol";
 
-contract FantasyERC20 is ERC20PresetMinterPauser {
+contract FantasyERC20 is ERC20MinterPauser {
   event TokensClaimed(address indexed user, uint256 amount, uint256 timestamp);
 
   mapping(address => bool) usersClaimed;
@@ -27,7 +27,7 @@ contract FantasyERC20 is ERC20PresetMinterPauser {
     address _tokenManager,
     address _PMV3Factory,
     address _PMV3Controller
-  ) ERC20PresetMinterPauser(name, symbol) {
+  ) ERC20MinterPauser(name, symbol) {
     tokenAmountToClaim = _tokenAmountToClaim;
     tokenManager = _tokenManager;
     PMV3Factory = _PMV3Factory;
@@ -35,17 +35,19 @@ contract FantasyERC20 is ERC20PresetMinterPauser {
   }
 
   /// @dev Validates if the transfer is from or to the tokenManager, blocking it otherwise
-  function _transfer(
+  function _update(
     address from,
     address to,
     uint256 amount
   ) internal override {
-    require(
-      from == tokenManager || to == tokenManager,
-      "FantasyERC20: token transfer not allowed between the addresses"
-    );
+    if (from != address(0) && to != address(0)) {
+      require(
+        from == tokenManager || to == tokenManager,
+        "FantasyERC20: token transfer not allowed between the addresses"
+      );
+    }
 
-    super._transfer(from, to, amount);
+    super._update(from, to, amount);
   }
 
   /// @dev Allows user to claim the amount of tokens by minting them
