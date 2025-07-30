@@ -185,6 +185,26 @@ class PredictionMarketV3PlusContract extends PredictionMarketV3Contract {
   async getMarketFees({marketId}) {
     return (await this.getContract().methods.getMarketFees(marketId).call());
   }
+
+  async referralBuy({ marketId, outcomeId, value, minOutcomeSharesToBuy, code }) {
+    const decimals = await this.getMarketDecimals({marketId});
+    const valueToWei = Numbers.toSmartContractDecimals(value, decimals);
+    minOutcomeSharesToBuy = Numbers.toSmartContractDecimals(minOutcomeSharesToBuy, decimals);
+
+    return await this.__sendTx(
+      this.getContract().methods.referralBuy(marketId, outcomeId, minOutcomeSharesToBuy, valueToWei, code),
+    );
+  };
+
+  async referralSell({marketId, outcomeId, value, maxOutcomeSharesToSell, code}) {
+    const decimals = await this.getMarketDecimals({marketId});
+    const valueToWei = Numbers.toSmartContractDecimals(value, decimals);
+    maxOutcomeSharesToSell = Numbers.toSmartContractDecimals(maxOutcomeSharesToSell, decimals);
+
+    return await this.__sendTx(
+      this.getContract().methods.referralSell(marketId, outcomeId, valueToWei, maxOutcomeSharesToSell, code),
+    );
+  };
 }
 
 module.exports = PredictionMarketV3PlusContract;
