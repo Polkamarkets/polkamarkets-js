@@ -1,4 +1,4 @@
-const predictionV3 = require("../interfaces").predictionV3_2;
+const predictionV3 = require("../interfaces").predictionV3Plus;
 const PredictionMarketV3Contract = require("./PredictionMarketV3Contract");
 const PredictionMarketV3QuerierContract = require("./PredictionMarketV3QuerierContract");
 
@@ -6,7 +6,7 @@ const Numbers = require('../utils/Numbers');
 
 const realitioLib = require('@reality.eth/reality-eth-lib/formatters/question');
 
-class PredictionMarketV3_2Contract extends PredictionMarketV3Contract {
+class PredictionMarketV3PlusContract extends PredictionMarketV3Contract {
   constructor(params) {
     super({ abi: predictionV3, ...params });
     this.contractName = 'predictionMarketV3';
@@ -168,54 +168,6 @@ class PredictionMarketV3_2Contract extends PredictionMarketV3Contract {
     }));
   };
 
-  async createMarketWithETH ({
-    value,
-    name,
-    description = '',
-    image,
-    duration,
-    oracleAddress,
-    outcomes,
-    category,
-    odds = [],
-    buyFees = [0, 0, 0],
-    sellFees = [0, 0, 0],
-    treasury = '0x0000000000000000000000000000000000000000',
-    distributor = '0x0000000000000000000000000000000000000000',
-    realitioAddress,
-    realitioTimeout,
-    PM3ManagerAddress
-  }) {
-    const token = await this.getWETHAddress();
-    const desc = await this.prepareCreateMarketDescription({
-      value,
-      name,
-      description,
-      image,
-      duration,
-      oracleAddress,
-      outcomes,
-      category,
-      token,
-      odds,
-      buyFees,
-      sellFees,
-      treasury,
-      distributor,
-    });
-
-    return await this.__sendTx(
-        this.getContract().methods.createMarketWithETH({
-          ...desc,
-          realitio: realitioAddress,
-          realitioTimeout,
-          manager: PM3ManagerAddress
-        }),
-        false,
-        desc.value
-      );
-  };
-
   async adminPauseMarket({marketId}) {
     return await this.__sendTx(
       this.getContract().methods.adminPauseMarket(marketId),
@@ -235,4 +187,4 @@ class PredictionMarketV3_2Contract extends PredictionMarketV3Contract {
   }
 }
 
-module.exports = PredictionMarketV3_2Contract;
+module.exports = PredictionMarketV3PlusContract;
