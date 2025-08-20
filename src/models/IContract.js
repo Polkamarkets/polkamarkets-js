@@ -1021,13 +1021,14 @@ class IContract {
    * @description Gets contract events
    * @returns {String | undefined} address
    */
-  async getEvents(event, filter, fromBlock = null, toBlock = 'latest') {
+  async getEvents(event, filter, fromBlock = null, toBlock = 'latest', contractAddress = null) {
     if (!fromBlock) {
       fromBlock = this.params.startBlock || 0;
     }
 
     if (!this.params.web3EventsProvider) {
-      const events = this.getContract().getPastEvents(event, {
+      const contract = contractAddress ? new ethers.Contract(contractAddress, this.params.abi, this.params.web3) : this.getContract();
+      const events = contract.getPastEvents(event, {
         fromBlock,
         toBlock,
         filter
