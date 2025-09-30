@@ -27,6 +27,7 @@ contract RewardsDistributor is Initializable, ReentrancyGuardUpgradeable, Ownabl
 
   mapping(address => mapping(IERC20 => uint256)) private _amountsToClaim;
   mapping(address => mapping(IERC20 => uint256)) private _amountsClaimed;
+  mapping(bytes32 operationId => bool processed) private _processedOperations;
 
   // ------ Modifiers ------
 
@@ -81,16 +82,27 @@ contract RewardsDistributor is Initializable, ReentrancyGuardUpgradeable, Ownabl
 
   /// ADMIN FUNCTIONS
 
-  function increaseUserClaimAmount(address user, uint256 amount, IERC20 token) external onlyAdmin  {
+  function increaseUserClaimAmount(address user, uint256 amount, IERC20 token, bytes32 opId) external onlyAdmin nonReentrant {
+    require(!_processedOperations[opId], "RewardsDistributor: op already processed");
+    _processedOperations[opId] = true;
+
     _amountsToClaim[user][token] += amount;
 
     emit UserClaimAmountIncreased(user, token, amount);
   }
 
-  function increaseUsersClaimAmounts(address[] calldata users, uint256[] calldata amounts, IERC20 token) external onlyAdmin {
-    require(users.length == amounts.length, "RewardsDistributor: arrays length mismatch");
+  function increaseUsersClaimAmounts(
+    address[] calldata users,
+    uint256[] calldata amounts,
+    IERC20 token,
+    bytes32[] calldata opIds
+  ) external onlyAdmin nonReentrant {
+    require(users.length == amounts.length && users.length == opIds.length, "RewardsDistributor: arrays length mismatch");
 
     for (uint256 i = 0; i < users.length; i++) {
+      bytes32 opId = opIds[i];
+      require(!_processedOperations[opId], "RewardsDistributor: op already processed");
+      _processedOperations[opId] = true;
       _amountsToClaim[users[i]][token] += amounts[i];
     }
   }
@@ -123,6 +135,10 @@ contract RewardsDistributor is Initializable, ReentrancyGuardUpgradeable, Ownabl
 
   function isAdmin(address account) external view returns (bool) {
     return hasRole(ADMIN_ROLE, account);
+  }
+
+  function isOperationProcessed(bytes32 opId) external view returns (bool) {
+    return _processedOperations[opId];
   }
 
   // ------ Upgrade Authorization ------

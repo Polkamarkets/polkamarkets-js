@@ -43,7 +43,7 @@ contract RewardsDistributorTest is Test {
 
   // helpers
   function _signClaim(address user, address receiver, uint256 amount, address tokenAddress, uint256 pk)
-    internal
+    internal view
     returns (uint256 nonce, bytes memory signature)
   {
     // Get next nonce from contract perspective by calling nonces on inherited Nonces
@@ -57,7 +57,7 @@ contract RewardsDistributorTest is Test {
     signature = abi.encodePacked(r, s, v);
   }
 
-  function test_ContractDeploymentAndAdmin() public {
+  function test_ContractDeploymentAndAdmin() public view {
     // deployer should be admin
     bool isAdmin = distributor.isAdmin(deployer);
     assertTrue(isAdmin);
@@ -69,7 +69,8 @@ contract RewardsDistributorTest is Test {
     assertEq(amountToClaim0, 0);
 
     // Add amount for user1 by admin (deployer)
-    distributor.increaseUserClaimAmount(user1, 1000, IERC20(address(token)));
+    bytes32 opId = keccak256(abi.encodePacked("op", uint256(1)));
+    distributor.increaseUserClaimAmount(user1, 1000, IERC20(address(token)), opId);
     uint256 amountToClaim = distributor.amountToClaim(user1, IERC20(address(token)));
     assertEq(amountToClaim, 1000);
 
@@ -115,7 +116,8 @@ contract RewardsDistributorTest is Test {
 
   function test_RevertWhen_ReceiverDiffersFromSigned() public {
     // add amount for user1
-    distributor.increaseUserClaimAmount(user1, 1000, IERC20(address(token)));
+    bytes32 opId1 = keccak256(abi.encodePacked("op", uint256(2)));
+    distributor.increaseUserClaimAmount(user1, 1000, IERC20(address(token)), opId1);
 
     uint256 amountToClaim = distributor.amountToClaim(user1, IERC20(address(token)));
     assertGt(amountToClaim, 0);
@@ -135,7 +137,8 @@ contract RewardsDistributorTest is Test {
 
   function test_RevertWhen_AmountDiffersFromSigned() public {
     // add amount for user1
-    distributor.increaseUserClaimAmount(user1, 1000, IERC20(address(token)));
+    bytes32 opId2 = keccak256(abi.encodePacked("op", uint256(3)));
+    distributor.increaseUserClaimAmount(user1, 1000, IERC20(address(token)), opId2);
 
     uint256 amountToClaim = distributor.amountToClaim(user1, IERC20(address(token)));
     assertGt(amountToClaim, 0);
@@ -150,7 +153,8 @@ contract RewardsDistributorTest is Test {
   }
 
   function test_RevertWhen_ReusingNonceSignature() public {
-    distributor.increaseUserClaimAmount(user1, 1000, IERC20(address(token)));
+    bytes32 opId = keccak256(abi.encodePacked("op", uint256(5)));
+    distributor.increaseUserClaimAmount(user1, 1000, IERC20(address(token)), opId);
     uint256 amountToClaim = distributor.amountToClaim(user1, IERC20(address(token)));
     uint256 half = amountToClaim / 2;
 
@@ -169,7 +173,7 @@ contract RewardsDistributorTest is Test {
   function test_RevertWhen_NonAdminIncreasesClaim() public {
     vm.prank(user2);
     vm.expectRevert(bytes("RewardsDistributor: must have admin role"));
-    distributor.increaseUserClaimAmount(user2, 1000, IERC20(address(token)));
+    distributor.increaseUserClaimAmount(user2, 1000, IERC20(address(token)), bytes32(0));
   }
 
   function test_RevertWhen_NonAdminAddsAdmin() public {
@@ -192,7 +196,8 @@ contract RewardsDistributorTest is Test {
 
     // as user1, increase claim for user2
     vm.prank(user1);
-    distributor.increaseUserClaimAmount(user2, 1000, IERC20(address(token)));
+    bytes32 opId3 = keccak256(abi.encodePacked("op", uint256(4)));
+    distributor.increaseUserClaimAmount(user2, 1000, IERC20(address(token)), opId3);
     assertEq(distributor.amountToClaim(user2, IERC20(address(token))), 1000);
 
     // remove admin
@@ -202,7 +207,7 @@ contract RewardsDistributorTest is Test {
     // now user1 cannot increase claim
     vm.prank(user1);
     vm.expectRevert(bytes("RewardsDistributor: must have admin role"));
-    distributor.increaseUserClaimAmount(user2, 1000, IERC20(address(token)));
+    distributor.increaseUserClaimAmount(user2, 1000, IERC20(address(token)), bytes32(0));
   }
 
   function test_AdminWithdrawTokens() public {
@@ -217,5 +222,30 @@ contract RewardsDistributorTest is Test {
     uint256 balAdminAfter = token.balanceOf(deployer);
     assertEq(balContractAfter, 0);
     assertEq(balAdminAfter, balContractBefore);
+  }
+
+  function test_RevertWhen_ReusingOperationId_Single() public {
+    bytes32 opId = keccak256(abi.encodePacked("op", uint256(999)));
+    distributor.increaseUserClaimAmount(user1, 123, IERC20(address(token)), opId);
+    assertTrue(distributor.isOperationProcessed(opId));
+
+    vm.expectRevert(bytes("RewardsDistributor: op already processed"));
+    distributor.increaseUserClaimAmount(user1, 456, IERC20(address(token)), opId);
+  }
+
+  function test_RevertWhen_DuplicateOpIdInBatch() public {
+    address[] memory users = new address[](2);
+    users[0] = user1;
+    users[1] = user2;
+    uint256[] memory amounts = new uint256[](2);
+    amounts[0] = 100;
+    amounts[1] = 200;
+    bytes32 dup = keccak256(abi.encodePacked("op", uint256(1001)));
+    bytes32[] memory opIds = new bytes32[](2);
+    opIds[0] = dup;
+    opIds[1] = dup;
+
+    vm.expectRevert(bytes("RewardsDistributor: op already processed"));
+    distributor.increaseUsersClaimAmounts(users, amounts, IERC20(address(token)), opIds);
   }
 }
