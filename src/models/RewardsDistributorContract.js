@@ -75,14 +75,39 @@ class RewardsDistributorContract extends IContract {
    * @param {Address} user
    * @param {Address} tokenAddress
    * @param {Integer} amount
+   * @param {String} opId bytes32 hex string idempotency key
    */
-  async increaseUserClaimAmount({ user, amount, tokenAddress }) {
+  async increaseUserClaimAmount({ user, amount, tokenAddress, opId }) {
+    if (!opId) throw new Error('opId is required');
     const amountDecimals = Numbers.toSmartContractDecimals(amount, 18);
 
     return await this.__sendTx(
-      this.getContract().methods.increaseUserClaimAmount(user, amountDecimals, tokenAddress)
+      this.getContract().methods.increaseUserClaimAmount(user, amountDecimals, tokenAddress, opId)
     );
   };
+
+  /**
+   * @function increaseUsersClaimAmounts
+   * @description Batch increase users claim amounts (idempotent per-opId)
+   * @param {Address[]} users
+   * @param {Integer[]} amounts
+   * @param {Address} tokenAddress
+   * @param {String[]} opIds bytes32 hex string ids
+   */
+  async increaseUsersClaimAmounts({ users, amounts, tokenAddress, opIds }) {
+    if (!Array.isArray(users) || !Array.isArray(amounts) || !Array.isArray(opIds)) {
+      throw new Error('users, amounts and opIds must be arrays');
+    }
+    if (!(users.length === amounts.length && users.length === opIds.length)) {
+      throw new Error('arrays length mismatch');
+    }
+
+    const amountsDecimals = amounts.map((a) => Numbers.toSmartContractDecimals(a, 18));
+
+    return await this.__sendTx(
+      this.getContract().methods.increaseUsersClaimAmounts(users, amountsDecimals, tokenAddress, opIds)
+    );
+  }
 
   /**
    * @function claim
@@ -156,6 +181,20 @@ class RewardsDistributorContract extends IContract {
     return await this.__sendTx(
       this.getContract().methods.withdrawTokens(tokenAddress, amountDecimals)
     );
+  }
+
+  /**
+   * @function isOperationProcessed
+   * @description Check if a given opId was already processed on-chain
+   * @param {String} opId bytes32 hex string idempotency key
+   * @returns {Boolean}
+   */
+  async isOperationProcessed({ opId }) {
+    return await this.params.contract
+      .getContract()
+      .methods
+      .isOperationProcessed(opId)
+      .call();
   }
 }
 

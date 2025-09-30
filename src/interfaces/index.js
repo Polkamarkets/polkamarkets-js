@@ -13,6 +13,7 @@ let index = {
   predictionMarketV3Factory: require("../../abis/PredictionMarketV3Factory.json"),
   predictionV3Querier: require("../../abis/PredictionMarketV3Querier.json"),
   realitio: require("../../abis/RealitioERC20.json"),
+  rewardsDistributor: require("../../abis/RewardsDistributor.json"),
   voting: require("../../abis/Voting.json"),
   weth: require("../../abis/WETH9.json"),
 };
