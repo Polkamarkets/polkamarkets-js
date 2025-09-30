@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.26;
 
 import "./Nonces.sol";
+// upgradeable
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+// non-upgradeable (interfaces and utils)
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract RewardsDistributor is Nonces, AccessControl {
+contract RewardsDistributor is Initializable, ReentrancyGuardUpgradeable, Ownable2StepUpgradeable, UUPSUpgradeable, Nonces, AccessControlUpgradeable {
   using ECDSA for bytes32;
   using MessageHashUtils for bytes32;
+  using SafeERC20 for IERC20;
 
   bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
@@ -19,7 +27,6 @@ contract RewardsDistributor is Nonces, AccessControl {
 
   mapping(address => mapping(IERC20 => uint256)) private _amountsToClaim;
   mapping(address => mapping(IERC20 => uint256)) private _amountsClaimed;
-  mapping(address account => uint256) private _nonces;
 
   // ------ Modifiers ------
 
@@ -28,12 +35,22 @@ contract RewardsDistributor is Nonces, AccessControl {
     _;
   }
 
+  /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
-    _grantRole(ADMIN_ROLE, msg.sender);
+    _disableInitializers();
+  }
+
+  function initialize(address initialOwner) public initializer {
+    __ReentrancyGuard_init();
+    __Ownable_init(initialOwner);
+    __UUPSUpgradeable_init();
+    __AccessControl_init();
+
+    _grantRole(ADMIN_ROLE, initialOwner);
     _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
   }
 
-  function claim(address user, address receiver, uint256 amount, IERC20 token, uint256 nonce, bytes memory signature) external {
+  function claim(address user, address receiver, uint256 amount, IERC20 token, uint256 nonce, bytes memory signature) external nonReentrant {
     require(amountToClaim(user, token) >= amount, "RewardsDistributor: not enough tokens to claim");
 
     _useCheckedNonce(user, nonce);
@@ -45,10 +62,11 @@ contract RewardsDistributor is Nonces, AccessControl {
     // checking the contract has enough balance to transfer
     require(token.balanceOf(address(this)) >= amount, "RewardsDistributor: not enough balance to transfer");
 
-    token.transfer(receiver, amount);
-
-    // _amountsToClaim[user][token] -= amount;
+    // effects
     _amountsClaimed[user][token] += amount;
+
+    // interaction
+    token.safeTransfer(receiver, amount);
 
     emit TokensClaimed(user, receiver, token, amount);
   }
@@ -89,8 +107,8 @@ contract RewardsDistributor is Nonces, AccessControl {
     }
   }
 
-  function withdrawTokens(IERC20 token, uint256 amount) external onlyAdmin {
-    token.transfer(msg.sender, amount);
+  function withdrawTokens(IERC20 token, uint256 amount) external onlyAdmin nonReentrant {
+    token.safeTransfer(msg.sender, amount);
 
     emit TokensWithdrawn(msg.sender, token, amount);
   }
@@ -106,4 +124,7 @@ contract RewardsDistributor is Nonces, AccessControl {
   function isAdmin(address account) external view returns (bool) {
     return hasRole(ADMIN_ROLE, account);
   }
+
+  // ------ Upgrade Authorization ------
+  function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
