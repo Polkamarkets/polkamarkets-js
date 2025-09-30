@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.26;
 
+// openzeppelin imports
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 // local imports
-import "./IPredictionMarketV3.sol";
+import "./IPredictionMarketV3_4.sol";
 
 /// @title Market Contract Factory
 contract PredictionMarketV3Querier {
-  IPredictionMarketV3 public immutable PredictionMarketV3;
+  IPredictionMarketV3_4 public immutable PredictionMarketV3;
 
   struct UserMarketData {
     uint256 liquidityShares;
@@ -18,8 +20,13 @@ contract PredictionMarketV3Querier {
     bool voidedSharesToClaim;
   }
 
+  struct MarketPrices {
+    uint256 liquidityPrice;
+    uint256[] outcomePrices;
+  }
+
   /// @dev protocol is immutable and has no ownership
-  constructor(IPredictionMarketV3 _PredictionMarketV3) {
+  constructor(IPredictionMarketV3_4 _PredictionMarketV3) {
     PredictionMarketV3 = _PredictionMarketV3;
   }
 
@@ -52,6 +59,18 @@ contract PredictionMarketV3Querier {
       });
   }
 
+  function getMarketPrices(uint256 marketId) public view returns (MarketPrices memory) {
+    (uint256 liquidityPrice, uint256[] memory outcomePrices) = PredictionMarketV3.getMarketPrices(marketId);
+
+    return MarketPrices({liquidityPrice: liquidityPrice, outcomePrices: outcomePrices});
+  }
+
+  function getMarketERC20Decimals(uint256 marketId) public view returns (uint8) {
+    (, , , address token, , , , , ) = PredictionMarketV3.getMarketAltData(marketId);
+
+    return IERC20Metadata(token).decimals();
+  }
+
   function getUserMarketsData(uint256[] calldata marketIds, address user)
     external
     view
@@ -75,5 +94,35 @@ contract PredictionMarketV3Querier {
     }
 
     return userMarketsData;
+  }
+
+  function getMarketUsersData(uint256 marketId, address[] calldata users) external view returns (UserMarketData[] memory) {
+    UserMarketData[] memory marketsUserData = new UserMarketData[](users.length);
+
+    for (uint256 i = 0; i < users.length; i++) {
+      marketsUserData[i] = getUserMarketData(marketId, users[i]);
+    }
+
+    return marketsUserData;
+  }
+
+  function getMarketsPrices(uint256[] calldata marketIds) external view returns (MarketPrices[] memory) {
+    MarketPrices[] memory marketPrices = new MarketPrices[](marketIds.length);
+
+    for (uint256 i = 0; i < marketIds.length; i++) {
+      marketPrices[i] = getMarketPrices(marketIds[i]);
+    }
+
+    return marketPrices;
+  }
+
+  function getMarketsERC20Decimals(uint256[] calldata marketIds) external view returns (uint8[] memory) {
+    uint8[] memory decimals = new uint8[](marketIds.length);
+
+    for (uint256 i = 0; i < marketIds.length; i++) {
+      decimals[i] = getMarketERC20Decimals(marketIds[i]);
+    }
+
+    return decimals;
   }
 }

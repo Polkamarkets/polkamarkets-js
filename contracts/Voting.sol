@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.26;
 pragma experimental ABIEncoderV2;
 
 // openzeppelin imports
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /// @title Upvoting / Downvoting Contract
 contract Voting {
-  using SafeMath for uint256;
-
   event ItemVotesUpdated(uint256 indexed itemId, uint256 upvotes, uint256 downvotes, uint256 timestamp);
 
   event ItemVoteAction(address indexed user, VoteAction indexed action, uint256 indexed itemId, uint256 timestamp);
@@ -84,11 +81,11 @@ contract Voting {
 
     // remove from total downvoted if needed
     if (hasUserVotedOtherDirection) {
-      action == VoteAction.upvote ? item.downvotes = item.downvotes.sub(1) : item.upvotes = item.upvotes.sub(1);
+      action == VoteAction.upvote ? item.downvotes = item.downvotes - 1 : item.upvotes = item.upvotes - 1;
     }
 
     // add the vote
-    action == VoteAction.upvote ? item.upvotes = item.upvotes.add(1) : item.downvotes = item.downvotes.add(1);
+    action == VoteAction.upvote ? item.upvotes = item.upvotes + 1 : item.downvotes = item.downvotes + 1;
     listToAddVote[msg.sender] = true;
     listToRemoveVote[msg.sender] = false;
 
@@ -128,7 +125,7 @@ contract Voting {
     require(hasUserVoted == true, "User doesn't have a vote on this item");
 
     // remove the vote
-    action == VoteAction.removeUpvote ? item.upvotes = item.upvotes.sub(1) : item.downvotes = item.downvotes.sub(1);
+    action == VoteAction.removeUpvote ? item.upvotes = item.upvotes - 1 : item.downvotes = item.downvotes - 1;
     listToRemoveVote[msg.sender] = false;
 
     // emit events

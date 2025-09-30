@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Based on https://github.com/RealityETH/reality-eth-monorepo/blob/main/packages/contracts/development/contracts/IRealityETH_ERC20.sol
 
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.26;
 
 interface IRealityETH_ERC20 {
      event LogAnswerReveal (bytes32 indexed question_id, address indexed user, bytes32 indexed answer_hash, bytes32 answer, uint256 nonce, uint256 bond);
