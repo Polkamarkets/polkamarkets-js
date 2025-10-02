@@ -33,10 +33,10 @@ contract MerkleRewardsDistributorTest is Test {
   }
 
   // local Merkle builder (keccak abi.encode)
-  function _leaf(uint256 index, address account, address tokenAddr, uint256 amount, string memory contestType, string memory periodId)
+  function _leaf(uint256 index, address account, address tokenAddr, uint256 amount, string memory contestId)
     internal pure returns (bytes32)
   {
-    return keccak256(abi.encode(index, account, tokenAddr, amount, contestType, periodId));
+    return keccak256(abi.encode(index, account, tokenAddr, amount, contestId));
   }
 
   function _buildRoot(bytes32[] memory leaves) internal pure returns (bytes32 root) {
@@ -90,75 +90,68 @@ contract MerkleRewardsDistributorTest is Test {
   }
 
   function test_PublishRootAndSingleClaim() public {
-    string memory ct = "daily";
-    string memory pid = "2025-09-30";
+    string memory cid = "daily:2025-09-30";
 
     bytes32[] memory leaves = new bytes32[](2);
-    leaves[0] = _leaf(0, alice, address(token), 100 ether, ct, pid);
-    leaves[1] = _leaf(1, bob, address(token), 200 ether, ct, pid);
+    leaves[0] = _leaf(0, alice, address(token), 100 ether, cid);
+    leaves[1] = _leaf(1, bob, address(token), 200 ether, cid);
     bytes32 root = _buildRoot(leaves);
 
-    distributor.publishRoot(ct, pid, IERC20(address(token)), root);
-    assertEq(distributor.getRoot(ct, pid, IERC20(address(token))), root);
+    distributor.publishRoot(cid, IERC20(address(token)), root);
+    assertEq(distributor.getRoot(cid, IERC20(address(token))), root);
 
     bytes32[] memory proofAlice = _proof(leaves, 0);
-    assertFalse(distributor.isClaimed(ct, pid, IERC20(address(token)), 0));
-    distributor.claim(ct, pid, IERC20(address(token)), 0, alice, 100 ether, proofAlice);
-    assertTrue(distributor.isClaimed(ct, pid, IERC20(address(token)), 0));
+    assertFalse(distributor.isClaimed(cid, IERC20(address(token)), 0));
+    distributor.claim(cid, IERC20(address(token)), 0, alice, 100 ether, proofAlice);
+    assertTrue(distributor.isClaimed(cid, IERC20(address(token)), 0));
     assertEq(token.balanceOf(alice), 100 ether);
   }
 
   function test_RevertOnInvalidProof() public {
-    string memory ct = "weekly";
-    string memory pid = "2025-W40";
+    string memory cid = "weekly:2025-W40";
 
     bytes32[] memory leaves = new bytes32[](1);
-    leaves[0] = _leaf(0, alice, address(token), 50 ether, ct, pid);
+    leaves[0] = _leaf(0, alice, address(token), 50 ether, cid);
     bytes32 root = _buildRoot(leaves);
-    distributor.publishRoot(ct, pid, IERC20(address(token)), root);
+    distributor.publishRoot(cid, IERC20(address(token)), root);
 
     bytes32[] memory wrongProof = new bytes32[](0);
     vm.expectRevert(bytes("MerkleRewards: invalid proof"));
-    distributor.claim(ct, pid, IERC20(address(token)), 0, alice, 51 ether, wrongProof);
+    distributor.claim(cid, IERC20(address(token)), 0, alice, 51 ether, wrongProof);
   }
 
   function test_RevertOnDoubleClaim() public {
-    string memory ct = "monthly";
-    string memory pid = "2025-09";
+    string memory cid = "monthly:2025-09";
 
     bytes32[] memory leaves = new bytes32[](1);
-    leaves[0] = _leaf(0, alice, address(token), 10 ether, ct, pid);
+    leaves[0] = _leaf(0, alice, address(token), 10 ether, cid);
     bytes32 root = _buildRoot(leaves);
-    distributor.publishRoot(ct, pid, IERC20(address(token)), root);
+    distributor.publishRoot(cid, IERC20(address(token)), root);
 
     bytes32[] memory proof = _proof(leaves, 0);
-    distributor.claim(ct, pid, IERC20(address(token)), 0, alice, 10 ether, proof);
+    distributor.claim(cid, IERC20(address(token)), 0, alice, 10 ether, proof);
 
     vm.expectRevert(bytes("MerkleRewards: already claimed"));
-    distributor.claim(ct, pid, IERC20(address(token)), 0, alice, 10 ether, proof);
+    distributor.claim(cid, IERC20(address(token)), 0, alice, 10 ether, proof);
   }
 
   function test_ClaimMany() public {
-    string memory ct1 = "daily";
-    string memory pid1 = "2025-09-30";
-    string memory ct2 = "weekly";
-    string memory pid2 = "2025-W40";
+    string memory cid1 = "daily:2025-09-30";
+    string memory cid2 = "weekly:2025-W40";
 
     bytes32[] memory leaves1 = new bytes32[](1);
-    leaves1[0] = _leaf(0, alice, address(token), 100 ether, ct1, pid1);
+    leaves1[0] = _leaf(0, alice, address(token), 100 ether, cid1);
     bytes32 root1 = _buildRoot(leaves1);
-    distributor.publishRoot(ct1, pid1, IERC20(address(token)), root1);
+    distributor.publishRoot(cid1, IERC20(address(token)), root1);
 
     bytes32[] memory leaves2 = new bytes32[](2);
-    leaves2[0] = _leaf(0, alice, address(token), 5 ether, ct2, pid2);
-    leaves2[1] = _leaf(1, bob, address(token), 7 ether, ct2, pid2);
+    leaves2[0] = _leaf(0, alice, address(token), 5 ether, cid2);
+    leaves2[1] = _leaf(1, bob, address(token), 7 ether, cid2);
     bytes32 root2 = _buildRoot(leaves2);
-    distributor.publishRoot(ct2, pid2, IERC20(address(token)), root2);
+    distributor.publishRoot(cid2, IERC20(address(token)), root2);
 
-    string[] memory cts = new string[](2);
-    cts[0] = ct1; cts[1] = ct2;
-    string[] memory pids = new string[](2);
-    pids[0] = pid1; pids[1] = pid2;
+    string[] memory cids = new string[](2);
+    cids[0] = cid1; cids[1] = cid2;
     IERC20[] memory tokens = new IERC20[](2);
     tokens[0] = IERC20(address(token)); tokens[1] = IERC20(address(token));
     uint256[] memory idxs = new uint256[](2);
@@ -171,9 +164,9 @@ contract MerkleRewardsDistributorTest is Test {
     proofs[0] = _proof(leaves1, 0);
     proofs[1] = _proof(leaves2, 0);
 
-    distributor.claimMany(cts, pids, tokens, idxs, accts, amts, proofs);
-    assertTrue(distributor.isClaimed(ct1, pid1, IERC20(address(token)), 0));
-    assertTrue(distributor.isClaimed(ct2, pid2, IERC20(address(token)), 0));
+    distributor.claimMany(cids, tokens, idxs, accts, amts, proofs);
+    assertTrue(distributor.isClaimed(cid1, IERC20(address(token)), 0));
+    assertTrue(distributor.isClaimed(cid2, IERC20(address(token)), 0));
     assertEq(token.balanceOf(alice), 105 ether);
   }
 
@@ -185,13 +178,12 @@ contract MerkleRewardsDistributorTest is Test {
   }
 
   function test_OnlyOwnerGuards() public {
-    string memory ct = "daily";
-    string memory pid = "2025-10-01";
+    string memory cid = "daily:2025-10-01";
     bytes32 dummyRoot = bytes32(uint256(1));
 
     vm.prank(alice);
-    vm.expectRevert();
-    distributor.publishRoot(ct, pid, IERC20(address(token)), dummyRoot);
+    vm.expectRevert(bytes("MerkleRewards: must have admin role"));
+    distributor.publishRoot(cid, IERC20(address(token)), dummyRoot);
 
     vm.prank(alice);
     vm.expectRevert();
@@ -203,93 +195,86 @@ contract MerkleRewardsDistributorTest is Test {
     distributor.addAdmin(alice);
     assertTrue(distributor.isAdmin(alice));
 
-    string memory ct = "daily";
-    string memory pid = "2025-10-05";
+    string memory cid = "daily:2025-10-05";
     bytes32[] memory leaves = new bytes32[](1);
-    leaves[0] = _leaf(0, alice, address(token), 1 ether, ct, pid);
+    leaves[0] = _leaf(0, alice, address(token), 1 ether, cid);
     bytes32 root = _buildRoot(leaves);
 
     vm.prank(alice);
-    distributor.publishRoot(ct, pid, IERC20(address(token)), root);
-    assertEq(distributor.getRoot(ct, pid, IERC20(address(token))), root);
+    distributor.publishRoot(cid, IERC20(address(token)), root);
+    assertEq(distributor.getRoot(cid, IERC20(address(token))), root);
 
     // remove admin and ensure access revoked
     distributor.removeAdmin(alice);
     assertFalse(distributor.isAdmin(alice));
     vm.prank(alice);
     vm.expectRevert(bytes("MerkleRewards: must have admin role"));
-    distributor.publishRoot(ct, pid, IERC20(address(token)), root);
+    distributor.publishRoot(cid, IERC20(address(token)), root);
   }
 
   function test_RootNotSet_RevertOnClaim() public {
-    string memory ct = "weekly";
-    string memory pid = "2025-W41";
+    string memory cid = "weekly:2025-W41";
     bytes32[] memory proof = new bytes32[](0);
     vm.expectRevert(bytes("MerkleRewards: root not set"));
-    distributor.claim(ct, pid, IERC20(address(token)), 0, alice, 1, proof);
+    distributor.claim(cid, IERC20(address(token)), 0, alice, 1, proof);
   }
 
   function test_RootUpdateInvalidatesOldProof() public {
-    string memory ct = "monthly";
-    string memory pid = "2025-10";
+    string memory cid = "monthly:2025-10";
 
     // first root
     bytes32[] memory leaves1 = new bytes32[](1);
-    leaves1[0] = _leaf(0, alice, address(token), 10 ether, ct, pid);
+    leaves1[0] = _leaf(0, alice, address(token), 10 ether, cid);
     bytes32 root1 = _buildRoot(leaves1);
-    distributor.publishRoot(ct, pid, IERC20(address(token)), root1);
+    distributor.publishRoot(cid, IERC20(address(token)), root1);
     bytes32[] memory proof1 = _proof(leaves1, 0);
 
     // update root with different allocation
     bytes32[] memory leaves2 = new bytes32[](1);
-    leaves2[0] = _leaf(0, alice, address(token), 20 ether, ct, pid);
+    leaves2[0] = _leaf(0, alice, address(token), 20 ether, cid);
     bytes32 root2 = _buildRoot(leaves2);
-    distributor.publishRoot(ct, pid, IERC20(address(token)), root2);
+    distributor.publishRoot(cid, IERC20(address(token)), root2);
 
     // old proof must fail now
     vm.expectRevert(bytes("MerkleRewards: invalid proof"));
-    distributor.claim(ct, pid, IERC20(address(token)), 0, alice, 10 ether, proof1);
+    distributor.claim(cid, IERC20(address(token)), 0, alice, 10 ether, proof1);
 
     // new proof succeeds
     bytes32[] memory proof2 = _proof(leaves2, 0);
-    distributor.claim(ct, pid, IERC20(address(token)), 0, alice, 20 ether, proof2);
+    distributor.claim(cid, IERC20(address(token)), 0, alice, 20 ether, proof2);
     assertEq(token.balanceOf(alice), 20 ether);
   }
 
-  function test_ClaimWithWrongTokenOrPeriod() public {
-    string memory ct = "daily";
-    string memory pid = "2025-10-02";
+  function test_ClaimWithWrongTokenOrContest() public {
+    string memory cid = "daily:2025-10-02";
     bytes32[] memory leaves = new bytes32[](1);
-    leaves[0] = _leaf(0, alice, address(token), 5 ether, ct, pid);
-    distributor.publishRoot(ct, pid, IERC20(address(token)), _buildRoot(leaves));
+    leaves[0] = _leaf(0, alice, address(token), 5 ether, cid);
+    distributor.publishRoot(cid, IERC20(address(token)), _buildRoot(leaves));
     bytes32[] memory proof = _proof(leaves, 0);
 
     // wrong token -> root not set for that key
     ERC20MinterPauser other = new ERC20MinterPauser("Other", "OTH");
     vm.expectRevert(bytes("MerkleRewards: root not set"));
-    distributor.claim(ct, pid, IERC20(address(other)), 0, alice, 5 ether, proof);
+    distributor.claim(cid, IERC20(address(other)), 0, alice, 5 ether, proof);
 
     // wrong amount -> invalid proof
     vm.expectRevert(bytes("MerkleRewards: invalid proof"));
-    distributor.claim(ct, pid, IERC20(address(token)), 0, alice, 6 ether, proof);
+    distributor.claim(cid, IERC20(address(token)), 0, alice, 6 ether, proof);
   }
 
   function test_IsClaimedReflectsState() public {
-    string memory ct = "daily";
-    string memory pid = "2025-10-03";
+    string memory cid = "daily:2025-10-03";
     bytes32[] memory leaves = new bytes32[](1);
-    leaves[0] = _leaf(0, alice, address(token), 1 ether, ct, pid);
-    distributor.publishRoot(ct, pid, IERC20(address(token)), _buildRoot(leaves));
-    assertFalse(distributor.isClaimed(ct, pid, IERC20(address(token)), 0));
-    distributor.claim(ct, pid, IERC20(address(token)), 0, alice, 1 ether, _proof(leaves, 0));
-    assertTrue(distributor.isClaimed(ct, pid, IERC20(address(token)), 0));
+    leaves[0] = _leaf(0, alice, address(token), 1 ether, cid);
+    distributor.publishRoot(cid, IERC20(address(token)), _buildRoot(leaves));
+    assertFalse(distributor.isClaimed(cid, IERC20(address(token)), 0));
+    distributor.claim(cid, IERC20(address(token)), 0, alice, 1 ether, _proof(leaves, 0));
+    assertTrue(distributor.isClaimed(cid, IERC20(address(token)), 0));
   }
 
   function test_ClaimMany_LengthMismatchReverts() public {
-    string[] memory ct = new string[](1);
-    ct[0] = "daily";
-    string[] memory pid = new string[](1);
-    pid[0] = "2025-10-04";
+    string[] memory cid = new string[](1);
+    cid[0] = "daily:2025-10-04";
     IERC20[] memory toks = new IERC20[](1);
     toks[0] = IERC20(address(token));
     uint256[] memory idx = new uint256[](1);
@@ -302,20 +287,17 @@ contract MerkleRewardsDistributorTest is Test {
     proofs[0] = new bytes32[](0);
 
     vm.expectRevert(bytes("MerkleRewards: arrays length mismatch"));
-    distributor.claimMany(ct, pid, toks, idx, accts, amts, proofs);
+    distributor.claimMany(cid, toks, idx, accts, amts, proofs);
   }
 
   function test_ClaimMany_DuplicateIndexReverts() public {
-    string memory ct = "weekly";
-    string memory pid = "2025-W42";
+    string memory cid = "weekly:2025-W42";
     bytes32[] memory leaves = new bytes32[](1);
-    leaves[0] = _leaf(0, alice, address(token), 3 ether, ct, pid);
-    distributor.publishRoot(ct, pid, IERC20(address(token)), _buildRoot(leaves));
+    leaves[0] = _leaf(0, alice, address(token), 3 ether, cid);
+    distributor.publishRoot(cid, IERC20(address(token)), _buildRoot(leaves));
 
-    string[] memory cts = new string[](2);
-    cts[0] = ct; cts[1] = ct;
-    string[] memory pids = new string[](2);
-    pids[0] = pid; pids[1] = pid;
+    string[] memory cids = new string[](2);
+    cids[0] = cid; cids[1] = cid;
     IERC20[] memory toks = new IERC20[](2);
     toks[0] = IERC20(address(token)); toks[1] = IERC20(address(token));
     uint256[] memory idxs = new uint256[](2);
@@ -329,6 +311,6 @@ contract MerkleRewardsDistributorTest is Test {
     proofs[1] = _proof(leaves, 0);
 
     vm.expectRevert(bytes("MerkleRewards: already claimed"));
-    distributor.claimMany(cts, pids, toks, idxs, accts, amts, proofs);
+    distributor.claimMany(cids, toks, idxs, accts, amts, proofs);
   }
 }
