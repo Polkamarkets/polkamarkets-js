@@ -33,10 +33,10 @@ contract MerkleRewardsDistributorTest is Test {
   }
 
   // local Merkle builder (keccak abi.encode)
-  function _leaf(uint256 index, address account, address tokenAddr, uint256 amount, string memory contestId)
+  function _leaf(uint256 index, address user, address tokenAddr, uint256 amount, string memory contestId)
     internal pure returns (bytes32)
   {
-    return keccak256(abi.encode(index, account, tokenAddr, amount, contestId));
+    return keccak256(abi.encode(index, user, tokenAddr, amount, contestId));
   }
 
   function _buildRoot(bytes32[] memory leaves) internal pure returns (bytes32 root) {
@@ -156,15 +156,15 @@ contract MerkleRewardsDistributorTest is Test {
     tokens[0] = IERC20(address(token)); tokens[1] = IERC20(address(token));
     uint256[] memory idxs = new uint256[](2);
     idxs[0] = 0; idxs[1] = 0;
-    address[] memory accts = new address[](2);
-    accts[0] = alice; accts[1] = alice;
+    address[] memory users = new address[](2);
+    users[0] = alice; users[1] = alice;
     uint256[] memory amts = new uint256[](2);
     amts[0] = 100 ether; amts[1] = 5 ether;
     bytes32[][] memory proofs = new bytes32[][](2);
     proofs[0] = _proof(leaves1, 0);
     proofs[1] = _proof(leaves2, 0);
 
-    distributor.claimMany(cids, tokens, idxs, accts, amts, proofs);
+    distributor.claimMany(cids, tokens, idxs, users, amts, proofs);
     assertTrue(distributor.isClaimed(cid1, IERC20(address(token)), 0));
     assertTrue(distributor.isClaimed(cid2, IERC20(address(token)), 0));
     assertEq(token.balanceOf(alice), 105 ether);
@@ -279,15 +279,15 @@ contract MerkleRewardsDistributorTest is Test {
     toks[0] = IERC20(address(token));
     uint256[] memory idx = new uint256[](1);
     idx[0] = 0;
-    address[] memory accts = new address[](1);
-    accts[0] = alice;
+    address[] memory users = new address[](1);
+    users[0] = alice;
     // amounts empty to force mismatch
     uint256[] memory amts = new uint256[](0);
     bytes32[][] memory proofs = new bytes32[][](1);
     proofs[0] = new bytes32[](0);
 
     vm.expectRevert(bytes("MerkleRewards: arrays length mismatch"));
-    distributor.claimMany(cid, toks, idx, accts, amts, proofs);
+    distributor.claimMany(cid, toks, idx, users, amts, proofs);
   }
 
   function test_ClaimMany_DuplicateIndexReverts() public {
@@ -302,8 +302,8 @@ contract MerkleRewardsDistributorTest is Test {
     toks[0] = IERC20(address(token)); toks[1] = IERC20(address(token));
     uint256[] memory idxs = new uint256[](2);
     idxs[0] = 0; idxs[1] = 0; // duplicate same index
-    address[] memory accts = new address[](2);
-    accts[0] = alice; accts[1] = alice;
+    address[] memory users = new address[](2);
+    users[0] = alice; users[1] = alice;
     uint256[] memory amts = new uint256[](2);
     amts[0] = 3 ether; amts[1] = 3 ether;
     bytes32[][] memory proofs = new bytes32[][](2);
@@ -311,6 +311,6 @@ contract MerkleRewardsDistributorTest is Test {
     proofs[1] = _proof(leaves, 0);
 
     vm.expectRevert(bytes("MerkleRewards: already claimed"));
-    distributor.claimMany(cids, toks, idxs, accts, amts, proofs);
+    distributor.claimMany(cids, toks, idxs, users, amts, proofs);
   }
 }

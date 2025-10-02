@@ -26,11 +26,11 @@ contract MerkleRewardsDistributor is Initializable, UUPSUpgradeable, Ownable2Ste
   mapping(bytes32 => mapping(uint256 => uint256)) private _claimedBitMap;
 
   event RootPublished(string contestId, IERC20 indexed token, bytes32 indexed root, bytes32 indexed rootKey);
-  event Claimed(
+  event Claim(
     string contestId,
     IERC20 indexed token,
     uint256 indexed index,
-    address indexed account,
+    address indexed user,
     uint256 amount
   );
   event TokensWithdrawn(address indexed token, address indexed to, uint256 amount);
@@ -72,27 +72,27 @@ contract MerkleRewardsDistributor is Initializable, UUPSUpgradeable, Ownable2Ste
     _;
   }
 
-  function addAdmin(address account) external onlyAdmin {
-    grantRole(ADMIN_ROLE, account);
+  function addAdmin(address user) external onlyAdmin {
+    grantRole(ADMIN_ROLE, user);
   }
 
-  function removeAdmin(address account) external onlyAdmin {
-    revokeRole(ADMIN_ROLE, account);
+  function removeAdmin(address user) external onlyAdmin {
+    revokeRole(ADMIN_ROLE, user);
   }
 
-  function isAdmin(address account) external view returns (bool) {
-    return hasRole(ADMIN_ROLE, account);
+  function isAdmin(address user) external view returns (bool) {
+    return hasRole(ADMIN_ROLE, user);
   }
 
   // ------ Claims ------
 
-  /// @notice Claims `amount` for `account` with a Merkle proof. Funds are sent to `account`.
-  /// @dev Leaf is keccak256(abi.encode(index, account, token, amount, contestId))
+  /// @notice Claims `amount` for `user` with a Merkle proof. Funds are sent to `user`.
+  /// @dev Leaf is keccak256(abi.encode(index, user, token, amount, contestId))
   function claim(
     string calldata contestId,
     IERC20 token,
     uint256 index,
-    address account,
+    address user,
     uint256 amount,
     bytes32[] calldata merkleProof
   ) external nonReentrant {
@@ -101,22 +101,22 @@ contract MerkleRewardsDistributor is Initializable, UUPSUpgradeable, Ownable2Ste
     require(root != bytes32(0), "MerkleRewards: root not set");
     require(!_isClaimed(key, index), "MerkleRewards: already claimed");
 
-    bytes32 leaf = keccak256(abi.encode(index, account, token, amount, contestId));
+    bytes32 leaf = keccak256(abi.encode(index, user, token, amount, contestId));
     require(MerkleProof.verify(merkleProof, root, leaf), "MerkleRewards: invalid proof");
 
     _setClaimed(key, index);
 
-    token.safeTransfer(account, amount);
+    token.safeTransfer(user, amount);
 
-    emit Claimed(contestId, token, index, account, amount);
+    emit Claim(contestId, token, index, user, amount);
   }
 
-  /// @notice Claims multiple entries in one transaction. Funds are sent to each entry's `account`.
+  /// @notice Claims multiple entries in one transaction. Funds are sent to each entry's `user`.
   function claimMany(
     string[] calldata contestIds,
     IERC20[] calldata tokens,
     uint256[] calldata indices,
-    address[] calldata accounts,
+    address[] calldata users,
     uint256[] calldata amounts,
     bytes32[][] calldata merkleProofs
   ) external nonReentrant {
@@ -124,7 +124,7 @@ contract MerkleRewardsDistributor is Initializable, UUPSUpgradeable, Ownable2Ste
     require(
       len == tokens.length &&
       len == indices.length &&
-      len == accounts.length &&
+      len == users.length &&
       len == amounts.length &&
       len == merkleProofs.length,
       "MerkleRewards: arrays length mismatch"
@@ -136,13 +136,13 @@ contract MerkleRewardsDistributor is Initializable, UUPSUpgradeable, Ownable2Ste
       require(root != bytes32(0), "MerkleRewards: root not set");
       require(!_isClaimed(key, indices[i]), "MerkleRewards: already claimed");
 
-      bytes32 leaf = keccak256(abi.encode(indices[i], accounts[i], tokens[i], amounts[i], contestIds[i]));
+      bytes32 leaf = keccak256(abi.encode(indices[i], users[i], tokens[i], amounts[i], contestIds[i]));
       require(MerkleProof.verify(merkleProofs[i], root, leaf), "MerkleRewards: invalid proof");
 
       _setClaimed(key, indices[i]);
-      tokens[i].safeTransfer(accounts[i], amounts[i]);
+      tokens[i].safeTransfer(users[i], amounts[i]);
 
-      emit Claimed(contestIds[i], tokens[i], indices[i], accounts[i], amounts[i]);
+      emit Claim(contestIds[i], tokens[i], indices[i], users[i], amounts[i]);
     }
   }
 

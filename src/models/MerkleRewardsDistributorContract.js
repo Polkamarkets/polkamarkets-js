@@ -44,6 +44,17 @@ class MerkleRewardsDistributorContract extends IContract {
       .call();
   }
 
+  async getClaims({ user, tokenAddress, index }) {
+    return await this.getEvents(
+      'Claim',
+      {
+        user,
+        tokenAddress,
+        index
+      }
+    );
+  }
+
   // ----- Admin -----
   async publishRoot({ contestId, tokenAddress, root }) {
     return await this.__sendTx(
@@ -71,24 +82,24 @@ class MerkleRewardsDistributorContract extends IContract {
   }
 
   // ----- Claims -----
-  async claim({ contestId, tokenAddress, index, account, amount, proof }) {
+  async claim({ contestId, tokenAddress, index, user, amount, proof }) {
     const amountDecimals = Numbers.toSmartContractDecimals(amount, 18);
     return await this.__sendTx(
-      this.getContract().methods.claim(contestId, tokenAddress, index, account, amountDecimals, proof)
+      this.getContract().methods.claim(contestId, tokenAddress, index, user, amountDecimals, proof)
     );
   }
 
   async claimMany({ entries }) {
-    // entries: array of { contestId, tokenAddress, index, account, amount, proof }
+    // entries: array of { contestId, tokenAddress, index, user, amount, proof }
     const contestIds = entries.map(e => e.contestId);
     const tokens = entries.map(e => e.tokenAddress);
     const indices = entries.map(e => e.index);
-    const accounts = entries.map(e => e.account);
+    const users = entries.map(e => e.user);
     const amounts = entries.map(e => Numbers.toSmartContractDecimals(e.amount, 18));
     const proofs = entries.map(e => e.proof);
 
     return await this.__sendTx(
-      this.getContract().methods.claimMany(contestIds, tokens, indices, accounts, amounts, proofs)
+      this.getContract().methods.claimMany(contestIds, tokens, indices, users, amounts, proofs)
     );
   }
 }
