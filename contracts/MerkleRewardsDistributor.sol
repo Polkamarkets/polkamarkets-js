@@ -160,6 +160,18 @@ contract MerkleRewardsDistributor is Initializable, UUPSUpgradeable, Ownable2Ste
     return _isClaimed(_rootKey(contestId, token), index);
   }
 
+  function isClaimedMany(
+    string[] calldata contestIds,
+    IERC20[] calldata tokens,
+    uint256[] calldata indices
+  ) external view returns (bool[] memory) {
+    bool[] memory claims = new bool[](contestIds.length);
+    for (uint256 i = 0; i < contestIds.length; i++) {
+      claims[i] = _isClaimed(_rootKey(contestIds[i], tokens[i]), indices[i]);
+    }
+    return claims;
+  }
+
   // ------ Internal utils ------
 
   function _rootKey(string calldata contestId, IERC20 token) private pure returns (bytes32) {

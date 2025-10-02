@@ -28,6 +28,14 @@ class MerkleRewardsDistributorContract extends IContract {
       .call();
   }
 
+  async isClaimedMany({ contestIds, tokenAddresses, indices }) {
+    return await this.params.contract
+      .getContract()
+      .methods
+      .isClaimedMany(contestIds, tokenAddresses, indices)
+      .call();
+  }
+
   async isAdmin({ user }) {
     return await this.params.contract
       .getContract()
