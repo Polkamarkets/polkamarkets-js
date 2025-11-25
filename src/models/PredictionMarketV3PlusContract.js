@@ -19,6 +19,9 @@ class PredictionMarketV3PlusContract extends PredictionMarketV3Contract {
         contractAddress: params.querierContractAddress
       });
     }
+    if (params.contractVersion) {
+      this.contractVersion = params.contractVersion;
+    }
     this.marketDecimals = {};
   }
 
@@ -205,6 +208,34 @@ class PredictionMarketV3PlusContract extends PredictionMarketV3Contract {
       this.getContract().methods.referralSell(marketId, outcomeId, valueToWei, maxOutcomeSharesToSell, code),
     );
   };
+
+  async addLiquidity({marketId, value, wrapped = false, minSharesIn = null}) {
+    if (!this.contractVersion || this.contractVersion < 3.4) {
+      return super.addLiquidity({marketId, value, wrapped});
+    }
+
+    const decimals = await this.getMarketDecimals({marketId});
+    const valueToWei = Numbers.toSmartContractDecimals(value, decimals);
+    const minSharesInToWei = minSharesIn === null ? 0 : Numbers.toSmartContractDecimals(minSharesIn, decimals);
+
+    return await this.__sendTx(
+      this.getContract().methods.addLiquidity(marketId, valueToWei, minSharesInToWei)
+    );
+  };
+
+  async removeLiquidity({marketId, shares, wrapped = false, minValueOut = null}) {
+    if (!this.contractVersion || this.contractVersion < 3.4) {
+      return super.removeLiquidity({marketId, shares, wrapped});
+    }
+
+    const decimals = await this.getMarketDecimals({marketId});
+    const sharesToWei = Numbers.toSmartContractDecimals(shares, decimals);
+    const minValueOutToWei = minValueOut === null ? sharesToWei : Numbers.toSmartContractDecimals(minValueOut, decimals);
+
+    return await this.__sendTx(
+      this.getContract().methods.removeLiquidity(marketId, sharesToWei, minValueOutToWei)
+    );
+  }
 }
 
 module.exports = PredictionMarketV3PlusContract;
