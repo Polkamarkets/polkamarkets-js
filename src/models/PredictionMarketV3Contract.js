@@ -1,6 +1,7 @@
 const predictionV3 = require("../interfaces").predictionV3;
 const PredictionMarketV2Contract = require("./PredictionMarketV2Contract");
 const PredictionMarketV3QuerierContract = require("./PredictionMarketV3QuerierContract");
+const _ = require('lodash');
 
 const Numbers = require('../utils/Numbers');
 
@@ -217,6 +218,8 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
         ];
       }));
 
+      const liquidityFeesClaimed = _.sumBy(_.filter(events, { action: 'Claim Fees' }), 'value');
+
       const item = {
         liquidity: {
           shares: Numbers.fromDecimalsNumber(marketData.liquidityShares, decimals),
@@ -230,7 +233,8 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
           liquidityClaimed: marketData.liquidityClaimed,
           voidedWinningsToClaim: marketData.voidedSharesToClaim,
           voidedWinningsClaimed: false,
-          liquidityFees: 0 // discontinued
+          liquidityFees: 0, // discontinued
+          liquidityFeesClaimed
         }
       };
 
