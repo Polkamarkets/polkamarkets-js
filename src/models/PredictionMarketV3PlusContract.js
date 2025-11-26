@@ -11,11 +11,8 @@ const realitioLib = require('@reality.eth/reality-eth-lib/formatters/question');
 class PredictionMarketV3PlusContract extends PredictionMarketV3Contract {
   constructor(params) {
     let abi = predictionV3Plus;
-    if (params.contractVersion) {
-      this.contractVersion = params.contractVersion;
-      if (this.contractVersion < 3.4) {
-        abi = this.contractVersion === 3.3 ? predictionV3_3 : predictionV3_2;
-      }
+    if (params.contractVersion && params.contractVersion < 3.4) {
+      abi = params.contractVersion === 3.3 ? predictionV3_3 : predictionV3_2;
     }
     super({ abi, ...params });
     this.contractName = 'predictionMarketV3';
