@@ -236,7 +236,7 @@ class PredictionMarketV3PlusContract extends PredictionMarketV3Contract {
 
     const decimals = await this.getMarketDecimals({marketId});
     const sharesToWei = Numbers.toSmartContractDecimals(shares, decimals);
-    const minValueOutToWei = minValueOut === null ? sharesToWei : Numbers.toSmartContractDecimals(minValueOut, decimals);
+    const minValueOutToWei = minValueOut === null ? 0 : Numbers.toSmartContractDecimals(minValueOut, decimals);
 
     return await this.__sendTx(
       this.getContract().methods.removeLiquidity(marketId, sharesToWei, minValueOutToWei)
