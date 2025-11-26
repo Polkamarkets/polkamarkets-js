@@ -196,11 +196,12 @@ class Application {
    * @param {Address} ContractAddress (Opt) If it is deployed
    * @description Create a PredictionMarketV3 Contract
    */
-  getPredictionMarketV3PlusContract({ contractAddress = null, querierContractAddress = null } = {}) {
+  getPredictionMarketV3PlusContract({ contractAddress = null, querierContractAddress = null, contractVersion = null } = {}) {
     try {
       return new PredictionMarketV3PlusContract({
         ...this.contractDefaultParams(contractAddress),
         querierContractAddress,
+        contractVersion,
       });
     } catch (err) {
       throw err;
