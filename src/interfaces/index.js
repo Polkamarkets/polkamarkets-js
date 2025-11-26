@@ -7,6 +7,8 @@ let index = {
   prediction: require("../../abis/PredictionMarket.json"),
   predictionV2: require("../../abis/PredictionMarketV2.json"),
   predictionV3: require("../../abis/PredictionMarketV3.json"),
+  predictionV3_2: require("../../abis/PredictionMarketV3_2.json"),
+  predictionV3_3: require("../../abis/PredictionMarketV3_3.json"),
   predictionV3Plus: require("../../abis/PredictionMarketV3_4.json"),
   predictionV3Manager: require("../../abis/PredictionMarketV3Manager.json"),
   predictionV3Controller: require("../../abis/PredictionMarketV3Controller.json"),

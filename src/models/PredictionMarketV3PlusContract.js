@@ -1,4 +1,6 @@
-const predictionV3 = require("../interfaces").predictionV3Plus;
+const predictionV3_2 = require("../interfaces").predictionV3_2;
+const predictionV3_3 = require("../interfaces").predictionV3_3;
+const predictionV3Plus = require("../interfaces").predictionV3Plus;
 const PredictionMarketV3Contract = require("./PredictionMarketV3Contract");
 const PredictionMarketV3QuerierContract = require("./PredictionMarketV3QuerierContract");
 
@@ -8,7 +10,14 @@ const realitioLib = require('@reality.eth/reality-eth-lib/formatters/question');
 
 class PredictionMarketV3PlusContract extends PredictionMarketV3Contract {
   constructor(params) {
-    super({ abi: predictionV3, ...params });
+    let abi = predictionV3Plus;
+    if (params.contractVersion) {
+      this.contractVersion = params.contractVersion;
+      if (this.contractVersion < 3.4) {
+        abi = this.contractVersion === 3.3 ? predictionV3_3 : predictionV3_2;
+      }
+    }
+    super({ abi, ...params });
     this.contractName = 'predictionMarketV3';
     if (params.defaultDecimals) {
       this.defaultDecimals = params.defaultDecimals;
