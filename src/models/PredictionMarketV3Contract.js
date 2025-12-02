@@ -219,6 +219,7 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
       }));
 
       const liquidityFeesClaimed = _.sumBy(_.filter(events, { action: 'Claim Fees' }), 'value');
+      const liquidityFees = marketData.feesToClaim ? Numbers.fromDecimalsNumber(marketData.feesToClaim, decimals) : 0;
 
       const item = {
         liquidity: {
@@ -233,7 +234,7 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
           liquidityClaimed: marketData.liquidityClaimed,
           voidedWinningsToClaim: marketData.voidedSharesToClaim,
           voidedWinningsClaimed: false,
-          liquidityFees: 0, // discontinued
+          liquidityFees,
           liquidityFeesClaimed
         }
       };
