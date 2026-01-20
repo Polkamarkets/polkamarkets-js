@@ -11,7 +11,7 @@ class PolkamarketsSmartAccount {
   static THIRDWEB_FACTORY_ADDRESS = '0x85e23b94e7F5E9cC1fF78BCe78cfb15B81f0DF00';
 
   static singleton = (() => {
-    let smartAccount;
+    let smartAccounts = {};
 
     function createInstance(provider, networkConfig, isConnectedWallet) {
       const options = {
@@ -41,14 +41,14 @@ class PolkamarketsSmartAccount {
 
     return {
       getInstance: (provider, networkConfig, isConnectedWallet) => {
-        if (!smartAccount) {
-          smartAccount = createInstance(provider, networkConfig, isConnectedWallet);
+        if (!smartAccounts || !smartAccounts[networkConfig.chainId]) {
+          smartAccounts[networkConfig.chainId] = createInstance(provider, networkConfig, isConnectedWallet);
         }
-        return smartAccount;
+        return smartAccounts[networkConfig.chainId];
       },
-      getInstanceIfExists: () => smartAccount,
-      clearInstance: () => {
-        smartAccount = null;
+      getInstanceIfExists: (chainId) => smartAccounts[chainId],
+      clearInstance: (chainId) => {
+        smartAccounts[chainId] = null;
       }
     };
   })();
