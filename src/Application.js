@@ -37,6 +37,7 @@ class Application {
     web3EventsProvider,
     gasPrice,
     isSocialLogin = false,
+    useGaslessTransactions,
     socialLoginParams,
     startBlock,
     defaultDecimals,
@@ -48,6 +49,8 @@ class Application {
     // fixed gas price for txs (optional)
     this.gasPrice = gasPrice;
     this.isSocialLogin = isSocialLogin;
+    // If useGaslessTransactions is not explicitly set, default to true when isSocialLogin is true, otherwise false (backwards compatibility)
+    this.useGaslessTransactions = useGaslessTransactions !== undefined ? useGaslessTransactions : isSocialLogin;
     this.startBlock = startBlock;
     this.defaultDecimals = defaultDecimals;
     // use DualProvider to separate read (HttpProvider) and write (window.ethereum) operations
@@ -91,6 +94,8 @@ class Application {
   /**
    * @name login
    * @description Login with Metamask or a web3 provider
+   * @param {Object} provider
+   * @param {Boolean} isConnectedWallet
    */
   async login(provider = null, isConnectedWallet = null) {
     if (this.isSocialLogin) {
@@ -98,9 +103,14 @@ class Application {
         this.smartAccount = PolkamarketsSmartAccount.singleton.getInstanceIfExists()
       }
 
-      if ((!this.smartAccount || !this.smartAccount.provider) && provider) {
+      if (provider) {
         PolkamarketsSmartAccount.singleton.clearInstance();
         this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig, isConnectedWallet);
+
+        // Store thirdweb account reference if provider has sendTransaction method
+        if (typeof provider.sendTransaction === 'function') {
+          this.smartAccount.thirdwebAccount = provider;
+        }
       }
 
       return true;
@@ -157,6 +167,7 @@ class Application {
       web3EventsProvider: this.web3EventsProvider,
       gasPrice: this.gasPrice,
       isSocialLogin: this.isSocialLogin,
+      useGaslessTransactions: this.useGaslessTransactions,
       startBlock: this.startBlock,
       defaultDecimals: this.defaultDecimals
     };
