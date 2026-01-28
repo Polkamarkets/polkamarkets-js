@@ -20,6 +20,7 @@ const ArbitrationProxyContract = require("./models/index").ArbitrationProxyContr
 const RewardsDistributorContract = require("./models/index").RewardsDistributorContract;
 const MerkleRewardsDistributorContract = require("./models/index").MerkleRewardsDistributorContract;
 
+const DualProvider = require("./utils/DualProvider");
 const Account = require('./utils/Account');
 
 
@@ -38,9 +39,11 @@ class Application {
     web3EventsProvider,
     gasPrice,
     isSocialLogin = false,
+    useGaslessTransactions,
     socialLoginParams,
     startBlock,
-    defaultDecimals
+    defaultDecimals,
+    useDualProvider = false
   }) {
     this.web3Provider = web3Provider;
     // evm logs http source (optional)
@@ -48,8 +51,12 @@ class Application {
     // fixed gas price for txs (optional)
     this.gasPrice = gasPrice;
     this.isSocialLogin = isSocialLogin;
+    // If useGaslessTransactions is not explicitly set, default to true when isSocialLogin is true, otherwise false (backwards compatibility)
+    this.useGaslessTransactions = useGaslessTransactions !== undefined ? useGaslessTransactions : isSocialLogin;
     this.startBlock = startBlock;
     this.defaultDecimals = defaultDecimals;
+    // use DualProvider to separate read (HttpProvider) and write (window.ethereum) operations
+    this.useDualProvider = useDualProvider;
 
     if (this.isSocialLogin) {
       this.socialLoginParams = socialLoginParams;
@@ -72,7 +79,14 @@ class Application {
    * @description Start the Application
    */
   start() {
-    this.web3 = new Web3(new Web3.providers.HttpProvider(this.web3Provider));
+    if (this.useDualProvider) {
+      // Store read provider for later use in DualProvider
+      this.readProvider = new Web3.providers.HttpProvider(this.web3Provider);
+      this.web3 = new Web3(this.readProvider);
+    } else {
+      // Backwards compatible: standard HttpProvider
+      this.web3 = new Web3(new Web3.providers.HttpProvider(this.web3Provider));
+    }
     this.web3.eth.handleRevert = true;
     if (typeof window !== "undefined") {
       window.web3 = this.web3;
@@ -82,6 +96,8 @@ class Application {
   /**
    * @name login
    * @description Login with Metamask or a web3 provider
+   * @param {Object} provider
+   * @param {Boolean} isConnectedWallet
    */
   async login(provider = null, isConnectedWallet = null) {
     if (this.isSocialLogin) {
@@ -89,9 +105,14 @@ class Application {
         this.smartAccount = PolkamarketsSmartAccount.singleton.getInstanceIfExists()
       }
 
-      if ((!this.smartAccount || !this.smartAccount.provider) && provider) {
+      if (provider) {
         PolkamarketsSmartAccount.singleton.clearInstance();
         this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig, isConnectedWallet);
+
+        // Store thirdweb account reference if provider has sendTransaction method
+        if (typeof provider.sendTransaction === 'function') {
+          this.smartAccount.thirdwebAccount = provider;
+        }
       }
 
       return true;
@@ -99,8 +120,18 @@ class Application {
       try {
         if (typeof window === "undefined") { return false; }
         if (window.ethereum) {
-          window.web3 = new Web3(window.ethereum);
-          this.web3 = window.web3;
+          if (this.useDualProvider) {
+            // New approach: DualProvider for reads (HttpProvider) and writes (window.ethereum)
+            const dualProvider = new DualProvider(this.readProvider, window.ethereum);
+            this.web3 = new Web3(dualProvider);
+            this.web3.eth.handleRevert = true;
+            window.web3 = this.web3;
+          } else {
+            // Backwards compatible: replace web3 with window.ethereum
+            window.web3 = new Web3(window.ethereum);
+            this.web3 = window.web3;
+          }
+
           await window.ethereum.enable();
           return true;
         }
@@ -138,6 +169,7 @@ class Application {
       web3EventsProvider: this.web3EventsProvider,
       gasPrice: this.gasPrice,
       isSocialLogin: this.isSocialLogin,
+      useGaslessTransactions: this.useGaslessTransactions,
       startBlock: this.startBlock,
       defaultDecimals: this.defaultDecimals
     };
@@ -198,11 +230,12 @@ class Application {
    * @param {Address} ContractAddress (Opt) If it is deployed
    * @description Create a PredictionMarketV3 Contract
    */
-  getPredictionMarketV3PlusContract({ contractAddress = null, querierContractAddress = null } = {}) {
+  getPredictionMarketV3PlusContract({ contractAddress = null, querierContractAddress = null, contractVersion = null } = {}) {
     try {
       return new PredictionMarketV3PlusContract({
         ...this.contractDefaultParams(contractAddress),
         querierContractAddress,
+        contractVersion,
       });
     } catch (err) {
       throw err;

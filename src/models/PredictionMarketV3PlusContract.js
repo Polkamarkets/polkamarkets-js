@@ -1,4 +1,6 @@
-const predictionV3 = require("../interfaces").predictionV3Plus;
+const predictionV3_2 = require("../interfaces").predictionV3_2;
+const predictionV3_3 = require("../interfaces").predictionV3_3;
+const predictionV3Plus = require("../interfaces").predictionV3Plus;
 const PredictionMarketV3Contract = require("./PredictionMarketV3Contract");
 const PredictionMarketV3QuerierContract = require("./PredictionMarketV3QuerierContract");
 
@@ -8,7 +10,11 @@ const realitioLib = require('@reality.eth/reality-eth-lib/formatters/question');
 
 class PredictionMarketV3PlusContract extends PredictionMarketV3Contract {
   constructor(params) {
-    super({ abi: predictionV3, ...params });
+    let abi = predictionV3Plus;
+    if (params.contractVersion && params.contractVersion < 3.4) {
+      abi = params.contractVersion === 3.3 ? predictionV3_3 : predictionV3_2;
+    }
+    super({ abi, ...params });
     this.contractName = 'predictionMarketV3';
     if (params.defaultDecimals) {
       this.defaultDecimals = params.defaultDecimals;
@@ -18,6 +24,9 @@ class PredictionMarketV3PlusContract extends PredictionMarketV3Contract {
         ...this.params,
         contractAddress: params.querierContractAddress
       });
+    }
+    if (params.contractVersion) {
+      this.contractVersion = params.contractVersion;
     }
     this.marketDecimals = {};
   }
@@ -205,6 +214,34 @@ class PredictionMarketV3PlusContract extends PredictionMarketV3Contract {
       this.getContract().methods.referralSell(marketId, outcomeId, valueToWei, maxOutcomeSharesToSell, code),
     );
   };
+
+  async addLiquidity({marketId, value, wrapped = false, minSharesIn = null}) {
+    if (!this.contractVersion || this.contractVersion < 3.4) {
+      return super.addLiquidity({marketId, value, wrapped});
+    }
+
+    const decimals = await this.getMarketDecimals({marketId});
+    const valueToWei = Numbers.toSmartContractDecimals(value, decimals);
+    const minSharesInToWei = minSharesIn === null ? 0 : Numbers.toSmartContractDecimals(minSharesIn, decimals);
+
+    return await this.__sendTx(
+      this.getContract().methods.addLiquidity(marketId, valueToWei, minSharesInToWei)
+    );
+  };
+
+  async removeLiquidity({marketId, shares, wrapped = false, minValueOut = null}) {
+    if (!this.contractVersion || this.contractVersion < 3.4) {
+      return super.removeLiquidity({marketId, shares, wrapped});
+    }
+
+    const decimals = await this.getMarketDecimals({marketId});
+    const sharesToWei = Numbers.toSmartContractDecimals(shares, decimals);
+    const minValueOutToWei = minValueOut === null ? 0 : Numbers.toSmartContractDecimals(minValueOut, decimals);
+
+    return await this.__sendTx(
+      this.getContract().methods.removeLiquidity(marketId, sharesToWei, minValueOutToWei)
+    );
+  }
 }
 
 module.exports = PredictionMarketV3PlusContract;
