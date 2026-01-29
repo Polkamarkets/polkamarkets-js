@@ -75,18 +75,23 @@ class Contract {
       const utilization = (latestBlock.gasUsed / latestBlock.gasLimit) * 100;
 
       const baseGasPriceBigInt = BigInt(baseGasPrice);
-      
-      // Continuous function: multiplier = 1.2 + 1.3 * (utilization/100)^2
-      // This creates a smooth curve from 1.2x to 2.5x with accelerated scaling at high utilization
+
+      // Continuous function: multiplier = 1.2 + 0.8 * (utilization/100)^2
+      // This creates a smooth curve from 1.2x to 2.0x with accelerated scaling at high utilization
       const utilizationRatio = Math.min(utilization / 100, 1.0); // Cap at 100%
-      const multiplierFloat = 1.2 + 1.3 * Math.pow(utilizationRatio, 2);
+      const multiplierFloat = 1.2 + 0.8 * Math.pow(utilizationRatio, 2);
       const multiplier = Math.round(multiplierFloat * 100); // Convert to integer for BigInt math
 
       const smartGasPrice = (baseGasPriceBigInt * BigInt(multiplier)) / BigInt(100);
       return smartGasPrice.toString();
     } catch (err) {
-      const fallbackPrice = await this.web3.eth.getGasPrice();
-      return ((BigInt(fallbackPrice) * BigInt(200)) / BigInt(100)).toString();
+      try {
+        const fallbackPrice = await this.web3.eth.getGasPrice();
+        return ((BigInt(fallbackPrice) * BigInt(200)) / BigInt(100)).toString();
+      } catch (fallbackErr) {
+        // should be non-blocking, defaulting to 10 gwei
+        return '10000000000';
+      }
     }
   }
 
