@@ -1,6 +1,7 @@
 const predictionV3 = require("../interfaces").predictionV3;
 const PredictionMarketV2Contract = require("./PredictionMarketV2Contract");
 const PredictionMarketV3QuerierContract = require("./PredictionMarketV3QuerierContract");
+const _ = require('lodash');
 
 const Numbers = require('../utils/Numbers');
 
@@ -157,7 +158,7 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
     );
   };
 
-  async getPortfolio({ user }) {
+  async getPortfolio({ user, excludeNoPositionMarkets = false }) {
     if (!this.querier) {
       return super.getPortfolio({ user });
     }
@@ -166,27 +167,60 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
     try {
       events = await this.getActions({ user });
     } catch (err) {
-      // should be non-blocking
+      // when excluding markets without positions, getActions must succeed
+      if (excludeNoPositionMarkets) {
+        throw err;
+      }
+      // should be non-blocking otherwise
     }
 
     const chunkSize = 250;
     let userMarketsData;
 
-    // chunking data to avoid out of gas errors
-    const marketIndex = await this.getMarketIndex();
-
-    if (marketIndex > chunkSize) {
-      const chunks = Math.ceil(marketIndex / chunkSize);
-      const promises = Array.from({ length: chunks }, async (_, i) => {
-        const marketIds = Array.from({ length: chunkSize }, (_, j) => i * chunkSize + j).filter(id => id < marketIndex);
-        const chunkMarketData = await this.querier.getUserMarketsData({ user, marketIds });
-        return chunkMarketData;
-      });
-      const chunksData = await Promise.all(promises);
-      // concatenating all arrays into a single one
-      userMarketsData = chunksData.reduce((obj, chunk) => [...obj, ...chunk], []);
+    if (excludeNoPositionMarkets) {
+      // only fetch data for markets where the user has actions
+      const marketIdsFromEvents = [...new Set(events.map(e => e.marketId))];
+      if (marketIdsFromEvents.length === 0) {
+        return {};
+      }
+      userMarketsData = {};
+      if (marketIdsFromEvents.length > chunkSize) {
+        const chunks = Math.ceil(marketIdsFromEvents.length / chunkSize);
+        const promises = Array.from({ length: chunks }, async (_, i) => {
+          const chunkMarketIds = marketIdsFromEvents.slice(i * chunkSize, i * chunkSize + chunkSize);
+          const chunkMarketData = await this.querier.getUserMarketsData({ user, marketIds: chunkMarketIds });
+          return { ids: chunkMarketIds, data: chunkMarketData };
+        });
+        const chunksData = await Promise.all(promises);
+        // map each returned entry to its corresponding marketId
+        chunksData.forEach(({ ids, data }) => {
+          ids.forEach((id, idx) => {
+            userMarketsData[id] = data[idx];
+          });
+        });
+      } else {
+        const data = await this.querier.getUserMarketsData({ user, marketIds: marketIdsFromEvents });
+        marketIdsFromEvents.forEach((id, idx) => {
+          userMarketsData[id] = data[idx];
+        });
+      }
     } else {
-      userMarketsData = await this.querier.getUserAllMarketsData({ user });
+      // chunking data to avoid out of gas errors
+      const marketIndex = await this.getMarketIndex();
+
+      if (marketIndex > chunkSize) {
+        const chunks = Math.ceil(marketIndex / chunkSize);
+        const promises = Array.from({ length: chunks }, async (_, i) => {
+          const marketIds = Array.from({ length: chunkSize }, (_, j) => i * chunkSize + j).filter(id => id < marketIndex);
+          const chunkMarketData = await this.querier.getUserMarketsData({ user, marketIds });
+          return chunkMarketData;
+        });
+        const chunksData = await Promise.all(promises);
+        // concatenating all arrays into a single one
+        userMarketsData = chunksData.reduce((obj, chunk) => [...obj, ...chunk], []);
+      } else {
+        userMarketsData = await this.querier.getUserAllMarketsData({ user });
+      }
     }
 
     const marketIds = Object.keys(userMarketsData).map(Number);
@@ -217,6 +251,9 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
         ];
       }));
 
+      const liquidityFeesClaimed = _.sumBy(_.filter(events, { action: 'Claim Fees' }), 'value');
+      const liquidityFees = marketData.feesToClaim ? Numbers.fromDecimalsNumber(marketData.feesToClaim, decimals) : 0;
+
       const item = {
         liquidity: {
           shares: Numbers.fromDecimalsNumber(marketData.liquidityShares, decimals),
@@ -230,7 +267,8 @@ class PredictionMarketV3Contract extends PredictionMarketV2Contract {
           liquidityClaimed: marketData.liquidityClaimed,
           voidedWinningsToClaim: marketData.voidedSharesToClaim,
           voidedWinningsClaimed: false,
-          liquidityFees: 0 // discontinued
+          liquidityFees,
+          liquidityFeesClaimed
         }
       };
 

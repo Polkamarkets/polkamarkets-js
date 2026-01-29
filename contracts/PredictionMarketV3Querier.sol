@@ -18,6 +18,7 @@ contract PredictionMarketV3Querier {
     bool liquidityToClaim;
     bool liquidityClaimed;
     bool voidedSharesToClaim;
+    uint256 feesToClaim;
   }
 
   struct MarketPrices {
@@ -35,7 +36,7 @@ contract PredictionMarketV3Querier {
     bool voidedSharesToClaim = false;
 
     (uint256 liquidityShares, uint256[] memory outcomeShares) = PredictionMarketV3.getUserMarketShares(marketId, user);
-    (bool winningsToClaim, bool winningsClaimed, bool liquidityToClaim, bool liquidityClaimed, ) = PredictionMarketV3
+    (bool winningsToClaim, bool winningsClaimed, bool liquidityToClaim, bool liquidityClaimed, uint256 feesToClaim) = PredictionMarketV3
       .getUserClaimStatus(marketId, user);
 
     if (isMarketVoided) {
@@ -55,7 +56,8 @@ contract PredictionMarketV3Querier {
         winningsClaimed: winningsClaimed,
         liquidityToClaim: liquidityToClaim,
         liquidityClaimed: liquidityClaimed,
-        voidedSharesToClaim: voidedSharesToClaim
+        voidedSharesToClaim: voidedSharesToClaim,
+        feesToClaim: feesToClaim
       });
   }
 
