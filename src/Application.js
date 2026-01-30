@@ -18,6 +18,7 @@ const WETH9Contract = require("./models/index").WETH9Contract;
 const ArbitrationContract = require("./models/index").ArbitrationContract;
 const ArbitrationProxyContract = require("./models/index").ArbitrationProxyContract;
 const MerkleRewardsDistributorContract = require("./models/index").MerkleRewardsDistributorContract;
+const Multicall3Contract = require("./models/index").Multicall3Contract;
 
 const DualProvider = require("./utils/DualProvider");
 const Account = require('./utils/Account');
@@ -421,6 +422,21 @@ class Application {
   getMerkleRewardsDistributorContract({ contractAddress = null }) {
     try {
       return new MerkleRewardsDistributorContract({
+        ...this.contractDefaultParams(contractAddress)
+      });
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  /**
+   * @name getMulticall3Contract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a Multicall3 Contract
+   */
+  getMulticall3Contract({ contractAddress = null } = {}) {
+    try {
+      return new Multicall3Contract({
         ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {

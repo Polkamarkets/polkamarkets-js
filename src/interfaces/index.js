@@ -16,6 +16,7 @@ let index = {
   predictionV3Querier: require("../../abis/PredictionMarketV3Querier.json"),
   realitio: require("../../abis/RealitioERC20.json"),
   merkleRewardsDistributor: require("../../abis/MerkleRewardsDistributor.json"),
+  multicall3: require("../../abis/Multicall3.json"),
   voting: require("../../abis/Voting.json"),
   weth: require("../../abis/WETH9.json"),
 };
