@@ -17,6 +17,11 @@ const FantasyERC20Contract = require("./models/index").FantasyERC20Contract;
 const WETH9Contract = require("./models/index").WETH9Contract;
 const ArbitrationContract = require("./models/index").ArbitrationContract;
 const ArbitrationProxyContract = require("./models/index").ArbitrationProxyContract;
+const AdminRegistryContract = require("./models/index").AdminRegistryContract;
+const PredictionMarketV3ManagerCLOBContract = require("./models/index").PredictionMarketV3ManagerCLOBContract;
+const ConditionalTokensContract = require("./models/index").ConditionalTokensContract;
+const MyriadCTFExchangeContract = require("./models/index").MyriadCTFExchangeContract;
+const FeeModuleContract = require("./models/index").FeeModuleContract;
 
 const DualProvider = require("./utils/DualProvider");
 const Account = require('./utils/Account');
@@ -268,6 +273,81 @@ class Application {
   getPredictionMarketV3ManagerContract({ contractAddress = null } = {}) {
     try {
       return new PredictionMarketV3ManagerContract({
+        ...this.contractDefaultParams(contractAddress)
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name getAdminRegistryContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create an AdminRegistry Contract
+   */
+  getAdminRegistryContract({ contractAddress = null } = {}) {
+    try {
+      return new AdminRegistryContract({
+        ...this.contractDefaultParams(contractAddress)
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name getPredictionMarketV3ManagerCLOBContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a PredictionMarketV3ManagerCLOB Contract
+   */
+  getPredictionMarketV3ManagerCLOBContract({ contractAddress = null } = {}) {
+    try {
+      return new PredictionMarketV3ManagerCLOBContract({
+        ...this.contractDefaultParams(contractAddress)
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name getConditionalTokensContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a ConditionalTokens Contract
+   */
+  getConditionalTokensContract({ contractAddress = null } = {}) {
+    try {
+      return new ConditionalTokensContract({
+        ...this.contractDefaultParams(contractAddress)
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name getMyriadCTFExchangeContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a MyriadCTFExchange Contract
+   */
+  getMyriadCTFExchangeContract({ contractAddress = null } = {}) {
+    try {
+      return new MyriadCTFExchangeContract({
+        ...this.contractDefaultParams(contractAddress)
+      });
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  /**
+   * @name getFeeModuleContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a FeeModule Contract
+   */
+  getFeeModuleContract({ contractAddress = null } = {}) {
+    try {
+      return new FeeModuleContract({
         ...this.contractDefaultParams(contractAddress)
       });
     } catch (err) {
