@@ -29,9 +29,16 @@ contract DeployCLOB is Script {
     address operator = vm.envOr("OPERATOR", admin);
 
     bool deployRegistry = adminRegistryAddr == address(0);
+    bool deployRealitio = realitio == address(0);
 
+    // Count every transaction before the Exchange deployment to predict its CREATE address.
+    //   Base (always): Manager + ConditionalTokens + FeeModule = 3 txns before Exchange
+    //   +1 if deploying AdminRegistry
+    //   +2 if deploying RealityETH (deployment tx + setToken tx)
     uint256 nonce = vm.getNonce(deployer);
-    uint256 exchangeOffset = deployRegistry ? 4 : 3;
+    uint256 exchangeOffset = 3;
+    if (deployRegistry) exchangeOffset += 1;
+    if (deployRealitio) exchangeOffset += 2;
     address predictedExchange = vm.computeCreateAddress(deployer, nonce + exchangeOffset);
 
     vm.startBroadcast(privateKey);
@@ -65,7 +72,7 @@ contract DeployCLOB is Script {
     registry.grantRole(registry.RESOLUTION_ADMIN_ROLE(), admin);
 
     feeModule.setFeeRecipients(treasury, distributor, network);
-    feeModule.setTakerFeeSplit(5000, 3000, 2000);
+    feeModule.setFeeSplit(5000, 3000, 2000);
 
     vm.stopBroadcast();
 

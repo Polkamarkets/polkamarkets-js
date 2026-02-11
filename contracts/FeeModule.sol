@@ -14,7 +14,7 @@ contract FeeModule {
     uint16 takerFeeBps;
   }
 
-  struct TakerFeeSplit {
+  struct FeeSplit {
     uint16 treasuryBps;
     uint16 distributorBps;
     uint16 networkBps;
@@ -28,11 +28,11 @@ contract FeeModule {
   address public treasury;
   address public distributor;
   address public network;
-  TakerFeeSplit public takerSplit;
+  FeeSplit public feeSplit;
 
   event MarketFeesUpdated(uint256 indexed marketId, uint16 makerFeeBps, uint16 takerFeeBps);
   event FeeRecipientsUpdated(address treasury, address distributor, address network);
-  event TakerFeeSplitUpdated(uint16 treasuryBps, uint16 distributorBps, uint16 networkBps);
+  event FeeSplitUpdated(uint16 treasuryBps, uint16 distributorBps, uint16 networkBps);
 
   constructor(AdminRegistry _registry, MyriadCTFExchange _exchange) {
     registry = _registry;
@@ -57,24 +57,25 @@ contract FeeModule {
     emit FeeRecipientsUpdated(_treasury, _distributor, _network);
   }
 
-  function setTakerFeeSplit(uint16 treasuryBps, uint16 distributorBps, uint16 networkBps) external {
+  function setFeeSplit(uint16 treasuryBps, uint16 distributorBps, uint16 networkBps) external {
     require(registry.hasRole(registry.FEE_ADMIN_ROLE(), msg.sender), "not fee admin");
     require(uint256(treasuryBps) + uint256(distributorBps) + uint256(networkBps) == BPS, "bad split");
 
-    takerSplit = TakerFeeSplit({
+    feeSplit = FeeSplit({
       treasuryBps: treasuryBps,
       distributorBps: distributorBps,
       networkBps: networkBps
     });
 
-    emit TakerFeeSplitUpdated(treasuryBps, distributorBps, networkBps);
+    emit FeeSplitUpdated(treasuryBps, distributorBps, networkBps);
   }
 
   function matchOrdersWithFees(
     MyriadCTFExchange.Order calldata maker,
     bytes calldata makerSig,
     MyriadCTFExchange.Order calldata taker,
-    bytes calldata takerSig
+    bytes calldata takerSig,
+    uint256 fillAmount
   ) external {
     require(registry.hasRole(registry.OPERATOR_ROLE(), msg.sender), "not operator");
     require(maker.marketId == taker.marketId, "market mismatch");
@@ -84,9 +85,9 @@ contract FeeModule {
     MyriadCTFExchange.FeeConfig memory feeConfig = MyriadCTFExchange.FeeConfig({
       makerFeeBps: fees.makerFeeBps,
       takerFeeBps: fees.takerFeeBps,
-      treasuryBps: takerSplit.treasuryBps,
-      distributorBps: takerSplit.distributorBps,
-      networkBps: takerSplit.networkBps
+      treasuryBps: feeSplit.treasuryBps,
+      distributorBps: feeSplit.distributorBps,
+      networkBps: feeSplit.networkBps
     });
 
     MyriadCTFExchange.FeeRecipients memory recipients = MyriadCTFExchange.FeeRecipients({
@@ -95,6 +96,6 @@ contract FeeModule {
       network: network
     });
 
-    exchange.matchOrders(maker, makerSig, taker, takerSig, feeConfig, recipients);
+    exchange.matchOrders(maker, makerSig, taker, takerSig, fillAmount, feeConfig, recipients);
   }
 }

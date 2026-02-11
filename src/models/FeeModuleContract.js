@@ -16,14 +16,14 @@ class FeeModuleContract extends IContract {
     return await this.__sendTx(this.getContract().methods.setFeeRecipients(treasury, distributor, network));
   }
 
-  async setTakerFeeSplit({ treasuryBps, distributorBps, networkBps }) {
+  async setFeeSplit({ treasuryBps, distributorBps, networkBps }) {
     return await this.__sendTx(
-      this.getContract().methods.setTakerFeeSplit(treasuryBps, distributorBps, networkBps)
+      this.getContract().methods.setFeeSplit(treasuryBps, distributorBps, networkBps)
     );
   }
 
-  async matchOrdersWithFees({ maker, makerSig, taker, takerSig }) {
-    return await this.__sendTx(this.getContract().methods.matchOrdersWithFees(maker, makerSig, taker, takerSig));
+  async matchOrdersWithFees({ maker, makerSig, taker, takerSig, fillAmount }) {
+    return await this.__sendTx(this.getContract().methods.matchOrdersWithFees(maker, makerSig, taker, takerSig, fillAmount));
   }
 }
 
