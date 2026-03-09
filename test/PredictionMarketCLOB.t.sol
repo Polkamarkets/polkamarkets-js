@@ -1145,6 +1145,23 @@ contract PredictionMarketCLOBTest is Test {
     assertEq(manager.getMarketResolvedOutcome(marketId), 0);
   }
 
+  function testAdminResolveBeforeCloseRevertsForNonDefaultAdmin() public {
+    registry.grantRole(registry.RESOLUTION_ADMIN_ROLE(), maker);
+
+    vm.prank(maker);
+    vm.expectRevert("market not closed");
+    manager.adminResolveMarket(marketId, 0);
+  }
+
+  function testAdminResolveAfterCloseSucceedsForResolutionAdmin() public {
+    registry.grantRole(registry.RESOLUTION_ADMIN_ROLE(), maker);
+
+    vm.warp(block.timestamp + 2 days);
+    vm.prank(maker);
+    int256 result = manager.adminResolveMarket(marketId, 0);
+    assertEq(result, 0);
+  }
+
   function testUpdateMarketOracle() public {
     MockOracle newOracle = new MockOracle();
 

@@ -190,6 +190,10 @@ contract PredictionMarketV3ManagerCLOB is Initializable, ReentrancyGuardUpgradea
     require(market.id == marketId, "!m");
     require(market.state != MarketState.resolved, "resolved");
     require(!market.negRisk || msg.sender == negRiskAdapter, "use resolveEvent");
+    require(
+      block.timestamp >= market.closesAt || registry.hasRole(registry.DEFAULT_ADMIN_ROLE(), msg.sender),
+      "market not closed"
+    );
 
     market.resolvedOutcome = outcomeId;
     market.state = MarketState.resolved;
