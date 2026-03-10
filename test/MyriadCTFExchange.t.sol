@@ -534,6 +534,30 @@ contract MyriadCTFExchangeTest is Test {
         exchange.matchOrdersWithFees(buyOrder, buySig, sellOrder, sellSig, amount);
     }
 
+    function testMintMatchCostExceedsValueReverts() public {
+        // Set high fees (10% maker, 10% taker) to trigger the guard
+        _setUniformFees(marketId, 1000, 1000);
+
+        uint256 amount = 100 ether;
+        // 95c + 5c = 1e18, but 95c * 1.10 = 1.045e18 > 1e18
+        uint256 highPrice = (95 * ONE) / 100;
+        uint256 lowPrice  = (5 * ONE) / 100;
+
+        collateral.mint(maker, 1000 ether);
+        collateral.mint(taker, 1000 ether);
+        _approveAll(maker);
+        _approveAll(taker);
+
+        MyriadCTFExchange.Order memory m = _buildOrder(maker, marketId, 0, MyriadCTFExchange.Side.Buy, amount, highPrice, 560);
+        MyriadCTFExchange.Order memory t = _buildOrder(taker, marketId, 1, MyriadCTFExchange.Side.Buy, amount, lowPrice, 561);
+
+        bytes memory mSig = _signOrder(m, makerPk);
+        bytes memory tSig = _signOrder(t, takerPk);
+
+        vm.expectRevert("cost exceeds value");
+        exchange.matchOrdersWithFees(m, mSig, t, tSig, amount);
+    }
+
     function testMintMatchPriceSumNotOneReverts() public {
         uint256 amount = 100 ether;
         // prices sum to 0.9 instead of 1.0

@@ -493,6 +493,8 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardUpgradeable, Pausabl
 
     makerFee = (makerNotional * feeConfig.makerFeeBps) / BPS;
     takerFee = (takerNotional * feeConfig.takerFeeBps) / BPS;
+    require(makerNotional + makerFee <= fillAmount, "cost exceeds value");
+    require(takerNotional + takerFee <= fillAmount, "cost exceeds value");
     uint256 totalProtocolFees = makerFee + takerFee;
 
     // Each buyer pays notional + fee
