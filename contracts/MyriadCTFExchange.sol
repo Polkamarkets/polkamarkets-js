@@ -65,6 +65,7 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardUpgradeable, Pausabl
     );
   uint256 private constant ONE = 1e18;
   uint256 private constant BPS = 10000;
+  uint256 public constant DUST_TOLERANCE = 10;
 
   AdminRegistry public registry;
   IMyriadMarketManager public manager;
@@ -493,8 +494,8 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardUpgradeable, Pausabl
 
     makerFee = (makerNotional * feeConfig.makerFeeBps) / BPS;
     takerFee = (takerNotional * feeConfig.takerFeeBps) / BPS;
-    require(makerNotional + makerFee <= fillAmount, "cost exceeds value");
-    require(takerNotional + takerFee <= fillAmount, "cost exceeds value");
+    require(makerNotional + makerFee <= fillAmount + DUST_TOLERANCE, "cost exceeds value");
+    require(takerNotional + takerFee <= fillAmount + DUST_TOLERANCE, "cost exceeds value");
     uint256 totalProtocolFees = makerFee + takerFee;
 
     // Each buyer pays notional + fee
