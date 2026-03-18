@@ -970,6 +970,51 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
   }
 
   // =========================================================================
+  // Cross-market two-pass grief protection
+  // =========================================================================
+
+  function testCrossMarketNoTransfersOnLateFailure() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    for (uint256 i = 0; i < 3; i++) _setUniformFees(marketIds[i], 100, 200);
+
+    uint256 fundAmount = 500 ether;
+    for (uint256 i = 0; i < 2; i++) {
+      address user = i == 0 ? alice : bob;
+      collateral.mint(user, fundAmount);
+      vm.startPrank(user);
+      collateral.approve(address(wcol), fundAmount);
+      wcol.wrap(fundAmount);
+      IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+      vm.stopPrank();
+    }
+    vm.prank(charlie);
+    IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+
+    uint256 aliceWcolBefore = wcol.balanceOf(alice);
+    uint256 bobWcolBefore = wcol.balanceOf(bob);
+
+    uint256 price0 = (45 * ONE) / 100;
+    uint256 price1 = (35 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory orders = new MyriadCTFExchange.Order[](3);
+    orders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Buy, 100 ether, price0, 900);
+    orders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Buy, 100 ether, price1, 901);
+    orders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Buy, 100 ether, price2, 902);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(orders[0], alicePk);
+    sigs[1] = _signOrder(orders[1], bobPk);
+    sigs[2] = _signOrder(orders[2], charliePk);
+
+    vm.expectRevert("insufficient collateral");
+    exchange.matchCrossMarketOrders(orders, sigs, 100 ether);
+
+    assertEq(wcol.balanceOf(alice), aliceWcolBefore, "alice balance unchanged");
+    assertEq(wcol.balanceOf(bob), bobWcolBefore, "bob balance unchanged");
+  }
+
+  // =========================================================================
   // Void event
   // =========================================================================
 

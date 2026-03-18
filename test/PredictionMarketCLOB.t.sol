@@ -353,7 +353,7 @@ contract PredictionMarketCLOBTest is Test {
 
     exchange.matchOrdersWithFees(makerOrder, makerSig, takerOrder, takerSig, amount);
 
-    vm.expectRevert("maker overfill");
+    vm.expectRevert("taker overfill");
     exchange.matchOrdersWithFees(makerOrder, makerSig, takerOrder, takerSig, 2 ether);
   }
 
@@ -2120,7 +2120,7 @@ contract PredictionMarketCLOBTest is Test {
     collateral.approve(address(exchange), type(uint256).max);
 
     MyriadCTFExchange.Order memory m = _buildOrder(maker, marketId, Outcomes.YES, MyriadCTFExchange.Side.Sell, 100 ether, price, 4100);
-    MyriadCTFExchange.Order memory t = _buildOrder(taker, marketId, Outcomes.YES, MyriadCTFExchange.Side.Buy, 100 ether, price, 4101);
+    MyriadCTFExchange.Order memory t = _buildOrder(taker, marketId, Outcomes.YES, MyriadCTFExchange.Side.Buy, 200 ether, price, 4101);
 
     MyriadCTFExchange.Order[] memory makers = new MyriadCTFExchange.Order[](1);
     makers[0] = m;
@@ -2272,6 +2272,228 @@ contract PredictionMarketCLOBTest is Test {
 
     vm.expectRevert("insufficient tokens");
     exchange.matchMultipleOrdersWithFees(makers, makerSigs, fills, t, takerSig);
+  }
+
+  // =========================================================================
+  // Two-pass grief protection (matchMultipleOrdersWithFees)
+  // =========================================================================
+
+  function testMatchMultipleSecondMakerNoCollateralReverts() public {
+    uint256 amount = 100 ether;
+    uint256 price = (60 * ONE) / 100;
+
+    collateral.mint(maker, 1000 ether);
+    collateral.mint(taker, 2000 ether);
+
+    vm.startPrank(maker);
+    collateral.approve(address(conditionalTokens), type(uint256).max);
+    conditionalTokens.splitPosition(marketId, 200 ether);
+    conditionalTokens.setApprovalForAll(address(exchange), true);
+    vm.stopPrank();
+
+    vm.prank(taker);
+    collateral.approve(address(exchange), type(uint256).max);
+
+    MyriadCTFExchange.Order memory m1 = _buildOrder(maker, marketId, Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price, 5001);
+    MyriadCTFExchange.Order memory m2 = _buildOrder(maker2, marketId, Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price, 5002);
+    MyriadCTFExchange.Order memory t = _buildOrder(taker, marketId, Outcomes.YES, MyriadCTFExchange.Side.Buy, 200 ether, price, 5003);
+
+    MyriadCTFExchange.Order[] memory makers = new MyriadCTFExchange.Order[](2);
+    makers[0] = m1;
+    makers[1] = m2;
+    bytes[] memory makerSigs = new bytes[](2);
+    makerSigs[0] = _signOrder(m1, makerPk);
+    makerSigs[1] = _signOrder(m2, maker2Pk);
+    uint256[] memory fills = new uint256[](2);
+    fills[0] = amount;
+    fills[1] = amount;
+    bytes memory takerSig = _signOrder(t, takerPk);
+
+    vm.expectRevert("insufficient tokens");
+    exchange.matchMultipleOrdersWithFees(makers, makerSigs, fills, t, takerSig);
+
+    bytes32 m1Hash = exchange.hashOrder(m1);
+    assertEq(exchange.filledAmounts(m1Hash), 0, "maker1 should not be filled");
+  }
+
+  function testMatchMultipleSecondMakerInvalidSignatureReverts() public {
+    uint256 amount = 100 ether;
+    uint256 price = (60 * ONE) / 100;
+
+    collateral.mint(maker, 1000 ether);
+    collateral.mint(maker2, 1000 ether);
+    collateral.mint(taker, 2000 ether);
+
+    vm.startPrank(maker);
+    collateral.approve(address(conditionalTokens), type(uint256).max);
+    conditionalTokens.splitPosition(marketId, 200 ether);
+    conditionalTokens.setApprovalForAll(address(exchange), true);
+    vm.stopPrank();
+    vm.startPrank(maker2);
+    collateral.approve(address(conditionalTokens), type(uint256).max);
+    conditionalTokens.splitPosition(marketId, 200 ether);
+    conditionalTokens.setApprovalForAll(address(exchange), true);
+    vm.stopPrank();
+    vm.prank(taker);
+    collateral.approve(address(exchange), type(uint256).max);
+
+    MyriadCTFExchange.Order memory m1 = _buildOrder(maker, marketId, Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price, 5011);
+    MyriadCTFExchange.Order memory m2 = _buildOrder(maker2, marketId, Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price, 5012);
+    MyriadCTFExchange.Order memory t = _buildOrder(taker, marketId, Outcomes.YES, MyriadCTFExchange.Side.Buy, 200 ether, price, 5013);
+
+    MyriadCTFExchange.Order[] memory makers = new MyriadCTFExchange.Order[](2);
+    makers[0] = m1;
+    makers[1] = m2;
+    bytes[] memory makerSigs = new bytes[](2);
+    makerSigs[0] = _signOrder(m1, makerPk);
+    makerSigs[1] = _signOrder(m2, makerPk);
+    uint256[] memory fills = new uint256[](2);
+    fills[0] = amount;
+    fills[1] = amount;
+    bytes memory takerSig = _signOrder(t, takerPk);
+
+    vm.expectRevert("invalid signature");
+    exchange.matchMultipleOrdersWithFees(makers, makerSigs, fills, t, takerSig);
+
+    bytes32 m1Hash = exchange.hashOrder(m1);
+    assertEq(exchange.filledAmounts(m1Hash), 0, "maker1 should not be filled");
+  }
+
+  function testMatchMultipleTwoPassSettlesCorrectly() public {
+    uint256 amount = 50 ether;
+    uint256 price1 = (60 * ONE) / 100;
+    uint256 price2 = (55 * ONE) / 100;
+
+    collateral.mint(maker, 1000 ether);
+    collateral.mint(maker2, 1000 ether);
+    collateral.mint(taker, 2000 ether);
+
+    vm.startPrank(maker);
+    collateral.approve(address(conditionalTokens), type(uint256).max);
+    conditionalTokens.splitPosition(marketId, 200 ether);
+    conditionalTokens.setApprovalForAll(address(exchange), true);
+    vm.stopPrank();
+    vm.startPrank(maker2);
+    collateral.approve(address(conditionalTokens), type(uint256).max);
+    conditionalTokens.splitPosition(marketId, 200 ether);
+    conditionalTokens.setApprovalForAll(address(exchange), true);
+    vm.stopPrank();
+    vm.prank(taker);
+    collateral.approve(address(exchange), type(uint256).max);
+
+    MyriadCTFExchange.Order memory m1 = _buildOrder(maker, marketId, Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price1, 5021);
+    MyriadCTFExchange.Order memory m2 = _buildOrder(maker2, marketId, Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price2, 5022);
+    MyriadCTFExchange.Order memory t = _buildOrder(taker, marketId, Outcomes.YES, MyriadCTFExchange.Side.Buy, 200 ether, price1, 5023);
+
+    MyriadCTFExchange.Order[] memory makers = new MyriadCTFExchange.Order[](2);
+    makers[0] = m1;
+    makers[1] = m2;
+    bytes[] memory makerSigs = new bytes[](2);
+    makerSigs[0] = _signOrder(m1, makerPk);
+    makerSigs[1] = _signOrder(m2, maker2Pk);
+    uint256[] memory fills = new uint256[](2);
+    fills[0] = amount;
+    fills[1] = amount;
+    bytes memory takerSig = _signOrder(t, takerPk);
+
+    exchange.matchMultipleOrdersWithFees(makers, makerSigs, fills, t, takerSig);
+
+    bytes32 m1Hash = exchange.hashOrder(m1);
+    bytes32 m2Hash = exchange.hashOrder(m2);
+    bytes32 tHash = exchange.hashOrder(t);
+
+    assertEq(exchange.filledAmounts(m1Hash), amount, "maker1 filled");
+    assertEq(exchange.filledAmounts(m2Hash), amount, "maker2 filled");
+    assertEq(exchange.filledAmounts(tHash), 2 * amount, "taker filled");
+  }
+
+  function testMatchMultipleMakerOverfillCaughtInPass1() public {
+    uint256 amount = 100 ether;
+    uint256 price = (60 * ONE) / 100;
+
+    collateral.mint(maker, 1000 ether);
+    collateral.mint(maker2, 1000 ether);
+    collateral.mint(taker, 2000 ether);
+
+    vm.startPrank(maker);
+    collateral.approve(address(conditionalTokens), type(uint256).max);
+    conditionalTokens.splitPosition(marketId, 200 ether);
+    conditionalTokens.setApprovalForAll(address(exchange), true);
+    vm.stopPrank();
+    vm.startPrank(maker2);
+    collateral.approve(address(conditionalTokens), type(uint256).max);
+    conditionalTokens.splitPosition(marketId, 200 ether);
+    conditionalTokens.setApprovalForAll(address(exchange), true);
+    vm.stopPrank();
+    vm.prank(taker);
+    collateral.approve(address(exchange), type(uint256).max);
+
+    MyriadCTFExchange.Order memory m1 = _buildOrder(maker, marketId, Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price, 5031);
+    MyriadCTFExchange.Order memory m2 = _buildOrder(maker2, marketId, Outcomes.YES, MyriadCTFExchange.Side.Sell, 50 ether, price, 5032);
+    MyriadCTFExchange.Order memory t = _buildOrder(taker, marketId, Outcomes.YES, MyriadCTFExchange.Side.Buy, 200 ether, price, 5033);
+
+    MyriadCTFExchange.Order[] memory makers = new MyriadCTFExchange.Order[](2);
+    makers[0] = m1;
+    makers[1] = m2;
+    bytes[] memory makerSigs = new bytes[](2);
+    makerSigs[0] = _signOrder(m1, makerPk);
+    makerSigs[1] = _signOrder(m2, maker2Pk);
+    uint256[] memory fills = new uint256[](2);
+    fills[0] = amount;
+    fills[1] = 60 ether;
+    bytes memory takerSig = _signOrder(t, takerPk);
+
+    vm.expectRevert("maker overfill");
+    exchange.matchMultipleOrdersWithFees(makers, makerSigs, fills, t, takerSig);
+
+    bytes32 m1Hash = exchange.hashOrder(m1);
+    assertEq(exchange.filledAmounts(m1Hash), 0, "maker1 should not be filled");
+  }
+
+  function testMatchMultipleMintTwoPassSettles() public {
+    uint256 amount = 50 ether;
+    uint256 price = (60 * ONE) / 100;
+    uint256 cpPrice = ONE - price;
+
+    collateral.mint(maker, 1000 ether);
+    collateral.mint(maker2, 1000 ether);
+    collateral.mint(taker, 2000 ether);
+
+    vm.prank(maker);
+    collateral.approve(address(exchange), type(uint256).max);
+    vm.prank(maker2);
+    collateral.approve(address(exchange), type(uint256).max);
+    vm.prank(taker);
+    collateral.approve(address(exchange), type(uint256).max);
+
+    MyriadCTFExchange.Order memory m1 = _buildOrder(maker, marketId, Outcomes.YES, MyriadCTFExchange.Side.Buy, amount, price, 5041);
+    MyriadCTFExchange.Order memory m2 = _buildOrder(maker2, marketId, Outcomes.YES, MyriadCTFExchange.Side.Buy, amount, price, 5042);
+    MyriadCTFExchange.Order memory t = _buildOrder(taker, marketId, Outcomes.NO, MyriadCTFExchange.Side.Buy, 200 ether, cpPrice, 5043);
+
+    MyriadCTFExchange.Order[] memory makers = new MyriadCTFExchange.Order[](2);
+    makers[0] = m1;
+    makers[1] = m2;
+    bytes[] memory makerSigs = new bytes[](2);
+    makerSigs[0] = _signOrder(m1, makerPk);
+    makerSigs[1] = _signOrder(m2, maker2Pk);
+    uint256[] memory fills = new uint256[](2);
+    fills[0] = amount;
+    fills[1] = amount;
+    bytes memory takerSig = _signOrder(t, takerPk);
+
+    exchange.matchMultipleOrdersWithFees(makers, makerSigs, fills, t, takerSig);
+
+    bytes32 m1Hash = exchange.hashOrder(m1);
+    bytes32 m2Hash = exchange.hashOrder(m2);
+    bytes32 tHash = exchange.hashOrder(t);
+
+    assertEq(exchange.filledAmounts(m1Hash), amount, "maker1 filled");
+    assertEq(exchange.filledAmounts(m2Hash), amount, "maker2 filled");
+    assertEq(exchange.filledAmounts(tHash), 2 * amount, "taker filled");
+
+    uint256 yesTokenId = conditionalTokens.getTokenId(marketId, Outcomes.YES);
+    assertEq(conditionalTokens.balanceOf(maker, yesTokenId), amount, "maker1 YES tokens");
+    assertEq(conditionalTokens.balanceOf(maker2, yesTokenId), amount, "maker2 YES tokens");
   }
 
   // =========================================================================
