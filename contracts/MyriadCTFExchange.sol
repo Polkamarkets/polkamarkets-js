@@ -28,6 +28,7 @@ interface IFeeModule {
 /// @dev Minimal interface for the NegRiskAdapter, used by cross-market matching.
 interface INegRiskAdapter {
   function mintAllYesTokens(bytes32 eventId, uint256 amount, address recipient) external;
+  function mergeAllYesTokens(bytes32 eventId, uint256 amount) external;
   function getEventOutcomeCount(bytes32 eventId) external view returns (uint256);
 }
 
@@ -325,33 +326,8 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
       require(orders.length == expectedCount, "must match all outcomes");
     }
 
-    uint256 priceSum;
-    bytes32[] memory orderHashes = new bytes32[](orders.length);
-    uint256[] memory currentFilled = new uint256[](orders.length);
-
-    for (uint256 i = 0; i < orders.length; i++) {
-      Order calldata order = orders[i];
-      require(order.side == Side.Buy, "not buy");
-      require(order.outcomeId == Outcomes.YES, "not YES");
-      require(order.price > 0 && order.price <= ONE, "bad price");
-      require(_manager.getEventId(order.marketId) == eventId, "event mismatch");
-      require(_manager.isNegRisk(order.marketId), "not neg risk");
-
-      _requireMarketOpen(order.marketId);
-      _validateOrder(order, signatures[i]);
-
-      bytes32 h = hashOrder(order);
-      orderHashes[i] = h;
-      currentFilled[i] = filledAmounts[h];
-      require(currentFilled[i] + fillAmount <= order.amount, "overfill");
-      require(order.minFillAmount == 0 || fillAmount >= order.minFillAmount, "below min fill");
-
-      for (uint256 j = 0; j < i; j++) {
-        require(order.marketId != orders[j].marketId, "dup market");
-      }
-
-      priceSum += order.price;
-    }
+    (bytes32[] memory orderHashes, uint256[] memory currentFilled, uint256 priceSum) =
+      _validateCrossMarketOrders(orders, signatures, fillAmount, eventId, Side.Buy);
 
     require(priceSum >= ONE, "price sum < 1");
 
@@ -409,6 +385,84 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
     uint256 surplus = totalNotional - fillAmount;
     uint256 toFeeModule = totalFees + surplus;
     if (toFeeModule > 0) {
+      collateral.safeTransfer(address(_feeModule), toFeeModule);
+      _feeModule.accrueFees(address(collateral), toFeeModule);
+    }
+    if (surplus > 0) {
+      emit SurplusCollected(eventId, surplus);
+    }
+  }
+
+  /// @notice Reverse of matchCrossMarketOrders: match SELL YES orders across
+  ///         different outcome markets in the same neg risk event.
+  ///         All orders must be SELL side, outcome 0 (YES), for distinct markets
+  ///         belonging to the same event. Prices must sum to <= ONE.
+  ///         YES tokens are collected from sellers, merged via NegRiskAdapter
+  ///         (using the adapter's held NO tokens), and the resulting collateral
+  ///         is distributed as proceeds to each seller.
+  function mergeCrossMarketOrders(
+    Order[] calldata orders,
+    bytes[] calldata signatures,
+    uint256 fillAmount
+  ) external whenNotPaused nonReentrant {
+    require(registry.hasRole(registry.OPERATOR_ROLE(), msg.sender), "not operator");
+
+    address _adapter = negRiskAdapter;
+    require(_adapter != address(0), "no adapter");
+    require(orders.length >= 2, "need >= 2 orders");
+    require(signatures.length == orders.length, "sig count");
+    require(fillAmount > 0, "fill 0");
+
+    IMyriadMarketManager _manager = manager;
+    ConditionalTokens _ct = conditionalTokens;
+    IFeeModule _feeModule = IFeeModule(feeModule);
+
+    bytes32 eventId = _manager.getEventId(orders[0].marketId);
+    require(eventId != bytes32(0), "not neg risk");
+
+    {
+      uint256 expectedCount = INegRiskAdapter(_adapter).getEventOutcomeCount(eventId);
+      require(orders.length == expectedCount, "must match all outcomes");
+    }
+
+    (bytes32[] memory orderHashes, uint256[] memory currentFilled, uint256 priceSum) =
+      _validateCrossMarketOrders(orders, signatures, fillAmount, eventId, Side.Sell);
+
+    require(priceSum <= ONE, "price sum > 1");
+
+    // Check all YES token balances, then collect tokens to adapter.
+    for (uint256 i = 0; i < orders.length; i++) {
+      uint256 yesTokenId = _ct.getTokenId(orders[i].marketId, Outcomes.YES);
+      _checkTokenBalance(orders[i].trader, yesTokenId, fillAmount);
+    }
+
+    for (uint256 i = 0; i < orders.length; i++) {
+      uint256 yesTokenId = _ct.getTokenId(orders[i].marketId, Outcomes.YES);
+      _ct.safeTransferFrom(orders[i].trader, _adapter, yesTokenId, fillAmount, "");
+    }
+
+    INegRiskAdapter(_adapter).mergeAllYesTokens(eventId, fillAmount);
+
+    (uint256 totalNotional, uint256 totalFees) = _distributeMergeProceeds(orders, fillAmount, _feeModule, _manager);
+
+    // Update fill amounts and emit events.
+    for (uint256 i = 0; i < orders.length; i++) {
+      uint256 newFill = currentFilled[i] + fillAmount;
+      filledAmounts[orderHashes[i]] = newFill;
+
+      if (minOrderAmount > 0) {
+        uint256 remaining = orders[i].amount - newFill;
+        require(remaining == 0 || remaining >= minOrderAmount, "dust remainder");
+      }
+
+      emit CrossMarketOrderFilled(orderHashes[i], eventId, orders[i].marketId, fillAmount, newFill);
+    }
+
+    // Surplus (priceSum < ONE) + fees to feeModule.
+    uint256 surplus = fillAmount - totalNotional;
+    uint256 toFeeModule = totalFees + surplus;
+    if (toFeeModule > 0) {
+      IERC20 collateral = _manager.getMarketCollateral(orders[0].marketId);
       collateral.safeTransfer(address(_feeModule), toFeeModule);
       _feeModule.accrueFees(address(collateral), toFeeModule);
     }
@@ -843,6 +897,73 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
 
     if (totalProtocolFees > 0) {
       collateral.safeTransfer(feeModule, totalProtocolFees);
+    }
+  }
+
+  /// @dev Shared validation for cross-market orders (BUY mint or SELL merge).
+  function _validateCrossMarketOrders(
+    Order[] calldata orders,
+    bytes[] calldata signatures,
+    uint256 fillAmount,
+    bytes32 eventId,
+    Side expectedSide
+  ) internal view returns (bytes32[] memory, uint256[] memory, uint256) {
+    uint256 n = orders.length;
+    bytes32[] memory hashes = new bytes32[](n);
+    uint256[] memory filled = new uint256[](n);
+    uint256 priceSum;
+
+    for (uint256 i = 0; i < n; i++) {
+      require(orders[i].side == expectedSide, expectedSide == Side.Buy ? "not buy" : "not sell");
+      require(orders[i].outcomeId == Outcomes.YES, "not YES");
+      require(orders[i].price > 0 && orders[i].price <= ONE, "bad price");
+      require(manager.getEventId(orders[i].marketId) == eventId, "event mismatch");
+      require(manager.isNegRisk(orders[i].marketId), "not neg risk");
+
+      _requireMarketOpen(orders[i].marketId);
+      _validateOrder(orders[i], signatures[i]);
+
+      hashes[i] = hashOrder(orders[i]);
+      filled[i] = filledAmounts[hashes[i]];
+      require(filled[i] + fillAmount <= orders[i].amount, "overfill");
+      require(orders[i].minFillAmount == 0 || fillAmount >= orders[i].minFillAmount, "below min fill");
+
+      for (uint256 j = 0; j < i; j++) {
+        require(orders[i].marketId != orders[j].marketId, "dup market");
+      }
+
+      priceSum += orders[i].price;
+    }
+
+    return (hashes, filled, priceSum);
+  }
+
+  /// @dev Distribute merge proceeds to sellers: each gets (notional - fee).
+  function _distributeMergeProceeds(
+    Order[] calldata orders,
+    uint256 fillAmount,
+    IFeeModule _feeModule,
+    IMyriadMarketManager _manager
+  ) internal returns (uint256 totalNotional, uint256 totalFees) {
+    IERC20 collateral = _manager.getMarketCollateral(orders[0].marketId);
+    uint256 takerIdx = orders.length - 1;
+
+    for (uint256 i = 0; i < orders.length; i++) {
+      uint256 notional = (fillAmount * orders[i].price) / ONE;
+      require(notional > 0, "notional 0");
+      totalNotional += notional;
+
+      uint256 fee;
+      if (i == takerIdx) {
+        (, uint16 takerBps) = _feeModule.getFeesAtPrice(orders[i].marketId, orders[i].price);
+        fee = (notional * takerBps) / BPS;
+      } else {
+        (uint16 makerBps, ) = _feeModule.getFeesAtPrice(orders[i].marketId, orders[i].price);
+        fee = (notional * makerBps) / BPS;
+      }
+      totalFees += fee;
+
+      collateral.safeTransfer(orders[i].trader, notional - fee);
     }
   }
 

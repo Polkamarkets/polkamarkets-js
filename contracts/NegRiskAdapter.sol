@@ -60,6 +60,7 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
   event PositionsMerged(bytes32 indexed eventId, uint256 outcomeIndex, address indexed user, uint256 amount);
   event PositionsConverted(bytes32 indexed eventId, uint256 noOutcomeIndex, address indexed user, uint256 amount);
   event AllYesTokensMinted(bytes32 indexed eventId, address indexed recipient, uint256 amount);
+  event AllYesTokensMerged(bytes32 indexed eventId, address indexed sender, uint256 amount);
   event NOPositionsRedeemed(bytes32 indexed eventId, uint256 wcolRecovered, uint256 wcolBurned, uint256 excessToTreasury);
   event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
   event ExchangeUpdated(address indexed oldExchange, address indexed newExchange);
@@ -305,6 +306,38 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     }
 
     emit AllYesTokensMinted(eventId, recipient, amount);
+  }
+
+  /// @notice Reverse of mintAllYesTokens: merge YES tokens for ALL outcomes
+  ///         back to wcol. The caller (exchange) must have already transferred
+  ///         `amount` YES tokens for every outcome to this contract.
+  ///         Adapter merges each market (burns YES + its held NO), burns the
+  ///         adapter-minted wcol portion, and returns `amount` wcol to caller.
+  /// @param eventId The event identifier.
+  /// @param amount Number of shares per outcome to merge.
+  function mergeAllYesTokens(
+    bytes32 eventId,
+    uint256 amount
+  ) external nonReentrant {
+    require(msg.sender == exchange, "only exchange");
+    Event storage evt = _events[eventId];
+    require(evt.outcomeCount > 0, "event !exist");
+    require(!evt.resolved, "event resolved");
+    require(amount > 0, "amount 0");
+
+    uint256 n = evt.outcomeCount;
+
+    for (uint256 i = 0; i < n; i++) {
+      conditionalTokens.mergePositions(evt.marketIds[i], amount);
+    }
+
+    uint256 wcolToBurn = (n - 1) * amount;
+    mintedWcolPerEvent[eventId] -= wcolToBurn;
+    wcol.adapterBurn(address(this), wcolToBurn);
+
+    IERC20(address(wcol)).safeTransfer(msg.sender, amount);
+
+    emit AllYesTokensMerged(eventId, msg.sender, amount);
   }
 
   // ─── Resolution ──────────────────────────────────────────────────────

@@ -970,6 +970,521 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
   }
 
   // =========================================================================
+  // Cross-market merge (SELL YES)
+  // =========================================================================
+
+  function _setupBuyThenSell(
+    uint256[] memory marketIds,
+    uint256 amount
+  ) internal returns (MyriadCTFExchange.Order[] memory buyOrders) {
+    for (uint256 i = 0; i < 3; i++) _setUniformFees(marketIds[i], 100, 200);
+
+    uint256 fundAmount = 500 ether;
+    for (uint256 i = 0; i < 3; i++) {
+      address user = i == 0 ? alice : (i == 1 ? bob : charlie);
+      collateral.mint(user, fundAmount);
+      vm.startPrank(user);
+      collateral.approve(address(wcol), fundAmount);
+      wcol.wrap(fundAmount);
+      IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+      conditionalTokens.setApprovalForAll(address(exchange), true);
+      vm.stopPrank();
+    }
+
+    uint256 price0 = (45 * ONE) / 100;
+    uint256 price1 = (35 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    buyOrders = new MyriadCTFExchange.Order[](3);
+    buyOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Buy, amount, price0, 100);
+    buyOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Buy, amount, price1, 101);
+    buyOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Buy, amount, price2, 102);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(buyOrders[0], alicePk);
+    sigs[1] = _signOrder(buyOrders[1], bobPk);
+    sigs[2] = _signOrder(buyOrders[2], charliePk);
+
+    exchange.matchCrossMarketOrders(buyOrders, sigs, amount);
+  }
+
+  function testMergeCrossMarketMatch() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    _setupBuyThenSell(marketIds, amount);
+
+    uint256 price0 = (45 * ONE) / 100;
+    uint256 price1 = (35 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory sellOrders = new MyriadCTFExchange.Order[](3);
+    sellOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price0, 200);
+    sellOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price1, 201);
+    sellOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price2, 202);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(sellOrders[0], alicePk);
+    sigs[1] = _signOrder(sellOrders[1], bobPk);
+    sigs[2] = _signOrder(sellOrders[2], charliePk);
+
+    exchange.mergeCrossMarketOrders(sellOrders, sigs, amount);
+
+    assertEq(conditionalTokens.balanceOf(alice, conditionalTokens.getTokenId(marketIds[0], Outcomes.YES)), 0);
+    assertEq(conditionalTokens.balanceOf(bob, conditionalTokens.getTokenId(marketIds[1], Outcomes.YES)), 0);
+    assertEq(conditionalTokens.balanceOf(charlie, conditionalTokens.getTokenId(marketIds[2], Outcomes.YES)), 0);
+
+    bytes32 hash0 = exchange.hashOrder(sellOrders[0]);
+    assertEq(exchange.filledAmounts(hash0), amount);
+  }
+
+  function testMergeCrossMarketPriceSumOver1Reverts() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    _setupBuyThenSell(marketIds, amount);
+
+    uint256 price0 = (45 * ONE) / 100;
+    uint256 price1 = (35 * ONE) / 100;
+    uint256 price2 = (21 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory sellOrders = new MyriadCTFExchange.Order[](3);
+    sellOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price0, 300);
+    sellOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price1, 301);
+    sellOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price2, 302);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(sellOrders[0], alicePk);
+    sigs[1] = _signOrder(sellOrders[1], bobPk);
+    sigs[2] = _signOrder(sellOrders[2], charliePk);
+
+    vm.expectRevert("price sum > 1");
+    exchange.mergeCrossMarketOrders(sellOrders, sigs, amount);
+  }
+
+  function testMergeCrossMarketNotSellReverts() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    _setupBuyThenSell(marketIds, amount);
+
+    uint256 price0 = (45 * ONE) / 100;
+    uint256 price1 = (35 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory sellOrders = new MyriadCTFExchange.Order[](3);
+    sellOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Buy, amount, price0, 400);
+    sellOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price1, 401);
+    sellOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price2, 402);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(sellOrders[0], alicePk);
+    sigs[1] = _signOrder(sellOrders[1], bobPk);
+    sigs[2] = _signOrder(sellOrders[2], charliePk);
+
+    vm.expectRevert("not sell");
+    exchange.mergeCrossMarketOrders(sellOrders, sigs, amount);
+  }
+
+  function testMergeCrossMarketInsufficientTokensReverts() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    _setupBuyThenSell(marketIds, amount);
+
+    uint256 price0 = (45 * ONE) / 100;
+    uint256 price1 = (35 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    // Transfer away bob's YES tokens so he can't sell
+    uint256 bobTokenId = conditionalTokens.getTokenId(marketIds[1], Outcomes.YES);
+    vm.prank(bob);
+    conditionalTokens.safeTransferFrom(bob, treasury, bobTokenId, amount, "");
+
+    MyriadCTFExchange.Order[] memory sellOrders = new MyriadCTFExchange.Order[](3);
+    sellOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price0, 500);
+    sellOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price1, 501);
+    sellOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price2, 502);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(sellOrders[0], alicePk);
+    sigs[1] = _signOrder(sellOrders[1], bobPk);
+    sigs[2] = _signOrder(sellOrders[2], charliePk);
+
+    vm.expectRevert("insufficient tokens");
+    exchange.mergeCrossMarketOrders(sellOrders, sigs, amount);
+  }
+
+  function testMergeCrossMarketFeesCollected() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    _setupBuyThenSell(marketIds, amount);
+
+    uint256 price0 = (45 * ONE) / 100;
+    uint256 price1 = (35 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory sellOrders = new MyriadCTFExchange.Order[](3);
+    sellOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price0, 600);
+    sellOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price1, 601);
+    sellOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price2, 602);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(sellOrders[0], alicePk);
+    sigs[1] = _signOrder(sellOrders[1], bobPk);
+    sigs[2] = _signOrder(sellOrders[2], charliePk);
+
+    uint256 feeModuleBefore = wcol.balanceOf(address(feeModule));
+
+    exchange.mergeCrossMarketOrders(sellOrders, sigs, amount);
+
+    uint256 feeModuleAfter = wcol.balanceOf(address(feeModule));
+    assertTrue(feeModuleAfter > feeModuleBefore, "fees should be collected");
+  }
+
+  function testMergeCrossMarketSurplus() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    _setupBuyThenSell(marketIds, amount);
+
+    uint256 price0 = (40 * ONE) / 100;
+    uint256 price1 = (30 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory sellOrders = new MyriadCTFExchange.Order[](3);
+    sellOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price0, 700);
+    sellOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price1, 701);
+    sellOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price2, 702);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(sellOrders[0], alicePk);
+    sigs[1] = _signOrder(sellOrders[1], bobPk);
+    sigs[2] = _signOrder(sellOrders[2], charliePk);
+
+    exchange.mergeCrossMarketOrders(sellOrders, sigs, amount);
+
+    bytes32 hash0 = exchange.hashOrder(sellOrders[0]);
+    assertEq(exchange.filledAmounts(hash0), amount);
+  }
+
+  function testMergeCrossMarketPartialFill() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+    uint256 fillAmount = 40 ether;
+
+    _setupBuyThenSell(marketIds, amount);
+
+    uint256 price0 = (45 * ONE) / 100;
+    uint256 price1 = (35 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory sellOrders = new MyriadCTFExchange.Order[](3);
+    sellOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price0, 800);
+    sellOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price1, 801);
+    sellOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price2, 802);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(sellOrders[0], alicePk);
+    sigs[1] = _signOrder(sellOrders[1], bobPk);
+    sigs[2] = _signOrder(sellOrders[2], charliePk);
+
+    exchange.mergeCrossMarketOrders(sellOrders, sigs, fillAmount);
+
+    assertEq(conditionalTokens.balanceOf(alice, conditionalTokens.getTokenId(marketIds[0], Outcomes.YES)), amount - fillAmount);
+    bytes32 hash0 = exchange.hashOrder(sellOrders[0]);
+    assertEq(exchange.filledAmounts(hash0), fillAmount);
+  }
+
+  function testMergeCrossMarketMakerTakerFees() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    _setupBuyThenSell(marketIds, amount);
+
+    // Override fees after setup (which sets 1%/2%) to 1% maker / 3% taker
+    for (uint256 i = 0; i < 3; i++) _setUniformFees(marketIds[i], 100, 300);
+
+    uint256 price0 = (40 * ONE) / 100;
+    uint256 price1 = (30 * ONE) / 100;
+    uint256 price2 = (30 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory sellOrders = new MyriadCTFExchange.Order[](3);
+    sellOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price0, 1100);
+    sellOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price1, 1101);
+    sellOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price2, 1102);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(sellOrders[0], alicePk);
+    sigs[1] = _signOrder(sellOrders[1], bobPk);
+    sigs[2] = _signOrder(sellOrders[2], charliePk);
+
+    uint256 aliceBefore = wcol.balanceOf(alice);
+    uint256 bobBefore = wcol.balanceOf(bob);
+    uint256 charlieBefore = wcol.balanceOf(charlie);
+    uint256 feeModuleBefore = wcol.balanceOf(address(feeModule));
+
+    exchange.mergeCrossMarketOrders(sellOrders, sigs, amount);
+
+    uint256 aliceNotional = (amount * price0) / ONE;
+    uint256 aliceFee = (aliceNotional * 100) / BPS;
+    assertEq(wcol.balanceOf(alice) - aliceBefore, aliceNotional - aliceFee, "alice receives notional - makerFee");
+
+    uint256 bobNotional = (amount * price1) / ONE;
+    uint256 bobFee = (bobNotional * 100) / BPS;
+    assertEq(wcol.balanceOf(bob) - bobBefore, bobNotional - bobFee, "bob receives notional - makerFee");
+
+    uint256 charlieNotional = (amount * price2) / ONE;
+    uint256 charlieFee = (charlieNotional * 300) / BPS;
+    assertEq(wcol.balanceOf(charlie) - charlieBefore, charlieNotional - charlieFee, "charlie receives notional - takerFee");
+
+    uint256 totalFees = aliceFee + bobFee + charlieFee;
+    assertEq(wcol.balanceOf(address(feeModule)) - feeModuleBefore, totalFees, "feeModule received exact fees");
+  }
+
+  function testMergeCrossMarketSurplusEmitsEvent() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    _setupBuyThenSell(marketIds, amount);
+
+    uint256 price0 = (40 * ONE) / 100;
+    uint256 price1 = (30 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory sellOrders = new MyriadCTFExchange.Order[](3);
+    sellOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price0, 1200);
+    sellOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price1, 1201);
+    sellOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price2, 1202);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(sellOrders[0], alicePk);
+    sigs[1] = _signOrder(sellOrders[1], bobPk);
+    sigs[2] = _signOrder(sellOrders[2], charliePk);
+
+    bytes32 eventId = manager.getEventId(marketIds[0]);
+    uint256 expectedSurplus = amount - ((amount * price0) / ONE + (amount * price1) / ONE + (amount * price2) / ONE);
+
+    vm.expectEmit(true, false, false, true, address(exchange));
+    emit MyriadCTFExchange.SurplusCollected(eventId, expectedSurplus);
+
+    exchange.mergeCrossMarketOrders(sellOrders, sigs, amount);
+  }
+
+  function testMergeCrossMarketSurplusWithFees() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    for (uint256 i = 0; i < 3; i++) _setUniformFees(marketIds[i], 100, 200);
+
+    _setupBuyThenSell(marketIds, amount);
+
+    uint256 price0 = (40 * ONE) / 100;
+    uint256 price1 = (30 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory sellOrders = new MyriadCTFExchange.Order[](3);
+    sellOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price0, 1300);
+    sellOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price1, 1301);
+    sellOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price2, 1302);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(sellOrders[0], alicePk);
+    sigs[1] = _signOrder(sellOrders[1], bobPk);
+    sigs[2] = _signOrder(sellOrders[2], charliePk);
+
+    uint256 feeModuleBefore = wcol.balanceOf(address(feeModule));
+
+    exchange.mergeCrossMarketOrders(sellOrders, sigs, amount);
+
+    uint256 n0 = (amount * price0) / ONE;
+    uint256 n1 = (amount * price1) / ONE;
+    uint256 n2 = (amount * price2) / ONE;
+    uint256 totalNotional = n0 + n1 + n2;
+    uint256 surplus = amount - totalNotional;
+    uint256 fee0 = (n0 * 100) / BPS;
+    uint256 fee1 = (n1 * 100) / BPS;
+    uint256 fee2 = (n2 * 200) / BPS;
+    uint256 totalFees = fee0 + fee1 + fee2;
+
+    assertEq(wcol.balanceOf(address(feeModule)) - feeModuleBefore, surplus + totalFees, "feeModule gets surplus + fees");
+  }
+
+  function testMergeCrossMarketTokensNotApprovedReverts() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    _setupBuyThenSell(marketIds, amount);
+
+    // Charlie revokes ERC-1155 approval for exchange
+    vm.prank(charlie);
+    conditionalTokens.setApprovalForAll(address(exchange), false);
+
+    uint256 price0 = (45 * ONE) / 100;
+    uint256 price1 = (35 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory sellOrders = new MyriadCTFExchange.Order[](3);
+    sellOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price0, 1400);
+    sellOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price1, 1401);
+    sellOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price2, 1402);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(sellOrders[0], alicePk);
+    sigs[1] = _signOrder(sellOrders[1], bobPk);
+    sigs[2] = _signOrder(sellOrders[2], charliePk);
+
+    vm.expectRevert("tokens not approved");
+    exchange.mergeCrossMarketOrders(sellOrders, sigs, amount);
+  }
+
+  function testMergeCrossMarketBelowMinAmountReverts() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    exchange.setMinOrderAmount(10 ether);
+
+    uint256 price0 = (45 * ONE) / 100;
+    uint256 price1 = (35 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory orders = new MyriadCTFExchange.Order[](3);
+    orders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Sell, 5 ether, price0, 1500);
+    orders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, 5 ether, price1, 1501);
+    orders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, 5 ether, price2, 1502);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(orders[0], alicePk);
+    sigs[1] = _signOrder(orders[1], bobPk);
+    sigs[2] = _signOrder(orders[2], charliePk);
+
+    vm.expectRevert("below min amount");
+    exchange.mergeCrossMarketOrders(orders, sigs, 5 ether);
+  }
+
+  function testMergeCrossMarketDustRemainderReverts() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    _setupBuyThenSell(marketIds, amount);
+    exchange.setMinOrderAmount(10 ether);
+
+    uint256 price0 = (45 * ONE) / 100;
+    uint256 price1 = (35 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory sellOrders = new MyriadCTFExchange.Order[](3);
+    sellOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Sell, 25 ether, price0, 1600);
+    sellOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, 20 ether, price1, 1601);
+    sellOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, 20 ether, price2, 1602);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(sellOrders[0], alicePk);
+    sigs[1] = _signOrder(sellOrders[1], bobPk);
+    sigs[2] = _signOrder(sellOrders[2], charliePk);
+
+    vm.expectRevert("dust remainder");
+    exchange.mergeCrossMarketOrders(sellOrders, sigs, 20 ether);
+  }
+
+  function testMergeCrossMarketExactRemainderAtMinAllowed() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    _setupBuyThenSell(marketIds, amount);
+    exchange.setMinOrderAmount(10 ether);
+
+    uint256 price0 = (45 * ONE) / 100;
+    uint256 price1 = (35 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory sellOrders = new MyriadCTFExchange.Order[](3);
+    sellOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Sell, 30 ether, price0, 1700);
+    sellOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, 20 ether, price1, 1701);
+    sellOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, 20 ether, price2, 1702);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(sellOrders[0], alicePk);
+    sigs[1] = _signOrder(sellOrders[1], bobPk);
+    sigs[2] = _signOrder(sellOrders[2], charliePk);
+
+    exchange.mergeCrossMarketOrders(sellOrders, sigs, 20 ether);
+
+    bytes32 hash0 = exchange.hashOrder(sellOrders[0]);
+    assertEq(exchange.filledAmounts(hash0), 20 ether);
+  }
+
+  function testMergeAllYesTokensOnlyExchangeReverts() public {
+    (bytes32 eventId, ) = _createThreeOutcomeEvent();
+
+    vm.prank(alice);
+    vm.expectRevert("only exchange");
+    adapter.mergeAllYesTokens(eventId, 10 ether);
+  }
+
+  function testMergeCrossMarketRoundTrip() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    for (uint256 i = 0; i < 3; i++) _setUniformFees(marketIds[i], 0, 0);
+
+    uint256 fundAmount = 500 ether;
+    for (uint256 i = 0; i < 3; i++) {
+      address user = i == 0 ? alice : (i == 1 ? bob : charlie);
+      collateral.mint(user, fundAmount);
+      vm.startPrank(user);
+      collateral.approve(address(wcol), fundAmount);
+      wcol.wrap(fundAmount);
+      IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+      conditionalTokens.setApprovalForAll(address(exchange), true);
+      vm.stopPrank();
+    }
+
+    uint256 price0 = (45 * ONE) / 100;
+    uint256 price1 = (35 * ONE) / 100;
+    uint256 price2 = (20 * ONE) / 100;
+
+    uint256 aliceBefore = wcol.balanceOf(alice);
+    uint256 bobBefore = wcol.balanceOf(bob);
+    uint256 charlieBefore = wcol.balanceOf(charlie);
+
+    // BUY mint
+    MyriadCTFExchange.Order[] memory buyOrders = new MyriadCTFExchange.Order[](3);
+    buyOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Buy, amount, price0, 1800);
+    buyOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Buy, amount, price1, 1801);
+    buyOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Buy, amount, price2, 1802);
+
+    bytes[] memory buySigs = new bytes[](3);
+    buySigs[0] = _signOrder(buyOrders[0], alicePk);
+    buySigs[1] = _signOrder(buyOrders[1], bobPk);
+    buySigs[2] = _signOrder(buyOrders[2], charliePk);
+
+    exchange.matchCrossMarketOrders(buyOrders, buySigs, amount);
+
+    // SELL merge at same prices
+    MyriadCTFExchange.Order[] memory sellOrders = new MyriadCTFExchange.Order[](3);
+    sellOrders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price0, 1900);
+    sellOrders[1] = _buildOrder(bob, marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price1, 1901);
+    sellOrders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Sell, amount, price2, 1902);
+
+    bytes[] memory sellSigs = new bytes[](3);
+    sellSigs[0] = _signOrder(sellOrders[0], alicePk);
+    sellSigs[1] = _signOrder(sellOrders[1], bobPk);
+    sellSigs[2] = _signOrder(sellOrders[2], charliePk);
+
+    exchange.mergeCrossMarketOrders(sellOrders, sellSigs, amount);
+
+    // With 0% fees and priceSum == ONE, each trader should get back exactly what they paid
+    assertEq(wcol.balanceOf(alice), aliceBefore, "alice wcol unchanged after round-trip");
+    assertEq(wcol.balanceOf(bob), bobBefore, "bob wcol unchanged after round-trip");
+    assertEq(wcol.balanceOf(charlie), charlieBefore, "charlie wcol unchanged after round-trip");
+
+    // All YES tokens should be gone
+    assertEq(conditionalTokens.balanceOf(alice, conditionalTokens.getTokenId(marketIds[0], Outcomes.YES)), 0);
+    assertEq(conditionalTokens.balanceOf(bob, conditionalTokens.getTokenId(marketIds[1], Outcomes.YES)), 0);
+    assertEq(conditionalTokens.balanceOf(charlie, conditionalTokens.getTokenId(marketIds[2], Outcomes.YES)), 0);
+  }
+
+  // =========================================================================
   // Void event
   // =========================================================================
 
