@@ -54,11 +54,13 @@ contract CreateCLOBMarket is Script {
       bool yesAbove = vm.envBool("YES_ABOVE");
       int256 param = vm.envOr("PARAM", int256(0));
       uint256 openTimestamp = vm.envOr("OPEN_TIMESTAMP", uint256(0));
+      int256 paramB = vm.envOr("PARAM_B", int256(0));
+      uint256 interval = vm.envOr("INTERVAL", uint256(0));
 
       bytes32 feedId = keccak256(bytes(feedIdStr));
       bytes32 feedIdB = bytes(feedIdBStr).length > 0 ? keccak256(bytes(feedIdBStr)) : bytes32(0);
 
-      oracleData = abi.encode(feedId, feedIdB, ruleType, yesAbove, param, openTimestamp);
+      oracleData = abi.encode(feedId, feedIdB, ruleType, yesAbove, param, openTimestamp, paramB, interval);
     }
 
     vm.startBroadcast(privateKey);

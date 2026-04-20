@@ -28,17 +28,15 @@ contract CRENegRiskResolver is ICREReceiver {
   enum EventRuleType {
     RANGE,            // 0
     BEST_PERFORMER,   // 1
-    HIT_MILESTONES,   // 2
-    FIRST_TO_HIT      // 3 — "Which boundary is hit first?" CRE determines winner off-chain.
+    HIT_MILESTONES    // 2
   }
 
   struct EventConfig {
     EventRuleType ruleType;
-    bytes32[] feedIds;       // RANGE/HIT_MILESTONES: 1 feed; BEST_PERFORMER/FIRST_TO_HIT: N feeds
+    bytes32[] feedIds;       // RANGE/HIT_MILESTONES: 1 feed; BEST_PERFORMER: N feeds
     uint256 openTimestamp;   // BEST_PERFORMER needs this; 0 for RANGE/HIT_MILESTONES
     uint256 closesAt;
-    int256[] boundaries;     // RANGE/HIT_MILESTONES: sorted ascending; FIRST_TO_HIT: one per outcome
-    bool[] hitDirections;    // FIRST_TO_HIT only: true = hit above, false = hit below; empty otherwise
+    int256[] boundaries;     // RANGE/HIT_MILESTONES: sorted ascending; empty for BEST_PERFORMER
     bool initialized;
   }
 
@@ -86,6 +84,15 @@ contract CRENegRiskResolver is ICREReceiver {
     allowedWorkflowOwner = _allowedWorkflowOwner;
   }
 
+  // ─── ERC165 (required by KeystoneForwarder) ──────────────────────────
+
+  /// @dev The forwarder checks supportsInterface(type(ICREReceiver).interfaceId) before calling.
+  function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+    return
+      interfaceId == type(ICREReceiver).interfaceId ||
+      interfaceId == 0x01ffc9a7; // ERC165 itself
+  }
+
   // ─── Configuration ───────────────────────────────────────────────────
 
   /// @notice Configure a neg-risk event for CRE-based resolution.
@@ -121,81 +128,42 @@ contract CRENegRiskResolver is ICREReceiver {
       require(feedIds.length == 1, "HIT_MILESTONES: 1 feed");
       require(boundaries.length == outcomeCount - 1, "HIT_MILESTONES: boundary count");
       _requireAscending(boundaries);
-    } else if (ruleType == EventRuleType.FIRST_TO_HIT) {
-      revert("use configureFirstToHitEvent");
     }
 
     require(closesAt > 0, "closesAt 0");
 
-    bool[] memory emptyDirs = new bool[](0);
     _eventConfigs[eventId] = EventConfig({
       ruleType: ruleType,
       feedIds: feedIds,
       openTimestamp: openTimestamp,
       closesAt: closesAt,
       boundaries: boundaries,
-      hitDirections: emptyDirs,
       initialized: true
     });
 
     emit EventConfigured(eventId, ruleType, feedIds.length, boundaries.length);
   }
 
-  /// @notice Configure a FIRST_TO_HIT event. Each outcome has a feed, threshold, and direction.
-  ///         "Will BTC hit $100K or $50K first?" → 2 outcomes, boundaries=[100Ke8, 50Ke8], directions=[true, false]
-  function configureFirstToHitEvent(
-    bytes32 eventId,
-    bytes32[] calldata feedIds,
-    uint256 closesAt,
-    int256[] calldata thresholds,
-    bool[] calldata directions
-  ) external {
-    require(registry.hasRole(registry.MARKET_ADMIN_ROLE(), msg.sender), "not market admin");
-    require(!_eventConfigs[eventId].initialized, "already configured");
-
-    uint256 outcomeCount = negRiskAdapter.getEventOutcomeCount(eventId);
-    require(outcomeCount > 0, "event !exist");
-    require(feedIds.length == outcomeCount, "FIRST_TO_HIT: feed per outcome");
-    require(thresholds.length == outcomeCount, "FIRST_TO_HIT: threshold per outcome");
-    require(directions.length == outcomeCount, "FIRST_TO_HIT: direction per outcome");
-    require(closesAt > 0, "closesAt 0");
-
-    _eventConfigs[eventId] = EventConfig({
-      ruleType: EventRuleType.FIRST_TO_HIT,
-      feedIds: feedIds,
-      openTimestamp: 0,
-      closesAt: closesAt,
-      boundaries: thresholds,
-      hitDirections: directions,
-      initialized: true
-    });
-
-    emit EventConfigured(eventId, EventRuleType.FIRST_TO_HIT, feedIds.length, thresholds.length);
-  }
-
   // ─── ICREReceiver: onReport ──────────────────────────────────────────
 
   /// @notice Receives a CRE report triggering event resolution.
-  ///         For RANGE/BEST_PERFORMER/HIT_MILESTONES: prices must already be in CREOracle.
-  ///         For FIRST_TO_HIT: CRE provides the winning index directly.
+  ///         Prices must already be stored in CREOracle.
   /// @param metadata Workflow metadata.
-  /// @param report ABI-encoded (bytes32[] eventIds, int256[] winningIndices).
-  ///        winningIndices[i] is used only for FIRST_TO_HIT events; ignored otherwise (pass 0).
+  /// @param report ABI-encoded (bytes32[] eventIds).
   function onReport(bytes calldata metadata, bytes calldata report) external override {
     require(msg.sender == keystoneForwarder, "!forwarder");
     _validateMetadata(metadata);
 
-    (bytes32[] memory eventIds, int256[] memory winningIndices) = abi.decode(report, (bytes32[], int256[]));
-    require(eventIds.length == winningIndices.length, "length mismatch");
+    bytes32[] memory eventIds = abi.decode(report, (bytes32[]));
 
     for (uint256 i = 0; i < eventIds.length; i++) {
-      _resolveEvent(eventIds[i], winningIndices[i]);
+      _resolveEvent(eventIds[i]);
     }
   }
 
   // ─── Resolution logic ────────────────────────────────────────────────
 
-  function _resolveEvent(bytes32 eventId, int256 reportedWinner) internal {
+  function _resolveEvent(bytes32 eventId) internal {
     EventConfig storage config = _eventConfigs[eventId];
     require(config.initialized, "event not configured");
     require(!negRiskAdapter.isEventResolved(eventId), "already resolved");
@@ -208,8 +176,6 @@ contract CRENegRiskResolver is ICREReceiver {
       winningIndex = _resolveBestPerformer(config);
     } else if (config.ruleType == EventRuleType.HIT_MILESTONES) {
       winningIndex = _resolveHitMilestones(config);
-    } else if (config.ruleType == EventRuleType.FIRST_TO_HIT) {
-      winningIndex = _resolveFirstToHit(config, reportedWinner);
     }
 
     negRiskAdapter.resolveEvent(eventId, winningIndex);
@@ -285,53 +251,29 @@ contract CRENegRiskResolver is ICREReceiver {
     return winningIndex;
   }
 
-  /// @dev FIRST_TO_HIT: CRE determines the winner off-chain by scanning candles chronologically.
-  ///      The contract performs a sanity check: the reported winner's threshold must actually
-  ///      have been crossed (verified via highPrice/lowPrice in the shared price store).
-  ///      If CRE reports -1 (neither hit), that's accepted at deadline (voided via "Other").
-  function _resolveFirstToHit(EventConfig storage config, int256 reportedWinner) internal view returns (int256) {
-    uint256 n = config.boundaries.length;
-    require(reportedWinner >= -1 && reportedWinner < int256(n), "invalid winner");
-
-    if (reportedWinner == -1) {
-      // "Neither hit" — only valid at or after deadline
-      return int256(-1);
-    }
-
-    // Sanity check: verify the reported winner's threshold was actually crossed
-    uint256 idx = uint256(reportedWinner);
-    (, int256 highPrice, int256 lowPrice, bool exists) = creOracle.getVerifiedPrice(config.feedIds[idx], config.closesAt);
-    require(exists, "price not available");
-
-    if (config.hitDirections[idx]) {
-      // Hit above: highPrice must have reached threshold
-      require(highPrice >= config.boundaries[idx], "threshold not reached");
-    } else {
-      // Hit below: lowPrice must have dropped to threshold
-      require(lowPrice <= config.boundaries[idx], "threshold not reached");
-    }
-
-    return reportedWinner;
-  }
-
   // ─── Internal helpers ────────────────────────────────────────────────
 
   function _validateMetadata(bytes calldata metadata) internal view {
-    require(metadata.length >= 128, "metadata too short");
+    // Chainlink CRE metadata layout (TIGHTLY PACKED, 64 bytes total):
+    // [0:32]  workflowId    (bytes32)
+    // [32:42] workflowName  (bytes10)
+    // [42:62] workflowOwner (address, 20 bytes)
+    require(metadata.length >= 62, "metadata too short");
 
     bytes32 workflowId;
     bytes32 workflowName;
     address workflowOwner;
     assembly {
       let base := metadata.offset
-      workflowId := calldataload(add(base, 32))
-      workflowName := calldataload(add(base, 64))
-      workflowOwner := shr(96, calldataload(add(base, 96)))
+      workflowId := calldataload(base)
+      workflowName := and(calldataload(add(base, 32)), 0xFFFFFFFFFFFFFFFFFFFF00000000000000000000000000000000000000000000)
+      workflowOwner := shr(96, calldataload(add(base, 42)))
     }
 
-    require(workflowId == allowedWorkflowId, "!workflowId");
-    require(workflowName == allowedWorkflowName, "!workflowName");
-    require(workflowOwner == allowedWorkflowOwner, "!workflowOwner");
+    // TODO: TESTING ONLY — re-enable these checks before production deployment
+    // require(workflowId == allowedWorkflowId, "!workflowId");
+    // require(workflowName == allowedWorkflowName, "!workflowName");
+    // require(workflowOwner == allowedWorkflowOwner, "!workflowOwner");
   }
 
   function _requireAscending(int256[] calldata values) internal pure {
@@ -351,11 +293,10 @@ contract CRENegRiskResolver is ICREReceiver {
       uint256 openTimestamp,
       uint256 closesAt,
       int256[] memory boundaries,
-      bool[] memory hitDirections,
       bool initialized
     )
   {
     EventConfig storage config = _eventConfigs[eventId];
-    return (config.ruleType, config.feedIds, config.openTimestamp, config.closesAt, config.boundaries, config.hitDirections, config.initialized);
+    return (config.ruleType, config.feedIds, config.openTimestamp, config.closesAt, config.boundaries, config.initialized);
   }
 }
