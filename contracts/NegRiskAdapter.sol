@@ -108,6 +108,19 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     emit ExchangeUpdated(old, _exchange);
   }
 
+  // ─── Exchange wrap helper ────────────────────────────────────────────
+
+  /// @notice Wrap `amount` of underlying into wcol on behalf of the exchange.
+  ///         Exchange-only. The reverse uses WrappedCollateral.unwrap directly.
+  function wrapForExchange(uint256 amount) external nonReentrant {
+    require(msg.sender == exchange, "only exchange");
+    require(amount > 0, "amount 0");
+    underlying.safeTransferFrom(msg.sender, address(this), amount);
+    underlying.forceApprove(address(wcol), amount);
+    wcol.wrap(amount);
+    IERC20(address(wcol)).safeTransfer(msg.sender, amount);
+  }
+
   // ─── Event lifecycle ─────────────────────────────────────────────────
 
   /// @notice Create a neg risk event with all binary markets in one tx.
@@ -259,12 +272,10 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
   }
 
   /// @notice Mint YES tokens for ALL outcomes in an event. Used by the exchange
-  ///         for cross-market matching. Takes wcol from caller, splits in the
-  ///         first market, then mints wcol and splits in remaining markets.
-  ///         All YES tokens go to `recipient`; adapter keeps all NO tokens.
-  /// @param eventId The event identifier.
-  /// @param amount Number of shares to create per outcome.
-  /// @param recipient Address to receive all YES tokens (typically the exchange).
+  ///         for cross-market matching. Takes underlying from caller, wraps
+  ///         to wcol internally, splits in the first market, then mints wcol
+  ///         and splits in the remaining markets. All YES tokens go to
+  ///         `recipient`; adapter keeps all NO tokens.
   function mintAllYesTokens(
     bytes32 eventId,
     uint256 amount,
@@ -279,10 +290,12 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
     uint256 n = evt.outcomeCount;
 
-    // Take `amount` wcol from caller for the first market's split
-    IERC20(address(wcol)).safeTransferFrom(msg.sender, address(this), amount);
+    // Pull underlying from the exchange and wrap for the first market's split.
+    underlying.safeTransferFrom(msg.sender, address(this), amount);
+    underlying.forceApprove(address(wcol), amount);
+    wcol.wrap(amount);
 
-    // Split first market using the caller's wcol
+    // Split first market using the freshly-wrapped wcol
     {
       uint256 marketId = evt.marketIds[0];
       conditionalTokens.splitPosition(marketId, amount);
