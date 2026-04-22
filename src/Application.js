@@ -22,6 +22,8 @@ const PredictionMarketV3ManagerCLOBContract = require("./models/index").Predicti
 const ConditionalTokensContract = require("./models/index").ConditionalTokensContract;
 const MyriadCTFExchangeContract = require("./models/index").MyriadCTFExchangeContract;
 const FeeModuleContract = require("./models/index").FeeModuleContract;
+const MerkleRewardsDistributorContract = require("./models/index").MerkleRewardsDistributorContract;
+const Multicall3Contract = require("./models/index").Multicall3Contract;
 
 const DualProvider = require("./utils/DualProvider");
 const Account = require('./utils/Account');
@@ -42,6 +44,7 @@ class Application {
     web3EventsProvider,
     gasPrice,
     isSocialLogin = false,
+    useGaslessTransactions,
     socialLoginParams,
     startBlock,
     defaultDecimals,
@@ -53,6 +56,8 @@ class Application {
     // fixed gas price for txs (optional)
     this.gasPrice = gasPrice;
     this.isSocialLogin = isSocialLogin;
+    // If useGaslessTransactions is not explicitly set, default to true when isSocialLogin is true, otherwise false (backwards compatibility)
+    this.useGaslessTransactions = useGaslessTransactions !== undefined ? useGaslessTransactions : isSocialLogin;
     this.startBlock = startBlock;
     this.defaultDecimals = defaultDecimals;
     // use DualProvider to separate read (HttpProvider) and write (window.ethereum) operations
@@ -96,6 +101,8 @@ class Application {
   /**
    * @name login
    * @description Login with Metamask or a web3 provider
+   * @param {Object} provider
+   * @param {Boolean} isConnectedWallet
    */
   async login(provider = null, isConnectedWallet = null) {
     if (this.isSocialLogin) {
@@ -103,9 +110,14 @@ class Application {
         this.smartAccount = PolkamarketsSmartAccount.singleton.getInstanceIfExists()
       }
 
-      if ((!this.smartAccount || !this.smartAccount.provider) && provider) {
+      if (provider) {
         PolkamarketsSmartAccount.singleton.clearInstance();
         this.smartAccount = PolkamarketsSmartAccount.singleton.getInstance(provider, this.socialLoginParams.networkConfig, isConnectedWallet);
+
+        // Store thirdweb account reference if provider has sendTransaction method
+        if (typeof provider.sendTransaction === 'function') {
+          this.smartAccount.thirdwebAccount = provider;
+        }
       }
 
       return true;
@@ -162,6 +174,7 @@ class Application {
       web3EventsProvider: this.web3EventsProvider,
       gasPrice: this.gasPrice,
       isSocialLogin: this.isSocialLogin,
+      useGaslessTransactions: this.useGaslessTransactions,
       startBlock: this.startBlock,
       defaultDecimals: this.defaultDecimals
     };
@@ -480,6 +493,36 @@ class Application {
       throw err;
     }
   };
+
+  /**
+   * @name getMerkleRewardsDistributorContract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a Merkle Rewards Distributor Contract
+   */
+  getMerkleRewardsDistributorContract({ contractAddress = null }) {
+    try {
+      return new MerkleRewardsDistributorContract({
+        ...this.contractDefaultParams(contractAddress)
+      });
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  /**
+   * @name getMulticall3Contract
+   * @param {Address} ContractAddress (Opt) If it is deployed
+   * @description Create a Multicall3 Contract
+   */
+  getMulticall3Contract({ contractAddress = null } = {}) {
+    try {
+      return new Multicall3Contract({
+        ...this.contractDefaultParams(contractAddress)
+      });
+    } catch (err) {
+      throw err;
+    }
+  }
 
   /***********/
   /** UTILS **/

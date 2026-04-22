@@ -6,6 +6,11 @@ const { createPublicClient, http } = require('viem');
 const { signerToSimpleSmartAccount } = require('permissionless/accounts');
 
 class PolkamarketsSmartAccount {
+  networkConfig = null;
+  provider = null;
+  isConnectedWallet = null;
+  thirdwebAccount = null;
+  smartAccount = null;
 
   static PIMLICO_FACTORY_ADDRESS = '0x9406Cc6185a346906296840746125a0E44976454';
   static THIRDWEB_FACTORY_ADDRESS = '0x85e23b94e7F5E9cC1fF78BCe78cfb15B81f0DF00';
@@ -65,10 +70,28 @@ class PolkamarketsSmartAccount {
     return { isConnectedWallet: false, address: null, signer: null };
   }
 
+  getThirdwebAccount() {
+    if (this.thirdwebAccount) {
+      return this.thirdwebAccount;
+    }
+
+    // For backward compatibility, check if provider is already a thirdweb account
+    if (this.provider && typeof this.provider.sendTransaction === "function") {
+      return this.provider;
+    }
+
+    return null;
+  }
+
   async getAddress() {
     const { isConnectedWallet, address } = await this.providerIsConnectedWallet();
     if (isConnectedWallet) {
       return address;
+    }
+
+    // Check if we have a stored thirdweb account (for agw support)
+    if (this.thirdwebAccount && this.thirdwebAccount.address) {
+      return this.thirdwebAccount.address;
     }
 
     if (this.networkConfig.useThirdWeb && this.networkConfig.isZkSync) {

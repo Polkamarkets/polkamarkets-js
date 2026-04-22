@@ -50,19 +50,18 @@ contract SetCLOBFees is Script {
   }
 
   /// @dev Builds 100 tiers (one per 1% price bucket). Fees scale linearly from
-  ///      the extremes to a peak at the center (price = 0.50):
+  ///      the extremes to a peak at the center (price = 0.50), with symmetric BPS:
   ///
   ///        feeAtBucket = peakFee * min(bucket, 100 - bucket) / 50
   ///
-  ///      Examples with peakFee = 100 bps:
-  ///        price 0.01 → 2 bps,  price 0.10 → 20 bps,  price 0.50 → 100 bps
-  ///        price 0.90 → 20 bps, price 0.99 → 2 bps
+  ///      Examples with peakFee = 75 bps:
+  ///        price 0.10 → 15 bps,  price 0.50 → 75 bps,  price 0.90 → 15 bps
   function _buildCurvedTiers(uint64 makerPeak, uint64 takerPeak) internal pure returns (FeeModule.FeeTier[] memory) {
     FeeModule.FeeTier[] memory tiers = new FeeModule.FeeTier[](BUCKETS);
 
     for (uint256 i = 1; i <= BUCKETS; i++) {
-      uint256 distFromEdge = i <= 50 ? i : (BUCKETS - i + 1);
-      // i=1 → distFromEdge=1 → fee = peak*1/50;  i=50 → distFromEdge=50 → fee = peak
+      uint256 distFromEdge = i <= 50 ? i : (BUCKETS - i);
+      // Symmetric: i=20 → distFromEdge=20, i=80 → distFromEdge=20
       uint64 maker = uint64((uint256(makerPeak) * distFromEdge) / 50);
       uint64 taker = uint64((uint256(takerPeak) * distFromEdge) / 50);
       if (maker == 0 && makerPeak > 0) maker = 1;
