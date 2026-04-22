@@ -19,6 +19,8 @@ const PredictionMarketV3ManagerCLOBContract = require('./PredictionMarketV3Manag
 const ConditionalTokensContract = require('./ConditionalTokensContract');
 const MyriadCTFExchangeContract = require('./MyriadCTFExchangeContract');
 const FeeModuleContract = require('./FeeModuleContract');
+const MerkleRewardsDistributorContract = require('./MerkleRewardsDistributorContract');
+const Multicall3Contract = require('./Multicall3Contract');
 
 module.exports = {
   ERC20Contract,
@@ -41,5 +43,7 @@ module.exports = {
   PredictionMarketV3ManagerCLOBContract,
   ConditionalTokensContract,
   MyriadCTFExchangeContract,
-  FeeModuleContract
+  FeeModuleContract,
+  MerkleRewardsDistributorContract,
+  Multicall3Contract
 }

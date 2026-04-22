@@ -17,6 +17,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///         Manager, FeeModule, and Exchange are deployed behind ERC1967 proxies.
 ///         ConditionalTokens is deployed directly (holds user funds, no proxy).
 ///
+///         When ADMIN differs from the deployer, the deployer is used as the
+///         initial registry admin so it can perform all setup (setExchange,
+///         grantRole). After setup it calls proposeAdmin(ADMIN); the ADMIN
+///         wallet must then call acceptAdmin() to complete the transfer, which
+///         atomically revokes every role from the deployer.
+///
 ///         Env vars:
 ///           PRIVATE_KEY      — deployer private key
 ///           COLLATERAL       — ERC20 collateral token address
@@ -36,11 +42,14 @@ contract DeployCLOB is Script {
     address treasuryAddr = vm.envOr("TREASURY", admin);
 
     bool deployRegistry = adminRegistryAddr == address(0);
+    bool transferAdmin = admin != deployer;
 
     vm.startBroadcast(privateKey);
 
+    // Always deploy registry with deployer as initial admin so we can
+    // call setExchange / grantRole. Admin is transferred at the end.
     if (deployRegistry) {
-      adminRegistryAddr = address(new AdminRegistry(admin));
+      adminRegistryAddr = address(new AdminRegistry(deployer));
     }
 
     AdminRegistry registry = AdminRegistry(adminRegistryAddr);
@@ -83,6 +92,17 @@ contract DeployCLOB is Script {
     registry.grantRole(registry.FEE_ADMIN_ROLE(), admin);
     registry.grantRole(registry.OPERATOR_ROLE(), operator);
     registry.grantRole(registry.RESOLUTION_ADMIN_ROLE(), admin);
+
+    // Transfer DEFAULT_ADMIN_ROLE to the intended admin via two-step handoff.
+    // The admin wallet must call registry.acceptAdmin() to complete the transfer,
+    // which atomically revokes all roles from the deployer.
+    if (transferAdmin) {
+      registry.proposeAdmin(admin);
+      console.log("");
+      console.log("!! Admin transfer initiated. The ADMIN wallet must call");
+      console.log("!! AdminRegistry.acceptAdmin() to complete the handoff.");
+      console.log("!! Until then, the deployer retains DEFAULT_ADMIN_ROLE.");
+    }
 
     vm.stopBroadcast();
 

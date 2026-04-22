@@ -34,6 +34,7 @@ class IContract {
     web3EventsProvider,
     gasPrice,
     isSocialLogin = false,
+    useGaslessTransactions,
     startBlock
   }) {
     try {
@@ -58,6 +59,8 @@ class IContract {
         gasPrice,
         contract: new Contract(web3, abi, contractAddress),
         isSocialLogin,
+        // (For backwards compatibility) If useGaslessTransactions is not explicitly set, default to true when isSocialLogin is true, otherwise false
+        useGaslessTransactions: useGaslessTransactions !== undefined ? useGaslessTransactions : isSocialLogin,
         startBlock,
       };
     } catch (err) {
@@ -590,6 +593,30 @@ class IContract {
     return receipt;
   }
 
+  async useThirdWebWithUserPaidGas(tx, networkConfig, smartAccount) {
+    const client = createThirdwebClient({ clientId: networkConfig.thirdWebClientId });
+    const chain = defineChain(networkConfig.chainId);
+
+    if (!smartAccount || typeof smartAccount.sendTransaction !== 'function') {
+      throw new Error('Invalid account provided - expected thirdweb Account object with sendTransaction method');
+    }
+
+    const res = await smartAccount.sendTransaction({
+      to: tx.to,
+      data: tx.data,
+      gas: BigInt(500000),
+      chain: chain,
+    });
+
+    const receipt = await waitForReceipt({
+      client,
+      chain,
+      transactionHash: res.transactionHash,
+    });
+
+    return receipt;
+  }
+
   async sendGaslessTransactions(f) {
     const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
     const networkConfig = smartAccount.networkConfig;
@@ -799,9 +826,68 @@ class IContract {
     return transformedEvents;
   }
 
+  async sendSocialLoginGasTransactions(f) {
+    const smartAccount = PolkamarketsSmartAccount.singleton.getInstance();
+    const networkConfig = smartAccount.networkConfig;
+
+    const { isConnectedWallet, signer } = await smartAccount.providerIsConnectedWallet();
+
+    const methodName = f._method.name;
+
+    const contractInterface = new ethers.utils.Interface(this.params.abi.abi);
+    const methodCallData = contractInterface.encodeFunctionData(methodName, f.arguments);
+
+    const tx = {
+      to: this.params.contractAddress,
+      data: methodCallData,
+    };
+
+    try {
+      let receipt;
+
+      if (isConnectedWallet) {
+        const txResponse = await signer.sendTransaction({ ...tx, gasLimit: 210000 });
+        receipt = await txResponse.wait();
+      } else {
+        if (networkConfig.useThirdWeb) {
+          const thirdwebAccount = smartAccount.getThirdwebAccount();
+          if (!thirdwebAccount) {
+            throw new Error('ThirdWeb account not found. Make sure you passed the thirdweb account when calling login()');
+          }
+          receipt = await this.useThirdWebWithUserPaidGas(tx, networkConfig, thirdwebAccount);
+        } else {
+          throw new Error('User-paid transactions are only supported with ThirdWeb configuration');
+        }
+      }
+
+      console.log('receipt:', receipt.status, receipt.transactionHash);
+
+      if (receipt.logs) {
+        const events = receipt.logs.map(log => {
+          try {
+            const event = contractInterface.parseLog(log);
+            return event;
+          } catch (error) {
+            return null;
+          }
+        });
+        receipt.events = this.convertEtherEventsToWeb3Events(events);
+      }
+
+      return receipt;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  }
+
   async __sendTx(f, call = false, value, callback = () => { }) {
     if (this.params.isSocialLogin && !call) {
-      return await this.sendGaslessTransactions(f);
+      if (this.params.useGaslessTransactions) {
+        return await this.sendGaslessTransactions(f);
+      } else {
+        return await this.sendSocialLoginGasTransactions(f);
+      }
     } else {
       var res;
       if (!this.acc && !call) {
@@ -1051,6 +1137,20 @@ class IContract {
    */
   async getBlock(blockNumber) {
     return await this.params.web3.eth.getBlock(blockNumber);
+  }
+
+  async soliditySha3(args) {
+    return this.params.web3.utils.soliditySha3(...args)
+  }
+
+  async signMessage(message) {
+    if (this.acc) {
+      return await this.acc.account.sign(message);
+    } else {
+      // TODO need to test with forntend
+      // return await this.params.web3.eth.sign(message, await this.getMyAccount());
+      return await this.params.web3.eth.personal.sign(message, await this.getMyAccount());
+    }
   }
 }
 
