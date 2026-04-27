@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
-import "../contracts/oracles/CREOracle.sol";
+import "../contracts/oracles/CryptoCREOracle.sol";
 import "../contracts/Outcomes.sol";
 
 /// @dev Mock manager that stores closesAt per market (mimics PredictionMarketV3ManagerCLOB).
@@ -18,8 +18,8 @@ contract MockCLOBManager {
   }
 }
 
-contract CREOracleTest is Test {
-  CREOracle internal oracle;
+contract CryptoCREOracleTest is Test {
+  CryptoCREOracle internal oracle;
   MockCLOBManager internal mockManager;
 
   address internal forwarder = address(0xF0);
@@ -33,7 +33,7 @@ contract CREOracleTest is Test {
 
   function setUp() public {
     mockManager = new MockCLOBManager();
-    oracle = new CREOracle(
+    oracle = new CryptoCREOracle(
       address(mockManager),
       forwarder,
       workflowId,
@@ -122,12 +122,12 @@ contract CREOracleTest is Test {
 
   function testConstructorZeroManagerReverts() public {
     vm.expectRevert("manager 0");
-    new CREOracle(address(0), forwarder, workflowId, workflowName, workflowOwner);
+    new CryptoCREOracle(address(0), forwarder, workflowId, workflowName, workflowOwner);
   }
 
   function testConstructorZeroForwarderReverts() public {
     vm.expectRevert("forwarder 0");
-    new CREOracle(address(mockManager), address(0), workflowId, workflowName, workflowOwner);
+    new CryptoCREOracle(address(mockManager), address(0), workflowId, workflowName, workflowOwner);
   }
 
   // =========================================================================
@@ -141,7 +141,7 @@ contract CREOracleTest is Test {
 
     (
       bytes32 feedId,,
-      CREOracle.RuleType rule,
+      CryptoCREOracle.RuleType rule,
       bool yesAbove,
       int256 param,
       uint256 storedClosesAt,,,,

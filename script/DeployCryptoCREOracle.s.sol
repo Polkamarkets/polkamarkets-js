@@ -2,9 +2,9 @@
 pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
-import {CREOracle} from "../contracts/oracles/CREOracle.sol";
+import {CryptoCREOracle} from "../contracts/oracles/CryptoCREOracle.sol";
 
-/// @notice Standalone CREOracle deployment.
+/// @notice Standalone CryptoCREOracle deployment.
 ///
 ///         Required env vars:
 ///           PRIVATE_KEY            — deployer private key
@@ -13,7 +13,7 @@ import {CREOracle} from "../contracts/oracles/CREOracle.sol";
 ///           CRE_WORKFLOW_ID        — bytes32 workflow ID
 ///           CRE_WORKFLOW_NAME      — bytes32 workflow name (bytes10 padded)
 ///           CRE_WORKFLOW_OWNER     — address of workflow owner
-contract DeployCREOracle is Script {
+contract DeployCryptoCREOracle is Script {
   function run() external {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address managerAddr = vm.envAddress("CLOB_MANAGER");
@@ -24,7 +24,7 @@ contract DeployCREOracle is Script {
 
     vm.startBroadcast(privateKey);
 
-    CREOracle creOracle = new CREOracle(
+    CryptoCREOracle creOracle = new CryptoCREOracle(
       managerAddr,
       keystoneForwarder,
       creWorkflowId,
@@ -34,6 +34,6 @@ contract DeployCREOracle is Script {
 
     vm.stopBroadcast();
 
-    console.log("CREOracle:", address(creOracle));
+    console.log("CryptoCREOracle:", address(creOracle));
   }
 }

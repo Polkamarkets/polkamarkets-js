@@ -2,13 +2,13 @@
 pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
-import {CRENegRiskResolver} from "../contracts/oracles/CRENegRiskResolver.sol";
+import {CryptoCRENegRiskResolver} from "../contracts/oracles/CryptoCRENegRiskResolver.sol";
 
 /// @notice Configures a neg-risk event for CRE-based resolution.
 ///
 ///         Required env vars:
 ///           PRIVATE_KEY              — signer (must have MARKET_ADMIN_ROLE)
-///           CRE_NEG_RISK_RESOLVER    — CRENegRiskResolver address
+///           CRE_NEG_RISK_RESOLVER    — CryptoCRENegRiskResolver address
 ///           EVENT_ID                 — bytes32 event identifier
 ///           EVENT_RULE_TYPE          — 0=RANGE, 1=BEST_PERFORMER, 2=HIT_MILESTONES
 ///           CLOSES_AT                — uint256 close timestamp
@@ -28,14 +28,14 @@ contract ConfigureCREEvent is Script {
     uint8 ruleTypeRaw = uint8(vm.envUint("EVENT_RULE_TYPE"));
     uint256 closesAt = vm.envUint("CLOSES_AT");
 
-    CRENegRiskResolver.EventRuleType ruleType = CRENegRiskResolver.EventRuleType(ruleTypeRaw);
-    CRENegRiskResolver resolver = CRENegRiskResolver(resolverAddr);
+    CryptoCRENegRiskResolver.EventRuleType ruleType = CryptoCRENegRiskResolver.EventRuleType(ruleTypeRaw);
+    CryptoCRENegRiskResolver resolver = CryptoCRENegRiskResolver(resolverAddr);
 
     bytes32[] memory feedIds;
     int256[] memory boundaries;
     uint256 openTimestamp = 0;
 
-    if (ruleType == CRENegRiskResolver.EventRuleType.RANGE || ruleType == CRENegRiskResolver.EventRuleType.HIT_MILESTONES) {
+    if (ruleType == CryptoCRENegRiskResolver.EventRuleType.RANGE || ruleType == CryptoCRENegRiskResolver.EventRuleType.HIT_MILESTONES) {
       string memory feedIdStr = vm.envString("FEED_ID");
       feedIds = new bytes32[](1);
       feedIds[0] = keccak256(bytes(feedIdStr));
@@ -46,7 +46,7 @@ contract ConfigureCREEvent is Script {
       for (uint256 i = 0; i < parts.length; i++) {
         boundaries[i] = vm.parseInt(parts[i]);
       }
-    } else if (ruleType == CRENegRiskResolver.EventRuleType.BEST_PERFORMER) {
+    } else if (ruleType == CryptoCRENegRiskResolver.EventRuleType.BEST_PERFORMER) {
       string memory feedIdsRaw = vm.envString("FEED_IDS");
       string[] memory feedParts = _split(feedIdsRaw, ",");
       feedIds = new bytes32[](feedParts.length);

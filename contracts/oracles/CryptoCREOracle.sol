@@ -9,7 +9,7 @@ interface ICREOracleManagerView {
   function getMarketClosesAt(uint256 marketId) external view returns (uint256);
 }
 
-/// @title CREOracle
+/// @title CryptoCREOracle
 /// @notice IMarketOracle + ICREReceiver implementation for deterministic crypto markets.
 ///         Receives verified price data from a Chainlink CRE workflow via onReport(),
 ///         stores it immutably, and computes binary market outcomes on-chain via getResult().
@@ -21,7 +21,7 @@ interface ICREOracleManagerView {
 ///           RELATIVE   — feed A's % change vs feed B's % change
 ///           HIT        — did high/low reach a target at any point
 ///           CANDLE     — more green or red candles in a period
-contract CREOracle is IMarketOracle, ICREReceiver {
+contract CryptoCREOracle is IMarketOracle, ICREReceiver {
   // ─── Types ───────────────────────────────────────────────────────────
 
   enum RuleType {
@@ -422,7 +422,7 @@ contract CREOracle is IMarketOracle, ICREReceiver {
     }
   }
 
-  // ─── View helpers (for CRENegRiskResolver) ───────────────────────────
+  // ─── View helpers (for CryptoCRENegRiskResolver) ───────────────────────────
 
   /// @notice Returns verified price data for a (feedId, timestamp) pair.
   function getVerifiedPrice(bytes32 feedId, uint256 timestamp)

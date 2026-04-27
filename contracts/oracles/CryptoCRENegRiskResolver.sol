@@ -3,7 +3,7 @@ pragma solidity ^0.8.26;
 
 import {AdminRegistry} from "../AdminRegistry.sol";
 import {ICREReceiver} from "./ICREReceiver.sol";
-import {CREOracle} from "./CREOracle.sol";
+import {CryptoCREOracle} from "./CryptoCREOracle.sol";
 
 /// @title INegRiskAdapterResolver
 /// @notice Minimal interface for the NegRiskAdapter functions needed by the resolver.
@@ -13,16 +13,16 @@ interface INegRiskAdapterResolver {
   function isEventResolved(bytes32 eventId) external view returns (bool);
 }
 
-/// @title CRENegRiskResolver
+/// @title CryptoCRENegRiskResolver
 /// @notice Receives CRE trigger reports and resolves neg-risk events using verified
-///         price data stored in CREOracle. Holds RESOLUTION_ADMIN_ROLE to call
+///         price data stored in CryptoCREOracle. Holds RESOLUTION_ADMIN_ROLE to call
 ///         NegRiskAdapter.resolveEvent().
 ///
 ///         Supports 3 event rule types:
 ///           RANGE          — bucket close price into ranges
 ///           BEST_PERFORMER — highest % change across N tokens wins
 ///           HIT_MILESTONES — highest milestone the high price reached wins
-contract CRENegRiskResolver is ICREReceiver {
+contract CryptoCRENegRiskResolver is ICREReceiver {
   // ─── Types ───────────────────────────────────────────────────────────
 
   enum EventRuleType {
@@ -44,7 +44,7 @@ contract CRENegRiskResolver is ICREReceiver {
 
   AdminRegistry public immutable registry;
   INegRiskAdapterResolver public immutable negRiskAdapter;
-  CREOracle public immutable creOracle;
+  CryptoCREOracle public immutable creOracle;
 
   address public immutable keystoneForwarder;
   bytes32 public immutable allowedWorkflowId;
@@ -63,7 +63,7 @@ contract CRENegRiskResolver is ICREReceiver {
   constructor(
     AdminRegistry _registry,
     address _negRiskAdapter,
-    CREOracle _creOracle,
+    CryptoCREOracle _creOracle,
     address _keystoneForwarder,
     bytes32 _allowedWorkflowId,
     bytes32 _allowedWorkflowName,
@@ -147,7 +147,7 @@ contract CRENegRiskResolver is ICREReceiver {
   // ─── ICREReceiver: onReport ──────────────────────────────────────────
 
   /// @notice Receives a CRE report triggering event resolution.
-  ///         Prices must already be stored in CREOracle.
+  ///         Prices must already be stored in CryptoCREOracle.
   /// @param metadata Workflow metadata.
   /// @param report ABI-encoded (bytes32[] eventIds).
   function onReport(bytes calldata metadata, bytes calldata report) external override {

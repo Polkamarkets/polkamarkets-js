@@ -3,11 +3,11 @@ pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
 import "../contracts/AdminRegistry.sol";
-import "../contracts/oracles/CREOracle.sol";
-import "../contracts/oracles/CRENegRiskResolver.sol";
+import "../contracts/oracles/CryptoCREOracle.sol";
+import "../contracts/oracles/CryptoCRENegRiskResolver.sol";
 import "../contracts/Outcomes.sol";
 
-/// @dev Mock manager for CREOracle.
+/// @dev Mock manager for CryptoCREOracle.
 contract MockCLOBManagerForResolver {
   mapping(uint256 => uint256) public closesAtMap;
   function setClosesAt(uint256 marketId, uint256 closesAt) external { closesAtMap[marketId] = closesAt; }
@@ -49,9 +49,9 @@ contract MockNegRiskAdapter {
   }
 }
 
-contract CRENegRiskResolverTest is Test {
-  CRENegRiskResolver internal resolver;
-  CREOracle internal creOracle;
+contract CryptoCRENegRiskResolverTest is Test {
+  CryptoCRENegRiskResolver internal resolver;
+  CryptoCREOracle internal creOracle;
   MockCLOBManagerForResolver internal mockManager;
   MockNegRiskAdapter internal mockAdapter;
   AdminRegistry internal registry;
@@ -80,7 +80,7 @@ contract CRENegRiskResolverTest is Test {
     mockManager = new MockCLOBManagerForResolver();
     mockAdapter = new MockNegRiskAdapter();
 
-    creOracle = new CREOracle(
+    creOracle = new CryptoCREOracle(
       address(mockManager),
       forwarder,
       workflowId,
@@ -88,7 +88,7 @@ contract CRENegRiskResolverTest is Test {
       workflowOwner
     );
 
-    resolver = new CRENegRiskResolver(
+    resolver = new CryptoCRENegRiskResolver(
       registry,
       address(mockAdapter),
       creOracle,
@@ -149,7 +149,7 @@ contract CRENegRiskResolverTest is Test {
 
   function testConstructorZeroRegistryReverts() public {
     vm.expectRevert("registry 0");
-    new CRENegRiskResolver(
+    new CryptoCRENegRiskResolver(
       AdminRegistry(address(0)), address(mockAdapter), creOracle,
       forwarder, workflowId, workflowName, workflowOwner
     );
@@ -174,11 +174,11 @@ contract CRENegRiskResolverTest is Test {
     vm.prank(marketAdmin);
     resolver.configureEvent(
       eventId,
-      CRENegRiskResolver.EventRuleType.RANGE,
+      CryptoCRENegRiskResolver.EventRuleType.RANGE,
       feedIds, 0, 200, boundaries
     );
 
-    (CRENegRiskResolver.EventRuleType ruleType,,,,,bool initialized) = resolver.getEventConfig(eventId);
+    (CryptoCRENegRiskResolver.EventRuleType ruleType,,,,,bool initialized) = resolver.getEventConfig(eventId);
     assertEq(uint8(ruleType), 0); // RANGE
     assertTrue(initialized);
   }
@@ -193,7 +193,7 @@ contract CRENegRiskResolverTest is Test {
 
     vm.prank(other);
     vm.expectRevert("not market admin");
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
   }
 
   function testConfigureDoubleConfigReverts() public {
@@ -208,11 +208,11 @@ contract CRENegRiskResolverTest is Test {
     feedIds[0] = BTC_FEED;
 
     vm.prank(marketAdmin);
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
 
     vm.prank(marketAdmin);
     vm.expectRevert("already configured");
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
   }
 
   function testConfigureBoundariesNotAscendingReverts() public {
@@ -228,7 +228,7 @@ contract CRENegRiskResolverTest is Test {
 
     vm.prank(marketAdmin);
     vm.expectRevert("boundaries not ascending");
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
   }
 
   function testConfigureBestPerformerRequiresFeedPerOutcome() public {
@@ -242,7 +242,7 @@ contract CRENegRiskResolverTest is Test {
 
     vm.prank(marketAdmin);
     vm.expectRevert("BEST_PERFORMER: feed per outcome");
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.BEST_PERFORMER, feedIds, 100, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.BEST_PERFORMER, feedIds, 100, 200, boundaries);
   }
 
   // =========================================================================
@@ -261,7 +261,7 @@ contract CRENegRiskResolverTest is Test {
     feedIds[0] = BTC_FEED;
 
     vm.prank(marketAdmin);
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
 
     // Close at 85K -> bucket 0 (< 90K)
     _deliverPrice(BTC_FEED, 200, 85000e8, 90000e8, 80000e8);
@@ -283,7 +283,7 @@ contract CRENegRiskResolverTest is Test {
     feedIds[0] = BTC_FEED;
 
     vm.prank(marketAdmin);
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
 
     // Close at 97K -> bucket 2 (95K <= 97K < 100K)
     _deliverPrice(BTC_FEED, 200, 97000e8, 100000e8, 95000e8);
@@ -305,7 +305,7 @@ contract CRENegRiskResolverTest is Test {
     feedIds[0] = BTC_FEED;
 
     vm.prank(marketAdmin);
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
 
     // Close at 105K -> bucket 3 (>= 100K)
     _deliverPrice(BTC_FEED, 200, 105000e8, 110000e8, 100000e8);
@@ -326,7 +326,7 @@ contract CRENegRiskResolverTest is Test {
     feedIds[0] = BTC_FEED;
 
     vm.prank(marketAdmin);
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
 
     // Close exactly at boundary 90K -> bucket 1 (90K <= 90K < 100K)
     _deliverPrice(BTC_FEED, 200, 90000e8, 95000e8, 85000e8);
@@ -348,7 +348,7 @@ contract CRENegRiskResolverTest is Test {
     int256[] memory boundaries = new int256[](0);
 
     vm.prank(marketAdmin);
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.BEST_PERFORMER, feedIds, 100, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.BEST_PERFORMER, feedIds, 100, 200, boundaries);
 
     // Open prices
     _deliverPrice(BTC_FEED, 100, 100000e8, 100000e8, 100000e8);
@@ -377,7 +377,7 @@ contract CRENegRiskResolverTest is Test {
     int256[] memory boundaries = new int256[](0);
 
     vm.prank(marketAdmin);
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.BEST_PERFORMER, feedIds, 100, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.BEST_PERFORMER, feedIds, 100, 200, boundaries);
 
     // Both +10%
     _deliverPrice(BTC_FEED, 100, 100000e8, 100000e8, 100000e8);
@@ -407,7 +407,7 @@ contract CRENegRiskResolverTest is Test {
     feedIds[0] = BTC_FEED;
 
     vm.prank(marketAdmin);
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.HIT_MILESTONES, feedIds, 0, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.HIT_MILESTONES, feedIds, 0, 200, boundaries);
 
     // High was 102K -> reached 100K but not 105K -> outcome 2
     _deliverPrice(BTC_FEED, 200, 99000e8, 102000e8, 93000e8);
@@ -429,7 +429,7 @@ contract CRENegRiskResolverTest is Test {
     feedIds[0] = BTC_FEED;
 
     vm.prank(marketAdmin);
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.HIT_MILESTONES, feedIds, 0, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.HIT_MILESTONES, feedIds, 0, 200, boundaries);
 
     // High was 93K -> didn't reach any milestone -> outcome 0
     _deliverPrice(BTC_FEED, 200, 90000e8, 93000e8, 88000e8);
@@ -451,7 +451,7 @@ contract CRENegRiskResolverTest is Test {
     feedIds[0] = BTC_FEED;
 
     vm.prank(marketAdmin);
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.HIT_MILESTONES, feedIds, 0, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.HIT_MILESTONES, feedIds, 0, 200, boundaries);
 
     // High was 110K -> reached all milestones -> outcome 3 (last)
     _deliverPrice(BTC_FEED, 200, 108000e8, 110000e8, 94000e8);
@@ -495,7 +495,7 @@ contract CRENegRiskResolverTest is Test {
     feedIds[0] = BTC_FEED;
 
     vm.prank(marketAdmin);
-    resolver.configureEvent(eventId, CRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
+    resolver.configureEvent(eventId, CryptoCRENegRiskResolver.EventRuleType.RANGE, feedIds, 0, 200, boundaries);
 
     _deliverPrice(BTC_FEED, 200, 95000e8, 100000e8, 90000e8);
     _triggerResolve(eventId);

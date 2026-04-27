@@ -3,21 +3,21 @@ pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
 import {AdminRegistry} from "../contracts/AdminRegistry.sol";
-import {CREOracle} from "../contracts/oracles/CREOracle.sol";
-import {CRENegRiskResolver} from "../contracts/oracles/CRENegRiskResolver.sol";
+import {CryptoCREOracle} from "../contracts/oracles/CryptoCREOracle.sol";
+import {CryptoCRENegRiskResolver} from "../contracts/oracles/CryptoCRENegRiskResolver.sol";
 
-/// @notice Deploys CRENegRiskResolver and grants it RESOLUTION_ADMIN_ROLE.
+/// @notice Deploys CryptoCRENegRiskResolver and grants it RESOLUTION_ADMIN_ROLE.
 ///
 ///         Required env vars:
 ///           PRIVATE_KEY            — deployer private key (must have DEFAULT_ADMIN_ROLE)
 ///           ADMIN_REGISTRY         — AdminRegistry address
 ///           NEG_RISK_ADAPTER       — NegRiskAdapter address
-///           CRE_ORACLE             — CREOracle address (for shared price storage)
+///           CRE_ORACLE             — CryptoCREOracle address (for shared price storage)
 ///           KEYSTONE_FORWARDER     — Chainlink KeystoneForwarder address
 ///           CRE_WORKFLOW_ID        — bytes32 workflow ID
 ///           CRE_WORKFLOW_NAME      — bytes32 workflow name
 ///           CRE_WORKFLOW_OWNER     — address of workflow owner
-contract DeployCRENegRiskResolver is Script {
+contract DeployCryptoCRENegRiskResolver is Script {
   function run() external {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address registryAddr = vm.envAddress("ADMIN_REGISTRY");
@@ -32,10 +32,10 @@ contract DeployCRENegRiskResolver is Script {
 
     vm.startBroadcast(privateKey);
 
-    CRENegRiskResolver resolver = new CRENegRiskResolver(
+    CryptoCRENegRiskResolver resolver = new CryptoCRENegRiskResolver(
       registry,
       negRiskAdapterAddr,
-      CREOracle(creOracleAddr),
+      CryptoCREOracle(creOracleAddr),
       keystoneForwarder,
       creWorkflowId,
       creWorkflowName,
@@ -47,7 +47,7 @@ contract DeployCRENegRiskResolver is Script {
 
     vm.stopBroadcast();
 
-    console.log("CRENegRiskResolver:", address(resolver));
+    console.log("CryptoCRENegRiskResolver:", address(resolver));
     console.log("RESOLUTION_ADMIN_ROLE granted");
   }
 }
