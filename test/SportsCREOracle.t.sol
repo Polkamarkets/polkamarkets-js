@@ -3,6 +3,8 @@ pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
 import "../contracts/oracles/SportsCREOracle.sol";
+import "../contracts/oracles/ICREReceiver.sol";
+import "../contracts/AdminRegistry.sol";
 import "../contracts/Outcomes.sol";
 
 /// @dev Mock manager that stores closesAt per market.
@@ -21,7 +23,10 @@ contract MockSportsManager {
 contract SportsCREOracleTest is Test {
   SportsCREOracle internal oracle;
   MockSportsManager internal mockManager;
+  AdminRegistry internal registry;
 
+  address internal admin;
+  address internal marketAdmin = address(0xA2);
   address internal forwarder = address(0xF0);
   bytes32 internal workflowId = keccak256("sports-workflow");
   bytes32 internal workflowName = bytes32(bytes10("sportsflow"));
@@ -32,14 +37,23 @@ contract SportsCREOracleTest is Test {
   string internal REF_NFL = "oddspapi:id999:4:10";
 
   function setUp() public {
+    admin = address(this);
+    registry = new AdminRegistry(admin);
+    registry.grantRole(registry.MARKET_ADMIN_ROLE(), marketAdmin);
+
     mockManager = new MockSportsManager();
     oracle = new SportsCREOracle(
+      registry,
       address(mockManager),
-      forwarder,
-      workflowId,
-      workflowName,
-      workflowOwner
+      forwarder
     );
+
+    // Enable opt-in checks
+    vm.startPrank(marketAdmin);
+    oracle.setExpectedAuthor(workflowOwner);
+    oracle.setExpectedWorkflowName(bytes10(workflowName));
+    oracle.setExpectedWorkflowId(workflowId);
+    vm.stopPrank();
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────
@@ -77,24 +91,20 @@ contract SportsCREOracleTest is Test {
 
   function testConstructorSetsImmutables() public view {
     assertEq(oracle.manager(), address(mockManager));
-    assertEq(oracle.keystoneForwarder(), forwarder);
-    assertEq(oracle.allowedWorkflowId(), workflowId);
-    assertEq(oracle.allowedWorkflowOwner(), workflowOwner);
+    assertEq(oracle.getForwarder(), forwarder);
+    assertEq(oracle.getExpectedWorkflowId(), workflowId);
+    assertEq(oracle.getExpectedAuthor(), workflowOwner);
+    assertEq(address(oracle.registry()), address(registry));
   }
 
   function testConstructorZeroManagerReverts() public {
     vm.expectRevert("manager 0");
-    new SportsCREOracle(address(0), forwarder, workflowId, workflowName, workflowOwner);
+    new SportsCREOracle(registry, address(0), forwarder);
   }
 
   function testConstructorZeroForwarderReverts() public {
     vm.expectRevert("forwarder 0");
-    new SportsCREOracle(address(mockManager), address(0), workflowId, workflowName, workflowOwner);
-  }
-
-  function testConstructorZeroOwnerReverts() public {
-    vm.expectRevert("owner 0");
-    new SportsCREOracle(address(mockManager), forwarder, workflowId, workflowName, address(0));
+    new SportsCREOracle(registry, address(mockManager), address(0));
   }
 
   // =========================================================================
@@ -164,16 +174,17 @@ contract SportsCREOracleTest is Test {
     bytes memory report = abi.encode(refs, outcomes);
 
     vm.prank(other);
-    vm.expectRevert("!forwarder");
+    vm.expectRevert(
+      abi.encodeWithSignature(
+        "UnauthorizedSender(address,address)",
+        other,
+        forwarder
+      )
+    );
     oracle.onReport(_buildMetadata(), report);
   }
 
-  // TODO: TESTING ONLY — re-enable when workflow identity validation is restored
-  // function testOnReportWrongWorkflowIdReverts() public {
-  //   ...
-  // }
-
-  function skip_testOnReportWrongOwnerReverts() public {
+  function testOnReportWrongAuthorReverts() public {
     string[] memory refs = new string[](1);
     int256[] memory outcomes = new int256[](1);
     refs[0] = REF_NBA;
@@ -182,8 +193,28 @@ contract SportsCREOracleTest is Test {
 
     bytes memory badMetadata = _buildMetadata(workflowId, workflowName, address(0xDEAD));
     vm.prank(forwarder);
-    vm.expectRevert("!workflowOwner");
+    vm.expectRevert(
+      abi.encodeWithSignature(
+        "UnauthorizedAuthor(address,address)",
+        address(0xDEAD),
+        workflowOwner
+      )
+    );
     oracle.onReport(badMetadata, report);
+  }
+
+  /// @notice Workflow ID is stored for traceability but never enforced.
+  function testOnReportWrongWorkflowIdDoesNotRevert() public {
+    string[] memory refs = new string[](1);
+    int256[] memory outcomes = new int256[](1);
+    refs[0] = REF_NBA;
+    outcomes[0] = int256(Outcomes.YES);
+    bytes memory report = abi.encode(refs, outcomes);
+
+    bytes memory metadata = _buildMetadata(keccak256("WRONG-WF-ID"), workflowName, workflowOwner);
+    vm.prank(forwarder);
+    oracle.onReport(metadata, report); // should succeed
+    assertTrue(oracle.outcomeResolved(keccak256(bytes(REF_NBA))));
   }
 
   function testOnReportInvalidOutcomeReverts() public {

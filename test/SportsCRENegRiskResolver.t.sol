@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "../contracts/AdminRegistry.sol";
 import "../contracts/oracles/SportsCREOracle.sol";
 import "../contracts/oracles/SportsCRENegRiskResolver.sol";
+import "../contracts/oracles/ICREReceiver.sol";
 import "../contracts/Outcomes.sol";
 
 /// @dev Mock manager for SportsCREOracle.
@@ -80,26 +81,31 @@ contract SportsCRENegRiskResolverTest is Test {
     mockAdapter = new MockNegRiskAdapter();
 
     sportsOracle = new SportsCREOracle(
+      registry,
       address(mockManager),
-      forwarder,
-      workflowId,
-      workflowName,
-      workflowOwner
+      forwarder
     );
 
     resolver = new SportsCRENegRiskResolver(
       registry,
       address(mockAdapter),
       sportsOracle,
-      forwarder,
-      workflowId,
-      workflowName,
-      workflowOwner
+      forwarder
     );
 
     // Grant RESOLUTION_ADMIN_ROLE to resolver so it can call resolveEvent
     // (mock doesn't check roles but we set it for correctness)
     registry.grantRole(registry.RESOLUTION_ADMIN_ROLE(), address(resolver));
+
+    // Enable opt-in checks
+    vm.startPrank(marketAdmin);
+    sportsOracle.setExpectedAuthor(workflowOwner);
+    sportsOracle.setExpectedWorkflowName(bytes10(workflowName));
+    sportsOracle.setExpectedWorkflowId(workflowId);
+    resolver.setExpectedAuthor(workflowOwner);
+    resolver.setExpectedWorkflowName(bytes10(workflowName));
+    resolver.setExpectedWorkflowId(workflowId);
+    vm.stopPrank();
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────
@@ -141,30 +147,27 @@ contract SportsCRENegRiskResolverTest is Test {
     assertEq(address(resolver.registry()), address(registry));
     assertEq(address(resolver.negRiskAdapter()), address(mockAdapter));
     assertEq(address(resolver.sportsOracle()), address(sportsOracle));
-    assertEq(resolver.keystoneForwarder(), forwarder);
+    assertEq(resolver.getForwarder(), forwarder);
   }
 
   function testConstructorZeroRegistryReverts() public {
     vm.expectRevert("registry 0");
     new SportsCRENegRiskResolver(
-      AdminRegistry(address(0)), address(mockAdapter), sportsOracle,
-      forwarder, workflowId, workflowName, workflowOwner
+      AdminRegistry(address(0)), address(mockAdapter), sportsOracle, forwarder
     );
   }
 
   function testConstructorZeroAdapterReverts() public {
     vm.expectRevert("adapter 0");
     new SportsCRENegRiskResolver(
-      registry, address(0), sportsOracle,
-      forwarder, workflowId, workflowName, workflowOwner
+      registry, address(0), sportsOracle, forwarder
     );
   }
 
   function testConstructorZeroOracleReverts() public {
     vm.expectRevert("oracle 0");
     new SportsCRENegRiskResolver(
-      registry, address(mockAdapter), SportsCREOracle(address(0)),
-      forwarder, workflowId, workflowName, workflowOwner
+      registry, address(mockAdapter), SportsCREOracle(address(0)), forwarder
     );
   }
 
@@ -369,16 +372,17 @@ contract SportsCRENegRiskResolverTest is Test {
     bytes memory report = abi.encode(eventIds, winners);
 
     vm.prank(other);
-    vm.expectRevert("!forwarder");
+    vm.expectRevert(
+      abi.encodeWithSignature(
+        "UnauthorizedSender(address,address)",
+        other,
+        forwarder
+      )
+    );
     resolver.onReport(_buildMetadata(), report);
   }
 
-  // TODO: TESTING ONLY — re-enable when workflow identity validation is restored
-  // function testOnReportWrongWorkflowIdReverts() public {
-  //   ...
-  // }
-
-  function skip_testOnReportWrongOwnerReverts() public {
+  function testOnReportWrongAuthorReverts() public {
     bytes32[] memory eventIds = new bytes32[](1);
     int256[] memory winners = new int256[](1);
     eventIds[0] = keccak256("x");
@@ -386,7 +390,13 @@ contract SportsCRENegRiskResolverTest is Test {
 
     bytes memory badMeta = _buildBadMetadata(workflowId, workflowName, address(0xDEAD));
     vm.prank(forwarder);
-    vm.expectRevert("!workflowOwner");
+    vm.expectRevert(
+      abi.encodeWithSignature(
+        "UnauthorizedAuthor(address,address)",
+        address(0xDEAD),
+        workflowOwner
+      )
+    );
     resolver.onReport(badMeta, report);
   }
 

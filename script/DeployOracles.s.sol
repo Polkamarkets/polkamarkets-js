@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
 import {IRealityETH_ERC20} from "../contracts/IRealityETH_ERC20.sol";
+import {AdminRegistry} from "../contracts/AdminRegistry.sol";
 import {RealitioOracle} from "../contracts/oracles/RealitioOracle.sol";
 import {CryptoCREOracle} from "../contracts/oracles/CryptoCREOracle.sol";
 
@@ -14,10 +15,8 @@ import {CryptoCREOracle} from "../contracts/oracles/CryptoCREOracle.sol";
 ///           REALITIO_ERC20     — Reality.eth contract address
 ///
 ///         Optional CRE env vars (set to deploy CryptoCREOracle):
+///           ADMIN_REGISTRY         — AdminRegistry address
 ///           KEYSTONE_FORWARDER     — Chainlink KeystoneForwarder address
-///           CRE_WORKFLOW_ID        — bytes32 workflow ID
-///           CRE_WORKFLOW_NAME      — bytes32 workflow name
-///           CRE_WORKFLOW_OWNER     — address of workflow owner
 contract DeployOracles is Script {
   function run() external {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
@@ -36,16 +35,12 @@ contract DeployOracles is Script {
     // Deploy CryptoCREOracle if CRE env vars are set
     address keystoneForwarder = vm.envOr("KEYSTONE_FORWARDER", address(0));
     if (keystoneForwarder != address(0)) {
-      bytes32 creWorkflowId = vm.envBytes32("CRE_WORKFLOW_ID");
-      bytes32 creWorkflowName = vm.envBytes32("CRE_WORKFLOW_NAME");
-      address creWorkflowOwner = vm.envAddress("CRE_WORKFLOW_OWNER");
+      address registryAddr = vm.envAddress("ADMIN_REGISTRY");
 
       CryptoCREOracle creOracle = new CryptoCREOracle(
+        AdminRegistry(registryAddr),
         managerAddr,
-        keystoneForwarder,
-        creWorkflowId,
-        creWorkflowName,
-        creWorkflowOwner
+        keystoneForwarder
       );
 
       console.log("CryptoCREOracle:", address(creOracle));

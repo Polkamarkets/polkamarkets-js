@@ -81,26 +81,31 @@ contract CryptoCRENegRiskResolverTest is Test {
     mockAdapter = new MockNegRiskAdapter();
 
     creOracle = new CryptoCREOracle(
+      registry,
       address(mockManager),
-      forwarder,
-      workflowId,
-      workflowName,
-      workflowOwner
+      forwarder
     );
 
     resolver = new CryptoCRENegRiskResolver(
       registry,
       address(mockAdapter),
       creOracle,
-      forwarder,
-      workflowId,
-      workflowName,
-      workflowOwner
+      forwarder
     );
 
     // Grant RESOLUTION_ADMIN_ROLE to resolver so it can call resolveEvent on the real adapter
     // (mock doesn't check roles, but we set it for correctness)
     registry.grantRole(registry.RESOLUTION_ADMIN_ROLE(), address(resolver));
+
+    // Enable opt-in checks
+    vm.startPrank(marketAdmin);
+    creOracle.setExpectedAuthor(workflowOwner);
+    creOracle.setExpectedWorkflowName(bytes10(workflowName));
+    creOracle.setExpectedWorkflowId(workflowId);
+    resolver.setExpectedAuthor(workflowOwner);
+    resolver.setExpectedWorkflowName(bytes10(workflowName));
+    resolver.setExpectedWorkflowId(workflowId);
+    vm.stopPrank();
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────
@@ -144,14 +149,13 @@ contract CryptoCRENegRiskResolverTest is Test {
   function testConstructorSetsImmutables() public view {
     assertEq(address(resolver.registry()), address(registry));
     assertEq(address(resolver.creOracle()), address(creOracle));
-    assertEq(resolver.keystoneForwarder(), forwarder);
+    assertEq(resolver.getForwarder(), forwarder);
   }
 
   function testConstructorZeroRegistryReverts() public {
     vm.expectRevert("registry 0");
     new CryptoCRENegRiskResolver(
-      AdminRegistry(address(0)), address(mockAdapter), creOracle,
-      forwarder, workflowId, workflowName, workflowOwner
+      AdminRegistry(address(0)), address(mockAdapter), creOracle, forwarder
     );
   }
 
@@ -471,14 +475,15 @@ contract CryptoCRENegRiskResolverTest is Test {
     bytes memory report = abi.encode(eventIds);
 
     vm.prank(other);
-    vm.expectRevert("!forwarder");
+    vm.expectRevert(
+      abi.encodeWithSignature(
+        "UnauthorizedSender(address,address)",
+        other,
+        forwarder
+      )
+    );
     resolver.onReport(_buildMetadata(), report);
   }
-
-  // TODO: TESTING ONLY — re-enable when workflowId/Name checks are restored
-  // function testOnReportWrongWorkflowReverts() public {
-  //   ...
-  // }
 
   // =========================================================================
   // Already resolved

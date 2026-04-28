@@ -3,6 +3,8 @@ pragma solidity ^0.8.26;
 
 import "forge-std/Test.sol";
 import "../contracts/oracles/CryptoCREOracle.sol";
+import "../contracts/oracles/ICREReceiver.sol";
+import "../contracts/AdminRegistry.sol";
 import "../contracts/Outcomes.sol";
 
 /// @dev Mock manager that stores closesAt per market (mimics PredictionMarketV3ManagerCLOB).
@@ -21,7 +23,10 @@ contract MockCLOBManager {
 contract CryptoCREOracleTest is Test {
   CryptoCREOracle internal oracle;
   MockCLOBManager internal mockManager;
+  AdminRegistry internal registry;
 
+  address internal admin;
+  address internal marketAdmin = address(0xA2);
   address internal forwarder = address(0xF0);
   bytes32 internal workflowId = keccak256("test-workflow");
   bytes32 internal workflowName = bytes32(bytes10("testflow"));
@@ -32,14 +37,23 @@ contract CryptoCREOracleTest is Test {
   bytes32 internal ETH_FEED = keccak256("ETHUSDT");
 
   function setUp() public {
+    admin = address(this);
+    registry = new AdminRegistry(admin);
+    registry.grantRole(registry.MARKET_ADMIN_ROLE(), marketAdmin);
+
     mockManager = new MockCLOBManager();
     oracle = new CryptoCREOracle(
+      registry,
       address(mockManager),
-      forwarder,
-      workflowId,
-      workflowName,
-      workflowOwner
+      forwarder
     );
+
+    // Enable opt-in checks so existing tests continue to validate them
+    vm.startPrank(marketAdmin);
+    oracle.setExpectedAuthor(workflowOwner);
+    oracle.setExpectedWorkflowName(bytes10(workflowName));
+    oracle.setExpectedWorkflowId(workflowId);
+    vm.stopPrank();
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────
@@ -115,19 +129,20 @@ contract CryptoCREOracleTest is Test {
 
   function testConstructorSetsImmutables() public view {
     assertEq(oracle.manager(), address(mockManager));
-    assertEq(oracle.keystoneForwarder(), forwarder);
-    assertEq(oracle.allowedWorkflowId(), workflowId);
-    assertEq(oracle.allowedWorkflowOwner(), workflowOwner);
+    assertEq(oracle.getForwarder(), forwarder);
+    assertEq(oracle.getExpectedWorkflowId(), workflowId);
+    assertEq(oracle.getExpectedAuthor(), workflowOwner);
+    assertEq(address(oracle.registry()), address(registry));
   }
 
   function testConstructorZeroManagerReverts() public {
     vm.expectRevert("manager 0");
-    new CryptoCREOracle(address(0), forwarder, workflowId, workflowName, workflowOwner);
+    new CryptoCREOracle(registry, address(0), forwarder);
   }
 
   function testConstructorZeroForwarderReverts() public {
     vm.expectRevert("forwarder 0");
-    new CryptoCREOracle(address(mockManager), address(0), workflowId, workflowName, workflowOwner);
+    new CryptoCREOracle(registry, address(mockManager), address(0));
   }
 
   // =========================================================================
@@ -232,17 +247,17 @@ contract CryptoCREOracleTest is Test {
 
     bytes memory report = abi.encode(feedIds, timestamps, prices, prices, prices);
     vm.prank(other);
-    vm.expectRevert("!forwarder");
+    vm.expectRevert(
+      abi.encodeWithSignature(
+        "UnauthorizedSender(address,address)",
+        other,
+        forwarder
+      )
+    );
     oracle.onReport(_buildMetadata(), report);
   }
 
-  // TODO: TESTING ONLY — re-enable when workflowId/Name checks are restored
-  // function testOnReportWrongWorkflowIdReverts() public {
-  //   ...
-  // }
-
-  // TODO: TESTING ONLY — re-enable when workflowOwner check is restored
-  function skip_testOnReportWrongOwnerReverts() public {
+  function testOnReportWrongAuthorReverts() public {
     bytes32[] memory feedIds = new bytes32[](1);
     uint256[] memory timestamps = new uint256[](1);
     int256[] memory prices = new int256[](1);
@@ -253,8 +268,52 @@ contract CryptoCREOracleTest is Test {
     bytes memory report = abi.encode(feedIds, timestamps, prices, prices, prices);
     bytes memory badMetadata = _buildMetadata(workflowId, workflowName, address(0xDEAD));
     vm.prank(forwarder);
-    vm.expectRevert("!workflowOwner");
+    vm.expectRevert(
+      abi.encodeWithSignature(
+        "UnauthorizedAuthor(address,address)",
+        address(0xDEAD),
+        workflowOwner
+      )
+    );
     oracle.onReport(badMetadata, report);
+  }
+
+  function testOnReportWrongWorkflowNameReverts() public {
+    bytes32[] memory feedIds = new bytes32[](1);
+    uint256[] memory timestamps = new uint256[](1);
+    int256[] memory prices = new int256[](1);
+    feedIds[0] = BTC_FEED;
+    timestamps[0] = 100;
+    prices[0] = 100000e8;
+
+    bytes memory report = abi.encode(feedIds, timestamps, prices, prices, prices);
+    bytes32 wrongName = bytes32(bytes10("WRONG"));
+    bytes memory badMetadata = _buildMetadata(workflowId, wrongName, workflowOwner);
+    vm.prank(forwarder);
+    vm.expectRevert(
+      abi.encodeWithSignature(
+        "UnauthorizedWorkflowName(bytes10,bytes10)",
+        bytes10(wrongName),
+        bytes10(workflowName)
+      )
+    );
+    oracle.onReport(badMetadata, report);
+  }
+
+  /// @notice Workflow ID is stored for traceability but never enforced.
+  function testOnReportWrongWorkflowIdDoesNotRevert() public {
+    bytes32[] memory feedIds = new bytes32[](1);
+    uint256[] memory timestamps = new uint256[](1);
+    int256[] memory prices = new int256[](1);
+    feedIds[0] = BTC_FEED;
+    timestamps[0] = 100;
+    prices[0] = 100000e8;
+
+    bytes memory report = abi.encode(feedIds, timestamps, prices, prices, prices);
+    bytes memory metadata = _buildMetadata(keccak256("WRONG-WF-ID"), workflowName, workflowOwner);
+    vm.prank(forwarder);
+    oracle.onReport(metadata, report); // should succeed
+    assertTrue(oracle.priceExists(keccak256(abi.encode(BTC_FEED, uint256(100)))));
   }
 
   function testOnReportBatchMultiplePrices() public {

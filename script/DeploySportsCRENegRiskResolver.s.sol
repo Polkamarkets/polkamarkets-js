@@ -14,9 +14,9 @@ import {SportsCRENegRiskResolver} from "../contracts/oracles/SportsCRENegRiskRes
 ///           NEG_RISK_ADAPTER          — NegRiskAdapter address
 ///           SPORTS_ORACLE             — SportsCREOracle address
 ///           KEYSTONE_FORWARDER        — Chainlink KeystoneForwarder address
-///           CRE_SPORTS_WORKFLOW_ID    — bytes32 workflow ID (same as SportsCREOracle)
-///           CRE_SPORTS_WORKFLOW_NAME  — bytes32 workflow name
-///           CRE_SPORTS_WORKFLOW_OWNER — address of workflow owner
+///
+///         Workflow identity (author + name) is configured POST-deploy via
+///         setExpectedAuthor / setExpectedWorkflowName from MARKET_ADMIN_ROLE.
 contract DeploySportsCRENegRiskResolver is Script {
   function run() external {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
@@ -24,9 +24,6 @@ contract DeploySportsCRENegRiskResolver is Script {
     address negRiskAdapterAddr = vm.envAddress("NEG_RISK_ADAPTER");
     address sportsOracleAddr = vm.envAddress("SPORTS_ORACLE");
     address keystoneForwarder = vm.envAddress("KEYSTONE_FORWARDER");
-    bytes32 workflowId = vm.envBytes32("CRE_SPORTS_WORKFLOW_ID");
-    bytes32 workflowName = vm.envBytes32("CRE_SPORTS_WORKFLOW_NAME");
-    address workflowOwner = vm.envAddress("CRE_SPORTS_WORKFLOW_OWNER");
 
     AdminRegistry registry = AdminRegistry(registryAddr);
 
@@ -36,10 +33,7 @@ contract DeploySportsCRENegRiskResolver is Script {
       registry,
       negRiskAdapterAddr,
       SportsCREOracle(sportsOracleAddr),
-      keystoneForwarder,
-      workflowId,
-      workflowName,
-      workflowOwner
+      keystoneForwarder
     );
 
     // Grant RESOLUTION_ADMIN_ROLE so resolver can call NegRiskAdapter.resolveEvent()

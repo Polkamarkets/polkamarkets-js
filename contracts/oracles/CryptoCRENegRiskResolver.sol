@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {AdminRegistry} from "../AdminRegistry.sol";
-import {ICREReceiver} from "./ICREReceiver.sol";
+import {CREReceiverBase} from "./CREReceiverBase.sol";
 import {CryptoCREOracle} from "./CryptoCREOracle.sol";
 
 /// @title INegRiskAdapterResolver
@@ -22,7 +22,7 @@ interface INegRiskAdapterResolver {
 ///           RANGE          — bucket close price into ranges
 ///           BEST_PERFORMER — highest % change across N tokens wins
 ///           HIT_MILESTONES — highest milestone the high price reached wins
-contract CryptoCRENegRiskResolver is ICREReceiver {
+contract CryptoCRENegRiskResolver is CREReceiverBase {
   // ─── Types ───────────────────────────────────────────────────────────
 
   enum EventRuleType {
@@ -42,14 +42,8 @@ contract CryptoCRENegRiskResolver is ICREReceiver {
 
   // ─── State ───────────────────────────────────────────────────────────
 
-  AdminRegistry public immutable registry;
   INegRiskAdapterResolver public immutable negRiskAdapter;
   CryptoCREOracle public immutable creOracle;
-
-  address public immutable keystoneForwarder;
-  bytes32 public immutable allowedWorkflowId;
-  bytes32 public immutable allowedWorkflowName;
-  address public immutable allowedWorkflowOwner;
 
   mapping(bytes32 => EventConfig) internal _eventConfigs;
 
@@ -64,33 +58,13 @@ contract CryptoCRENegRiskResolver is ICREReceiver {
     AdminRegistry _registry,
     address _negRiskAdapter,
     CryptoCREOracle _creOracle,
-    address _keystoneForwarder,
-    bytes32 _allowedWorkflowId,
-    bytes32 _allowedWorkflowName,
-    address _allowedWorkflowOwner
-  ) {
-    require(address(_registry) != address(0), "registry 0");
+    address _keystoneForwarder
+  ) CREReceiverBase(_registry, _keystoneForwarder) {
     require(_negRiskAdapter != address(0), "adapter 0");
     require(address(_creOracle) != address(0), "oracle 0");
-    require(_keystoneForwarder != address(0), "forwarder 0");
-    require(_allowedWorkflowOwner != address(0), "owner 0");
 
-    registry = _registry;
     negRiskAdapter = INegRiskAdapterResolver(_negRiskAdapter);
     creOracle = _creOracle;
-    keystoneForwarder = _keystoneForwarder;
-    allowedWorkflowId = _allowedWorkflowId;
-    allowedWorkflowName = _allowedWorkflowName;
-    allowedWorkflowOwner = _allowedWorkflowOwner;
-  }
-
-  // ─── ERC165 (required by KeystoneForwarder) ──────────────────────────
-
-  /// @dev The forwarder checks supportsInterface(type(ICREReceiver).interfaceId) before calling.
-  function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-    return
-      interfaceId == type(ICREReceiver).interfaceId ||
-      interfaceId == 0x01ffc9a7; // ERC165 itself
   }
 
   // ─── Configuration ───────────────────────────────────────────────────
@@ -151,8 +125,7 @@ contract CryptoCRENegRiskResolver is ICREReceiver {
   /// @param metadata Workflow metadata.
   /// @param report ABI-encoded (bytes32[] eventIds).
   function onReport(bytes calldata metadata, bytes calldata report) external override {
-    require(msg.sender == keystoneForwarder, "!forwarder");
-    _validateMetadata(metadata);
+    _validate(metadata);
 
     bytes32[] memory eventIds = abi.decode(report, (bytes32[]));
 
@@ -252,29 +225,6 @@ contract CryptoCRENegRiskResolver is ICREReceiver {
   }
 
   // ─── Internal helpers ────────────────────────────────────────────────
-
-  function _validateMetadata(bytes calldata metadata) internal view {
-    // Chainlink CRE metadata layout (TIGHTLY PACKED, 64 bytes total):
-    // [0:32]  workflowId    (bytes32)
-    // [32:42] workflowName  (bytes10)
-    // [42:62] workflowOwner (address, 20 bytes)
-    require(metadata.length >= 62, "metadata too short");
-
-    bytes32 workflowId;
-    bytes32 workflowName;
-    address workflowOwner;
-    assembly {
-      let base := metadata.offset
-      workflowId := calldataload(base)
-      workflowName := and(calldataload(add(base, 32)), 0xFFFFFFFFFFFFFFFFFFFF00000000000000000000000000000000000000000000)
-      workflowOwner := shr(96, calldataload(add(base, 42)))
-    }
-
-    // TODO: TESTING ONLY — re-enable these checks before production deployment
-    // require(workflowId == allowedWorkflowId, "!workflowId");
-    // require(workflowName == allowedWorkflowName, "!workflowName");
-    // require(workflowOwner == allowedWorkflowOwner, "!workflowOwner");
-  }
 
   function _requireAscending(int256[] calldata values) internal pure {
     for (uint256 i = 1; i < values.length; i++) {

@@ -20,12 +20,12 @@ contract TestDeliverSportsResult is Script {
 
     SportsCREOracle oracle = SportsCREOracle(oracleAddr);
 
-    // Build metadata matching the oracle's expected workflow identity
-    bytes32 execId = keccak256("test-exec");
-    bytes32 workflowId = oracle.allowedWorkflowId();
-    bytes32 workflowName = oracle.allowedWorkflowName();
-    address workflowOwner = oracle.allowedWorkflowOwner();
-    bytes memory metadata = abi.encode(execId, workflowId, workflowName, bytes32(bytes20(workflowOwner)));
+    // Build metadata matching the oracle's expected workflow identity.
+    // Layout: [0:32] workflowId | [32:42] workflowName (bytes10) | [42:62] workflowOwner.
+    bytes32 workflowId = oracle.getExpectedWorkflowId();
+    bytes10 workflowName = oracle.getExpectedWorkflowName();
+    address workflowOwner = oracle.getExpectedAuthor();
+    bytes memory metadata = abi.encodePacked(workflowId, workflowName, workflowOwner, bytes2(0x0001));
 
     string[] memory refs = _split(vm.envString("EXTERNAL_REFS"), ",");
     string[] memory outcomeStrs = _split(vm.envString("OUTCOME_IDS"), ",");

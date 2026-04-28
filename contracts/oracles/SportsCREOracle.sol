@@ -3,7 +3,8 @@ pragma solidity ^0.8.26;
 
 import "../IMarketOracle.sol";
 import "../Outcomes.sol";
-import "./ICREReceiver.sol";
+import {CREReceiverBase} from "./CREReceiverBase.sol";
+import {AdminRegistry} from "../AdminRegistry.sol";
 
 interface ISportsManagerView {
   function getMarketClosesAt(uint256 marketId) external view returns (uint256);
@@ -19,7 +20,7 @@ interface ISportsManagerView {
 ///         Trust model: DON consensus over OddsPapi HTTP response + write-once storage.
 ///         This is "Option A" (off-chain calculation) applied to sports because the
 ///         data source and resolution logic are inherently off-chain.
-contract SportsCREOracle is IMarketOracle, ICREReceiver {
+contract SportsCREOracle is IMarketOracle, CREReceiverBase {
   // ─── Types ───────────────────────────────────────────────────────────
 
   struct MarketConfig {
@@ -32,10 +33,6 @@ contract SportsCREOracle is IMarketOracle, ICREReceiver {
   // ─── State ───────────────────────────────────────────────────────────
 
   address public immutable manager;
-  address public immutable keystoneForwarder;
-  bytes32 public immutable allowedWorkflowId;
-  bytes32 public immutable allowedWorkflowName;
-  address public immutable allowedWorkflowOwner;
 
   /// @dev Resolved outcomes keyed by keccak256(externalRef).
   ///      Shared across markets with the same externalRef (rare but possible).
@@ -48,26 +45,16 @@ contract SportsCREOracle is IMarketOracle, ICREReceiver {
 
   event SportsResultReported(bytes32 indexed externalRefHash, int256 outcomeId);
   event MarketConfigured(uint256 indexed marketId, string externalRef);
-  event DebugMetadata(uint256 metadataLength, bytes32 workflowId, bytes32 workflowName, address workflowOwner, address allowedOwner);
 
   // ─── Constructor ─────────────────────────────────────────────────────
 
   constructor(
+    AdminRegistry _registry,
     address _manager,
-    address _keystoneForwarder,
-    bytes32 _allowedWorkflowId,
-    bytes32 _allowedWorkflowName,
-    address _allowedWorkflowOwner
-  ) {
+    address _keystoneForwarder
+  ) CREReceiverBase(_registry, _keystoneForwarder) {
     require(_manager != address(0), "manager 0");
-    require(_keystoneForwarder != address(0), "forwarder 0");
-    require(_allowedWorkflowOwner != address(0), "owner 0");
-
     manager = _manager;
-    keystoneForwarder = _keystoneForwarder;
-    allowedWorkflowId = _allowedWorkflowId;
-    allowedWorkflowName = _allowedWorkflowName;
-    allowedWorkflowOwner = _allowedWorkflowOwner;
   }
 
   // ─── IMarketOracle: initialize ───────────────────────────────────────
@@ -99,32 +86,7 @@ contract SportsCREOracle is IMarketOracle, ICREReceiver {
   /// @param report ABI-encoded (string[] externalRefs, int256[] outcomeIds).
   ///        outcomeId: 0 = YES, 1 = NO, -1 = VOIDED (fixture cancelled/postponed)
   function onReport(bytes calldata metadata, bytes calldata report) external override {
-    require(msg.sender == keystoneForwarder, "!forwarder");
-
-    // Chainlink CRE metadata layout (TIGHTLY PACKED, 64 bytes total):
-    //   [0:32]  workflowId    (bytes32)
-    //   [32:42] workflowName  (bytes10)
-    //   [42:62] workflowOwner (address, 20 bytes)
-    require(metadata.length >= 62, "metadata too short");
-
-    bytes32 workflowId;
-    bytes32 workflowName;
-    address workflowOwner;
-    assembly {
-      let base := metadata.offset
-      workflowId := calldataload(base)
-      // workflowName: 10 bytes at offset 32, mask top 10 bytes of the loaded word
-      workflowName := and(calldataload(add(base, 32)), 0xFFFFFFFFFFFFFFFFFFFF00000000000000000000000000000000000000000000)
-      // workflowOwner: 20 bytes at offset 42, shift right to get address as right-aligned 160 bits
-      workflowOwner := shr(96, calldataload(add(base, 42)))
-    }
-
-    emit DebugMetadata(metadata.length, workflowId, workflowName, workflowOwner, allowedWorkflowOwner);
-
-    // TODO: TESTING ONLY — re-enable these checks before production deployment
-    // require(workflowId == allowedWorkflowId, "!workflowId");
-    // require(workflowName == allowedWorkflowName, "!workflowName");
-    // require(workflowOwner == allowedWorkflowOwner, "!workflowOwner");
+    _validate(metadata);
 
     (string[] memory externalRefs, int256[] memory outcomeIds) =
       abi.decode(report, (string[], int256[]));
@@ -180,12 +142,4 @@ contract SportsCREOracle is IMarketOracle, ICREReceiver {
     refHash = keccak256(bytes(config.externalRef));
   }
 
-  // ─── ERC165 ──────────────────────────────────────────────────────────
-
-  /// @dev The forwarder checks supportsInterface(type(ICREReceiver).interfaceId) before calling.
-  function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-    return
-      interfaceId == type(ICREReceiver).interfaceId ||
-      interfaceId == 0x01ffc9a7; // ERC165 itself
-  }
 }

@@ -14,9 +14,9 @@ import {CryptoCRENegRiskResolver} from "../contracts/oracles/CryptoCRENegRiskRes
 ///           NEG_RISK_ADAPTER       — NegRiskAdapter address
 ///           CRE_ORACLE             — CryptoCREOracle address (for shared price storage)
 ///           KEYSTONE_FORWARDER     — Chainlink KeystoneForwarder address
-///           CRE_WORKFLOW_ID        — bytes32 workflow ID
-///           CRE_WORKFLOW_NAME      — bytes32 workflow name
-///           CRE_WORKFLOW_OWNER     — address of workflow owner
+///
+///         Workflow identity (author + name) is configured POST-deploy via
+///         setExpectedAuthor / setExpectedWorkflowName from MARKET_ADMIN_ROLE.
 contract DeployCryptoCRENegRiskResolver is Script {
   function run() external {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
@@ -24,9 +24,6 @@ contract DeployCryptoCRENegRiskResolver is Script {
     address negRiskAdapterAddr = vm.envAddress("NEG_RISK_ADAPTER");
     address creOracleAddr = vm.envAddress("CRE_ORACLE");
     address keystoneForwarder = vm.envAddress("KEYSTONE_FORWARDER");
-    bytes32 creWorkflowId = vm.envBytes32("CRE_WORKFLOW_ID");
-    bytes32 creWorkflowName = vm.envBytes32("CRE_WORKFLOW_NAME");
-    address creWorkflowOwner = vm.envAddress("CRE_WORKFLOW_OWNER");
 
     AdminRegistry registry = AdminRegistry(registryAddr);
 
@@ -36,10 +33,7 @@ contract DeployCryptoCRENegRiskResolver is Script {
       registry,
       negRiskAdapterAddr,
       CryptoCREOracle(creOracleAddr),
-      keystoneForwarder,
-      creWorkflowId,
-      creWorkflowName,
-      creWorkflowOwner
+      keystoneForwarder
     );
 
     // Grant RESOLUTION_ADMIN_ROLE so the resolver can call NegRiskAdapter.resolveEvent()
