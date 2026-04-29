@@ -784,4 +784,250 @@ contract CryptoCREOracleTest is Test {
     assertEq(outcome1, int256(Outcomes.YES), "105K >= 100K");
     assertEq(outcome2, int256(Outcomes.NO), "105K < 110K");
   }
+
+  // =========================================================================
+  // RANGE_BUCKET (rule 7)
+  // =========================================================================
+
+  function testRangeBucketYes() public {
+    uint256 closesAt = 200;
+    // bucket [100K, 110K)
+    _initMarketFull(1, BTC_FEED, bytes32(0), 7, true, 100_000e8, 0, closesAt, 110_000e8, 0);
+    _deliverPrice(BTC_FEED, closesAt, 105_000e8, 105_000e8, 105_000e8);
+
+    (int256 outcome, bool resolved) = oracle.getResult(1);
+    assertTrue(resolved);
+    assertEq(outcome, int256(Outcomes.YES));
+  }
+
+  function testRangeBucketNoBelow() public {
+    uint256 closesAt = 200;
+    _initMarketFull(1, BTC_FEED, bytes32(0), 7, true, 100_000e8, 0, closesAt, 110_000e8, 0);
+    _deliverPrice(BTC_FEED, closesAt, 99_999e8, 99_999e8, 99_999e8);
+
+    (int256 outcome, bool resolved) = oracle.getResult(1);
+    assertTrue(resolved);
+    assertEq(outcome, int256(Outcomes.NO));
+  }
+
+  function testRangeBucketNoAtUpperBound() public {
+    uint256 closesAt = 200;
+    _initMarketFull(1, BTC_FEED, bytes32(0), 7, true, 100_000e8, 0, closesAt, 110_000e8, 0);
+    // Half-open: price == upperBound is NO (belongs to next bucket)
+    _deliverPrice(BTC_FEED, closesAt, 110_000e8, 110_000e8, 110_000e8);
+
+    (int256 outcome, bool resolved) = oracle.getResult(1);
+    assertTrue(resolved);
+    assertEq(outcome, int256(Outcomes.NO));
+  }
+
+  function testRangeBucketYesAtLowerBound() public {
+    uint256 closesAt = 200;
+    _initMarketFull(1, BTC_FEED, bytes32(0), 7, true, 100_000e8, 0, closesAt, 110_000e8, 0);
+    // Half-open: price == lowerBound is YES
+    _deliverPrice(BTC_FEED, closesAt, 100_000e8, 100_000e8, 100_000e8);
+
+    (int256 outcome, bool resolved) = oracle.getResult(1);
+    assertTrue(resolved);
+    assertEq(outcome, int256(Outcomes.YES));
+  }
+
+  function testRangeBucketNotResolvedWithoutFeed() public {
+    uint256 closesAt = 200;
+    _initMarketFull(1, BTC_FEED, bytes32(0), 7, true, 100_000e8, 0, closesAt, 110_000e8, 0);
+    (int256 outcome, bool resolved) = oracle.getResult(1);
+    assertFalse(resolved);
+    assertEq(outcome, int256(-2));
+  }
+
+  function testRangeBucketRequiresUpperGreaterThanLower() public {
+    mockManager.setClosesAt(1, 200);
+    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(7), true, int256(110_000e8), uint256(0), int256(100_000e8), uint256(0));
+    vm.prank(address(mockManager));
+    vm.expectRevert("upperBound > lowerBound");
+    oracle.initialize(1, data);
+  }
+
+  // =========================================================================
+  // RANGE_BUCKET_HIGH (rule 9) — for HIT_MILESTONES outcomes
+  // =========================================================================
+
+  function testRangeBucketHighReadsHighPrice() public {
+    uint256 closesAt = 200;
+    // bucket [100K, 110K) on highPrice
+    _initMarketFull(1, BTC_FEED, bytes32(0), 9, true, 100_000e8, 0, closesAt, 110_000e8, 0);
+    // close=99K but high=105K → high is in range → YES
+    _deliverPrice(BTC_FEED, closesAt, 99_000e8, 105_000e8, 90_000e8);
+
+    (int256 outcome, bool resolved) = oracle.getResult(1);
+    assertTrue(resolved);
+    assertEq(outcome, int256(Outcomes.YES));
+  }
+
+  function testRangeBucketHighOutOfRange() public {
+    uint256 closesAt = 200;
+    _initMarketFull(1, BTC_FEED, bytes32(0), 9, true, 100_000e8, 0, closesAt, 110_000e8, 0);
+    // high=120K — above upper → NO
+    _deliverPrice(BTC_FEED, closesAt, 115_000e8, 120_000e8, 90_000e8);
+
+    (int256 outcome, bool resolved) = oracle.getResult(1);
+    assertTrue(resolved);
+    assertEq(outcome, int256(Outcomes.NO));
+  }
+
+  // =========================================================================
+  // BEST_PERFORMER_OUTCOME (rule 8)
+  // =========================================================================
+
+  function _initBestPerformerMarket(
+    uint256 marketId,
+    bytes32 myFeedId,
+    bytes32[] memory peers,
+    uint256 openTimestamp,
+    uint256 closesAt
+  ) internal {
+    mockManager.setClosesAt(marketId, closesAt);
+    bytes memory data = abi.encode(myFeedId, bytes32(0), uint8(8), peers, openTimestamp);
+    vm.prank(address(mockManager));
+    oracle.initialize(marketId, data);
+  }
+
+  function testBestPerformerOutcomeUniqueWinner() public {
+    bytes32 SOL = keccak256("SOLUSDT");
+    bytes32 DOGE = keccak256("DOGEUSDT");
+
+    uint256 openTs = 100;
+    uint256 closeTs = 200;
+
+    // Market 1 = BTC. Peers: ETH, SOL, DOGE.
+    bytes32[] memory peers = new bytes32[](3);
+    peers[0] = ETH_FEED;
+    peers[1] = SOL;
+    peers[2] = DOGE;
+    _initBestPerformerMarket(1, BTC_FEED, peers, openTs, closeTs);
+
+    // Deliver opens (all at $100 for simple math) and closes:
+    //   BTC: 100 → 130 (+30%)
+    //   ETH: 100 → 110 (+10%)
+    //   SOL: 100 → 120 (+20%)
+    //   DOGE: 100 → 105 (+5%)
+    _deliverPrice(BTC_FEED, openTs, 100e8, 100e8, 100e8);
+    _deliverPrice(BTC_FEED, closeTs, 130e8, 130e8, 130e8);
+    _deliverPrice(ETH_FEED, openTs, 100e8, 100e8, 100e8);
+    _deliverPrice(ETH_FEED, closeTs, 110e8, 110e8, 110e8);
+    _deliverPrice(SOL, openTs, 100e8, 100e8, 100e8);
+    _deliverPrice(SOL, closeTs, 120e8, 120e8, 120e8);
+    _deliverPrice(DOGE, openTs, 100e8, 100e8, 100e8);
+    _deliverPrice(DOGE, closeTs, 105e8, 105e8, 105e8);
+
+    (int256 outcome, bool resolved) = oracle.getResult(1);
+    assertTrue(resolved);
+    assertEq(outcome, int256(Outcomes.YES), "BTC wins uniquely");
+  }
+
+  function testBestPerformerOutcomeNotWinner() public {
+    uint256 openTs = 100;
+    uint256 closeTs = 200;
+
+    // Market 2 = ETH (less performer). Peers: BTC.
+    bytes32[] memory peers = new bytes32[](1);
+    peers[0] = BTC_FEED;
+    _initBestPerformerMarket(2, ETH_FEED, peers, openTs, closeTs);
+
+    _deliverPrice(BTC_FEED, openTs, 100e8, 100e8, 100e8);
+    _deliverPrice(BTC_FEED, closeTs, 130e8, 130e8, 130e8);
+    _deliverPrice(ETH_FEED, openTs, 100e8, 100e8, 100e8);
+    _deliverPrice(ETH_FEED, closeTs, 110e8, 110e8, 110e8);
+
+    (int256 outcome, bool resolved) = oracle.getResult(2);
+    assertTrue(resolved);
+    assertEq(outcome, int256(Outcomes.NO), "ETH loses to BTC");
+  }
+
+  function testBestPerformerOutcomeTieAtTop() public {
+    uint256 openTs = 100;
+    uint256 closeTs = 200;
+
+    bytes32[] memory peers = new bytes32[](1);
+    peers[0] = ETH_FEED;
+    _initBestPerformerMarket(1, BTC_FEED, peers, openTs, closeTs);
+
+    // Identical % change → tie → BTC market resolves NO (strict comparison).
+    _deliverPrice(BTC_FEED, openTs, 100e8, 100e8, 100e8);
+    _deliverPrice(BTC_FEED, closeTs, 110e8, 110e8, 110e8);
+    _deliverPrice(ETH_FEED, openTs, 200e8, 200e8, 200e8);
+    _deliverPrice(ETH_FEED, closeTs, 220e8, 220e8, 220e8);
+
+    (int256 outcome, bool resolved) = oracle.getResult(1);
+    assertTrue(resolved);
+    assertEq(outcome, int256(Outcomes.NO), "tie -> NO");
+  }
+
+  function testBestPerformerOutcomeNotReadyMissingPeerOpen() public {
+    uint256 openTs = 100;
+    uint256 closeTs = 200;
+
+    bytes32[] memory peers = new bytes32[](1);
+    peers[0] = ETH_FEED;
+    _initBestPerformerMarket(1, BTC_FEED, peers, openTs, closeTs);
+
+    _deliverPrice(BTC_FEED, openTs, 100e8, 100e8, 100e8);
+    _deliverPrice(BTC_FEED, closeTs, 130e8, 130e8, 130e8);
+    _deliverPrice(ETH_FEED, closeTs, 110e8, 110e8, 110e8);
+    // Peer's open price is missing.
+
+    (int256 outcome, bool resolved) = oracle.getResult(1);
+    assertFalse(resolved);
+    assertEq(outcome, int256(-2));
+  }
+
+  function testBestPerformerOutcomeMyOpenZero() public {
+    uint256 openTs = 100;
+    uint256 closeTs = 200;
+
+    bytes32[] memory peers = new bytes32[](1);
+    peers[0] = ETH_FEED;
+    _initBestPerformerMarket(1, BTC_FEED, peers, openTs, closeTs);
+
+    // My open price is zero — can't compute %change → automatic NO
+    _deliverPrice(BTC_FEED, openTs, 0, 0, 0);
+    _deliverPrice(BTC_FEED, closeTs, 130e8, 130e8, 130e8);
+    _deliverPrice(ETH_FEED, openTs, 100e8, 100e8, 100e8);
+    _deliverPrice(ETH_FEED, closeTs, 110e8, 110e8, 110e8);
+
+    (int256 outcome, bool resolved) = oracle.getResult(1);
+    assertTrue(resolved);
+    assertEq(outcome, int256(Outcomes.NO));
+  }
+
+  function testBestPerformerOutcomeRejectsSelfAsPeer() public {
+    bytes32[] memory peers = new bytes32[](1);
+    peers[0] = BTC_FEED; // same as myFeedId
+    mockManager.setClosesAt(1, 200);
+    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(8), peers, uint256(100));
+    vm.prank(address(mockManager));
+    vm.expectRevert("peer = self");
+    oracle.initialize(1, data);
+  }
+
+  function testBestPerformerOutcomeRejectsEmptyPeers() public {
+    bytes32[] memory peers = new bytes32[](0);
+    mockManager.setClosesAt(1, 200);
+    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(8), peers, uint256(100));
+    vm.prank(address(mockManager));
+    vm.expectRevert("no peers");
+    oracle.initialize(1, data);
+  }
+
+  function testBestPerformerOutcomePeerListGetter() public {
+    bytes32[] memory peers = new bytes32[](2);
+    peers[0] = ETH_FEED;
+    peers[1] = keccak256("SOLUSDT");
+    _initBestPerformerMarket(1, BTC_FEED, peers, 100, 200);
+
+    bytes32[] memory got = oracle.getMarketPeerFeedIds(1);
+    assertEq(got.length, 2);
+    assertEq(got[0], ETH_FEED);
+    assertEq(got[1], peers[1]);
+  }
 }

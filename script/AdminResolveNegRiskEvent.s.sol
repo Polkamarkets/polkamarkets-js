@@ -5,33 +5,33 @@ import {Script, console} from "forge-std/Script.sol";
 
 import {NegRiskAdapter} from "../contracts/NegRiskAdapter.sol";
 
-/// @notice Permissionless event resolution. Reads `winningIndex` from the
-///         constituent markets — every market must already be resolved
-///         (per-market via `manager.resolveMarket(id)`) before this call.
+/// @notice Admin override for event resolution. Caller supplies `winningIndex`.
+///         Already-resolved constituent markets are skipped, but their existing
+///         outcome must agree with the supplied index — otherwise reverts.
 ///
 ///         Env vars:
-///           PRIVATE_KEY          — signer (no role required)
+///           PRIVATE_KEY          — signer (must have RESOLUTION_ADMIN_ROLE)
 ///           NEG_RISK_ADAPTER     — NegRiskAdapter address
 ///           EVENT_ID             — bytes32 hex event identifier
-///           REDEEM               — "true" to also call redeemNOPositions (default: false)
-///                                  (redeemNOPositions still requires DEFAULT_ADMIN_ROLE)
-contract ResolveNegRiskEvent is Script {
+///           WINNING_INDEX        — int: -1 = "Other" wins (all NO), 0..N-1 = named outcome wins
+///           REDEEM               — "true" to also call redeemNOPositions (default: true)
+contract AdminResolveNegRiskEvent is Script {
   function run() external {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address adapterAddr = vm.envAddress("NEG_RISK_ADAPTER");
     bytes32 eventId = vm.envBytes32("EVENT_ID");
-    bool redeem = vm.envOr("REDEEM", false);
+    int256 winningIndex = vm.envInt("WINNING_INDEX");
+    bool redeem = vm.envOr("REDEEM", true);
 
     vm.startBroadcast(privateKey);
 
     NegRiskAdapter adapter = NegRiskAdapter(adapterAddr);
-    adapter.resolveEvent(eventId);
+    adapter.adminResolveEvent(eventId, winningIndex);
 
-    (, , int256 winningIndex, , ) = adapter.getEvent(eventId);
-    console.log("Event resolved:");
+    console.log("Event resolved (admin):");
     console.logBytes32(eventId);
     if (winningIndex == -1) {
-      console.log("Winning index: -1 (Other wins - all markets resolved NO)");
+      console.log("Winning index: -1 (Other wins - all markets resolve NO)");
     } else {
       console.log("Winning index:", uint256(winningIndex));
     }

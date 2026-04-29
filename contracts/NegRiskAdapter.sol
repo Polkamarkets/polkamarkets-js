@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
 import "./AdminRegistry.sol";
 import "./PredictionMarketV3ManagerCLOB.sol";
+import "./IMyriadMarketManager.sol";
 import "./ConditionalTokens.sol";
 import "./WrappedCollateral.sol";
 import "./Outcomes.sol";
@@ -309,9 +310,41 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
   // ─── Resolution ──────────────────────────────────────────────────────
 
-  /// @notice Resolve the event. winningIndex >= 0 means that outcome won (YES).
-  ///         winningIndex == -1 means "Other" won: all markets resolve NO.
-  function resolveEvent(bytes32 eventId, int256 winningIndex) external nonReentrant {
+  /// @notice Permissionless event resolution. Derives `winningIndex` by scanning
+  ///         the constituent markets — every market must already be resolved.
+  ///         A single YES across the constituents wins; all NO means "Other"
+  ///         (winningIndex = -1). Multiple YES is rejected.
+  function resolveEvent(bytes32 eventId) external nonReentrant {
+    Event storage evt = _events[eventId];
+    require(evt.outcomeCount > 0, "event !exist");
+    require(!evt.resolved, "already resolved");
+
+    uint256 n = evt.outcomeCount;
+    int256 winningIndex = -1;
+    uint256 yesCount = 0;
+
+    for (uint256 i = 0; i < n; i++) {
+      uint256 mid = evt.marketIds[i];
+      require(manager.getMarketState(mid) == IMyriadMarketManager.MarketState.resolved, "market !resolved");
+      int256 outcome = manager.getMarketResolvedOutcome(mid);
+      if (outcome == int256(Outcomes.YES)) {
+        require(yesCount == 0, "multiple YES");
+        winningIndex = int256(i);
+        yesCount++;
+      }
+    }
+
+    evt.resolved = true;
+    evt.winningIndex = winningIndex;
+
+    emit EventResolved(eventId, winningIndex);
+  }
+
+  /// @notice Admin override: caller supplies winningIndex. Resolves any unresolved
+  ///         constituent markets via `manager.adminResolveMarket`. For markets
+  ///         that are already resolved, asserts the existing outcome matches the
+  ///         supplied winningIndex (otherwise reverts).
+  function adminResolveEvent(bytes32 eventId, int256 winningIndex) external nonReentrant {
     require(registry.hasRole(registry.RESOLUTION_ADMIN_ROLE(), msg.sender), "not resolution admin");
 
     Event storage evt = _events[eventId];
@@ -324,18 +357,17 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     evt.resolved = true;
     evt.winningIndex = winningIndex;
 
-    if (winningIndex == -1) {
-      for (uint256 i = 0; i < n; i++) {
-        manager.adminResolveMarket(evt.marketIds[i], int256(Outcomes.NO));
+    for (uint256 i = 0; i < n; i++) {
+      uint256 mid = evt.marketIds[i];
+      int256 expected = (winningIndex >= 0 && int256(i) == winningIndex)
+        ? int256(Outcomes.YES)
+        : int256(Outcomes.NO);
+
+      if (manager.getMarketState(mid) == IMyriadMarketManager.MarketState.resolved) {
+        require(manager.getMarketResolvedOutcome(mid) == expected, "winningIndex conflicts with resolved market");
+        continue;
       }
-    } else {
-      for (uint256 i = 0; i < n; i++) {
-        if (int256(i) == winningIndex) {
-          manager.adminResolveMarket(evt.marketIds[i], int256(Outcomes.YES));
-        } else {
-          manager.adminResolveMarket(evt.marketIds[i], int256(Outcomes.NO));
-        }
-      }
+      manager.adminResolveMarket(mid, expected);
     }
 
     emit EventResolved(eventId, winningIndex);

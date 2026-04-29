@@ -22,6 +22,23 @@ contract MockERC20NR is ERC20 {
   function mint(address to, uint256 amount) external { _mint(to, amount); }
 }
 
+/// @notice Minimal oracle stub for tests: lets us program per-market outcomes.
+contract MockMarketOracle is IMarketOracle {
+  mapping(uint256 => int256) public outcomes;
+  mapping(uint256 => bool) public isResolved;
+
+  function initialize(uint256, bytes calldata) external override {}
+
+  function setResult(uint256 marketId, int256 outcome, bool resolved_) external {
+    outcomes[marketId] = outcome;
+    isResolved[marketId] = resolved_;
+  }
+
+  function getResult(uint256 marketId) external view override returns (int256, bool) {
+    return (outcomes[marketId], isResolved[marketId]);
+  }
+}
+
 contract NegRiskAdapterTest is Test, ERC1155Holder {
   uint256 private constant ONE = 1e18;
   uint256 private constant BPS = 10000;
@@ -280,7 +297,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     vm.warp(block.timestamp + 2 days);
 
     // Resolve: outcome 1 wins
-    adapter.resolveEvent(eventId, 1);
+    adapter.adminResolveEvent(eventId, 1);
 
     (,bool resolved, int256 winningIndex,,) = adapter.getEvent(eventId);
     assertTrue(resolved);
@@ -331,7 +348,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     vm.warp(block.timestamp + 2 days);
 
     // Resolve: "Other" wins (-1)
-    adapter.resolveEvent(eventId, -1);
+    adapter.adminResolveEvent(eventId, -1);
 
     // All markets should resolve with outcome 1 (NO wins)
     for (uint256 i = 0; i < 3; i++) {
@@ -1086,7 +1103,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
   function testVoidEventAlreadyResolvedReverts() public {
     (bytes32 eventId,) = _createThreeOutcomeEvent();
     vm.warp(block.timestamp + 2 days);
-    adapter.resolveEvent(eventId, 0);
+    adapter.adminResolveEvent(eventId, 0);
 
     uint256[] memory yesPayouts = new uint256[](3);
     yesPayouts[0] = ONE / 2;
@@ -1137,7 +1154,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
   function testRedeemNOPositionsNotAdminReverts() public {
     (bytes32 eventId, ) = _createThreeOutcomeEvent();
     vm.warp(block.timestamp + 2 days);
-    adapter.resolveEvent(eventId, 0);
+    adapter.adminResolveEvent(eventId, 0);
 
     vm.prank(alice);
     vm.expectRevert("not admin");
@@ -1147,7 +1164,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
   function testRedeemNOPositionsDoubleCallReverts() public {
     (bytes32 eventId, ) = _createThreeOutcomeEvent();
     vm.warp(block.timestamp + 2 days);
-    adapter.resolveEvent(eventId, 0);
+    adapter.adminResolveEvent(eventId, 0);
 
     adapter.redeemNOPositions(eventId);
 
@@ -1206,6 +1223,264 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
   }
 
   // =========================================================================
+  // Per-market resolution of neg-risk markets (Phase A: !negRisk guards lifted)
+  // =========================================================================
+
+  function testResolveNegRiskMarketIndividually() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 4);
+
+    vm.warp(block.timestamp + 2 days);
+
+    oracle.setResult(marketIds[2], int256(Outcomes.NO), true);
+
+    vm.prank(alice);
+    int256 outcome = manager.resolveMarket(marketIds[2]);
+    assertEq(outcome, int256(Outcomes.NO));
+    assertEq(uint8(manager.getMarketState(marketIds[2])), uint8(IMyriadMarketManager.MarketState.resolved));
+
+    for (uint256 i = 0; i < marketIds.length; i++) {
+      if (i == 2) continue;
+      assertTrue(uint8(manager.getMarketState(marketIds[i])) != uint8(IMyriadMarketManager.MarketState.resolved));
+    }
+  }
+
+  function testResolveNegRiskMarketRevertsWhenOracleNotReady() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 3);
+
+    vm.warp(block.timestamp + 2 days);
+
+    vm.expectRevert("oracle: not resolved");
+    manager.resolveMarket(marketIds[1]);
+  }
+
+  function testAdminResolveMarketAllowedForNegRiskNonAdapter() public {
+    (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+
+    vm.warp(block.timestamp + 2 days);
+
+    manager.adminResolveMarket(marketIds[0], int256(Outcomes.YES));
+    assertEq(manager.getMarketResolvedOutcome(marketIds[0]), int256(Outcomes.YES));
+  }
+
+  // =========================================================================
+  // Permissionless event resolution (Phase B)
+  // =========================================================================
+
+  function testResolveEventPermissionless_AllResolved() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 4);
+
+    vm.warp(block.timestamp + 2 days);
+
+    oracle.setResult(marketIds[0], int256(Outcomes.NO), true);
+    oracle.setResult(marketIds[1], int256(Outcomes.YES), true);
+    oracle.setResult(marketIds[2], int256(Outcomes.NO), true);
+    oracle.setResult(marketIds[3], int256(Outcomes.NO), true);
+    for (uint256 i = 0; i < 4; i++) {
+      manager.resolveMarket(marketIds[i]);
+    }
+
+    vm.prank(alice);
+    adapter.resolveEvent(eventId);
+
+    (, bool resolved, int256 winningIndex,,) = adapter.getEvent(eventId);
+    assertTrue(resolved);
+    assertEq(winningIndex, 1);
+  }
+
+  function testResolveEventPermissionless_NoYes_AllNo() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 3);
+
+    vm.warp(block.timestamp + 2 days);
+
+    for (uint256 i = 0; i < 3; i++) {
+      oracle.setResult(marketIds[i], int256(Outcomes.NO), true);
+      manager.resolveMarket(marketIds[i]);
+    }
+
+    adapter.resolveEvent(eventId);
+
+    (,, int256 winningIndex,,) = adapter.getEvent(eventId);
+    assertEq(winningIndex, -1);
+  }
+
+  function testResolveEventPermissionless_RevertsWhenMarketUnresolved() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 3);
+
+    vm.warp(block.timestamp + 2 days);
+
+    oracle.setResult(marketIds[0], int256(Outcomes.NO), true);
+    manager.resolveMarket(marketIds[0]);
+    // markets 1, 2 unresolved
+
+    vm.expectRevert("market !resolved");
+    adapter.resolveEvent(eventId);
+  }
+
+  function testResolveEventPermissionless_RevertsOnMultipleYes() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 3);
+
+    vm.warp(block.timestamp + 2 days);
+
+    oracle.setResult(marketIds[0], int256(Outcomes.YES), true);
+    oracle.setResult(marketIds[1], int256(Outcomes.YES), true);
+    oracle.setResult(marketIds[2], int256(Outcomes.NO), true);
+    for (uint256 i = 0; i < 3; i++) {
+      manager.resolveMarket(marketIds[i]);
+    }
+
+    vm.expectRevert("multiple YES");
+    adapter.resolveEvent(eventId);
+  }
+
+  function testResolveEventPermissionless_RevertsWhenAlreadyResolved() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 3);
+
+    vm.warp(block.timestamp + 2 days);
+    for (uint256 i = 0; i < 3; i++) {
+      oracle.setResult(marketIds[i], int256(Outcomes.NO), true);
+      manager.resolveMarket(marketIds[i]);
+    }
+    adapter.resolveEvent(eventId);
+
+    vm.expectRevert("already resolved");
+    adapter.resolveEvent(eventId);
+  }
+
+  // =========================================================================
+  // Admin event resolution overrides (Phase B)
+  // =========================================================================
+
+  function testAdminResolveEvent_SkipsPreResolved() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 4);
+
+    vm.warp(block.timestamp + 2 days);
+
+    // market 1 pre-resolved YES via per-market path
+    oracle.setResult(marketIds[1], int256(Outcomes.YES), true);
+    manager.resolveMarket(marketIds[1]);
+
+    // Admin agrees: outcome 1 wins
+    adapter.adminResolveEvent(eventId, 1);
+
+    assertEq(manager.getMarketResolvedOutcome(marketIds[0]), int256(Outcomes.NO));
+    assertEq(manager.getMarketResolvedOutcome(marketIds[1]), int256(Outcomes.YES));
+    assertEq(manager.getMarketResolvedOutcome(marketIds[2]), int256(Outcomes.NO));
+    assertEq(manager.getMarketResolvedOutcome(marketIds[3]), int256(Outcomes.NO));
+
+    (, bool resolved, int256 winningIndex,,) = adapter.getEvent(eventId);
+    assertTrue(resolved);
+    assertEq(winningIndex, 1);
+  }
+
+  function testAdminResolveEvent_RevertsOnDisagreement() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 4);
+
+    vm.warp(block.timestamp + 2 days);
+
+    // market 0 pre-resolved YES via per-market
+    oracle.setResult(marketIds[0], int256(Outcomes.YES), true);
+    manager.resolveMarket(marketIds[0]);
+
+    // Admin claims outcome 2 wins → conflict with market 0 = YES
+    vm.expectRevert("winningIndex conflicts with resolved market");
+    adapter.adminResolveEvent(eventId, 2);
+  }
+
+  function testVoidEventStillStrict() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 3);
+
+    vm.warp(block.timestamp + 2 days);
+
+    // market 0 pre-resolved
+    oracle.setResult(marketIds[0], int256(Outcomes.NO), true);
+    manager.resolveMarket(marketIds[0]);
+
+    uint256[] memory yesPayouts = new uint256[](3);
+    yesPayouts[0] = ONE / 2;
+    yesPayouts[1] = ONE / 2;
+    yesPayouts[2] = ONE / 2;
+
+    // adminVoidMarket on the already-resolved market 0 reverts inside the loop
+    vm.expectRevert("resolved");
+    adapter.voidEvent(eventId, yesPayouts);
+  }
+
+  // =========================================================================
+  // wcol redemption integrity after mixed-order resolution (Phase B)
+  // =========================================================================
+
+  function testRedeemNOPositionsAfterMixedResolution() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 4);
+    uint256 amount = 100 ether;
+
+    // Alice splits in outcome 0 and converts → YES(0..3); adapter holds NO(0..3)
+    collateral.mint(alice, amount);
+    vm.startPrank(alice);
+    collateral.approve(address(adapter), amount);
+    adapter.splitPosition(eventId, 0, amount);
+    conditionalTokens.setApprovalForAll(address(adapter), true);
+    adapter.convertPositions(eventId, 0, amount);
+    vm.stopPrank();
+
+    // Adapter minted (n-1)*amount = 3 * 100 = 300 wcol
+    uint256 mintedBefore = adapter.mintedWcolPerEvent(eventId);
+    assertEq(mintedBefore, 3 * amount);
+
+    vm.warp(block.timestamp + 2 days);
+
+    // Outcome 2 wins. Resolve markets 0 and 3 per-market, leave 1 and 2 to resolveEvent.
+    oracle.setResult(marketIds[0], int256(Outcomes.NO), true);
+    oracle.setResult(marketIds[2], int256(Outcomes.YES), true);
+    oracle.setResult(marketIds[3], int256(Outcomes.NO), true);
+    manager.resolveMarket(marketIds[0]);
+    manager.resolveMarket(marketIds[3]);
+
+    // Now market 1 is still open. resolveEvent would revert "market !resolved".
+    // Use per-market for market 1 too, then ratify with permissionless resolveEvent.
+    oracle.setResult(marketIds[1], int256(Outcomes.NO), true);
+    manager.resolveMarket(marketIds[1]);
+
+    // The remaining one (market 2) gets resolved via resolveEvent? No — resolveEvent
+    // doesn't write per-market outcomes anymore. We resolve market 2 per-market too,
+    // then call resolveEvent to ratify event-level state.
+    manager.resolveMarket(marketIds[2]);
+
+    adapter.resolveEvent(eventId);
+    (,, int256 winningIndex,,) = adapter.getEvent(eventId);
+    assertEq(winningIndex, 2);
+
+    // Alice redeems winning YES(2) → gets `amount` wcol
+    vm.prank(alice);
+    conditionalTokens.redeemPosition(marketIds[2]);
+    assertEq(wcol.balanceOf(alice), amount);
+
+    // Adapter cleans up: redeems its NO positions, burns the 300 minted, sends excess to treasury
+    adapter.redeemNOPositions(eventId);
+    assertEq(adapter.mintedWcolPerEvent(eventId), 0);
+    assertTrue(adapter.noPositionsRedeemed(eventId));
+
+    // Alice unwraps her wcol → underlying
+    vm.prank(alice);
+    wcol.unwrap(amount);
+    assertEq(collateral.balanceOf(alice), amount);
+
+    // Treasury should have received nothing extra: alice's deposit (amount) flowed through
+    // the YES(2) winning side. The 3 NO redemptions netted exactly the 3*amount minted.
+    assertEq(collateral.balanceOf(treasury), 0);
+  }
+
+  // =========================================================================
   // Helpers
   // =========================================================================
 
@@ -1218,6 +1493,36 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
 
     eventId = adapter.createEvent("Who will win?", params);
     marketIds = adapter.getEventMarkets(eventId);
+  }
+
+  function _createEventWithOracle(address oracle, uint256 outcomeCount)
+    internal
+    returns (bytes32 eventId, uint256[] memory marketIds)
+  {
+    PredictionMarketV3ManagerCLOB.CreateMarketParams[] memory params =
+      new PredictionMarketV3ManagerCLOB.CreateMarketParams[](outcomeCount);
+    for (uint256 i = 0; i < outcomeCount; i++) {
+      params[i] = PredictionMarketV3ManagerCLOB.CreateMarketParams({
+        closesAt: block.timestamp + 1 days,
+        question: string(abi.encodePacked("Outcome ", _u2s(i))),
+        image: "",
+        feeModule: address(feeModule),
+        oracle: oracle,
+        oracleData: ""
+      });
+    }
+
+    eventId = adapter.createEvent("Generic event", params);
+    marketIds = adapter.getEventMarkets(eventId);
+  }
+
+  function _u2s(uint256 v) private pure returns (string memory) {
+    if (v == 0) return "0";
+    uint256 t = v; uint256 d;
+    while (t != 0) { d++; t /= 10; }
+    bytes memory b = new bytes(d);
+    while (v != 0) { d--; b[d] = bytes1(uint8(48 + v % 10)); v /= 10; }
+    return string(b);
   }
 
   function _mkParam(string memory question) internal view returns (PredictionMarketV3ManagerCLOB.CreateMarketParams memory) {

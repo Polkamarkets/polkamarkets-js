@@ -176,7 +176,6 @@ contract PredictionMarketV3ManagerCLOB is Initializable, ReentrancyGuardTransien
   /// @notice Permissionless resolution via the market's oracle.
   function resolveMarket(uint256 marketId) external nonReentrant returns (int256 outcomeId) {
     Market storage market = _requireMarketExists(marketId);
-    require(!market.negRisk, "use resolveEvent for neg risk");
     require(getMarketState(marketId) == MarketState.closed, "!closed");
     require(market.state != MarketState.resolved, "resolved");
     require(market.oracle != address(0), "no oracle");
@@ -198,7 +197,6 @@ contract PredictionMarketV3ManagerCLOB is Initializable, ReentrancyGuardTransien
 
     Market storage market = _requireMarketExists(marketId);
     require(market.state != MarketState.resolved, "resolved");
-    require(!market.negRisk || msg.sender == negRiskAdapter, "use resolveEvent");
 
     market.resolvedOutcome = outcomeId;
     market.state = MarketState.resolved;

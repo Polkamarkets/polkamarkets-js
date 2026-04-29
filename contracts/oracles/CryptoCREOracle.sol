@@ -15,25 +15,30 @@ interface ICREOracleManagerView {
 ///         Receives verified price data from a Chainlink CRE workflow via onReport(),
 ///         stores it immutably, and computes binary market outcomes on-chain via getResult().
 ///
-///         Supports 7 rule types with a yesAbove flag:
-///           THRESHOLD    — close vs fixed price
-///           DIRECTION    — close vs open (same feed)
-///           CHANGE_PCT   — |% change| vs bps threshold (volatility)
-///           RELATIVE     — feed A's % change vs feed B's % change
-///           HIT          — did high/low reach a target at any point
-///           CANDLE       — more green or red candles in a period
-///           FIRST_TO_HIT — high vs low threshold race within a window
+///         Supports 9 rule types with a yesAbove flag:
+///           THRESHOLD              — close vs fixed price
+///           DIRECTION              — close vs open (same feed)
+///           CHANGE_PCT             — |% change| vs bps threshold (volatility)
+///           RELATIVE               — feed A's % change vs feed B's % change
+///           HIT                    — did high/low reach a target at any point
+///           CANDLE                 — more green or red candles in a period
+///           FIRST_TO_HIT           — high vs low threshold race within a window
+///           RANGE_BUCKET           — close in [lowerBound, upperBound) — for neg-risk RANGE
+///           BEST_PERFORMER_OUTCOME — myFeed strictly beats peers' % change — for neg-risk BEST_PERFORMER
 contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
   // ─── Types ───────────────────────────────────────────────────────────
 
   enum RuleType {
-    THRESHOLD,      // 0
-    DIRECTION,      // 1
-    CHANGE_PCT,     // 2
-    RELATIVE,       // 3
-    HIT,            // 4
-    CANDLE,         // 5 — param = candle interval in seconds
-    FIRST_TO_HIT    // 6 — param = above threshold, paramB = below threshold, interval = sub-interval
+    THRESHOLD,              // 0
+    DIRECTION,              // 1
+    CHANGE_PCT,             // 2
+    RELATIVE,               // 3
+    HIT,                    // 4
+    CANDLE,                 // 5 — param = candle interval in seconds
+    FIRST_TO_HIT,           // 6 — param = above threshold, paramB = below threshold, interval = sub-interval
+    RANGE_BUCKET,           // 7 — param = lowerBound, paramB = upperBound (half-open: [lower, upper)) on closePrice
+    BEST_PERFORMER_OUTCOME, // 8 — feedId = mine; peers stored separately; openTimestamp + closesAt define the period
+    RANGE_BUCKET_HIGH       // 9 — same as RANGE_BUCKET but on highPrice (for "highest milestone reached" outcomes)
   }
 
   struct MarketConfig {
@@ -65,6 +70,11 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
 
   mapping(uint256 => MarketConfig) public marketConfigs;
 
+  /// @dev BEST_PERFORMER_OUTCOME: per-market list of competing feed IDs.
+  ///      Each constituent in a neg-risk event stores everyone else's feed
+  ///      so it can compare its own % change against theirs.
+  mapping(uint256 => bytes32[]) internal marketPeerFeedIds;
+
   // ─── Events ──────────────────────────────────────────────────────────
 
   event PriceVerified(bytes32 indexed feedId, uint256 indexed timestamp, int256 closePrice, int256 highPrice, int256 lowPrice);
@@ -84,11 +94,35 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
   // ─── IMarketOracle: initialize ───────────────────────────────────────
 
   /// @notice Called by the manager during createMarket().
-  /// @param data ABI-encoded (bytes32 feedId, bytes32 feedIdB, uint8 rule, bool yesAbove, int256 param, uint256 openTimestamp, int256 paramB, uint256 interval)
+  ///
+  /// @param data Two encodings are accepted, distinguished by the third field
+  ///   (rule). Both formats start with `(bytes32 feedId, bytes32 feedIdB, uint8 rule)`
+  ///   so we peek at those three slots first.
+  ///
+  ///   Standard rules (rule ∈ 0..7):
+  ///     abi.encode(bytes32 feedId, bytes32 feedIdB, uint8 rule, bool yesAbove,
+  ///                int256 param, uint256 openTimestamp, int256 paramB, uint256 interval)
+  ///
+  ///   BEST_PERFORMER_OUTCOME (rule == 8):
+  ///     abi.encode(bytes32 myFeedId, bytes32 unused, uint8 rule,
+  ///                bytes32[] peerFeedIds, uint256 openTimestamp)
   function initialize(uint256 marketId, bytes calldata data) external override {
     require(msg.sender == manager, "!manager");
     require(!marketConfigs[marketId].initialized, "already init");
 
+    (bytes32 feedId, , uint8 ruleRaw) = abi.decode(data[:96], (bytes32, bytes32, uint8));
+    require(feedId != bytes32(0), "feedId 0");
+    require(ruleRaw <= uint8(type(RuleType).max), "invalid rule");
+    RuleType rule = RuleType(ruleRaw);
+
+    if (rule == RuleType.BEST_PERFORMER_OUTCOME) {
+      _initBestPerformerOutcome(marketId, data);
+    } else {
+      _initStandard(marketId, data);
+    }
+  }
+
+  function _initStandard(uint256 marketId, bytes calldata data) internal {
     (
       bytes32 feedId,
       bytes32 feedIdB,
@@ -99,9 +133,6 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
       int256 paramB,
       uint256 interval
     ) = abi.decode(data, (bytes32, bytes32, uint8, bool, int256, uint256, int256, uint256));
-
-    require(feedId != bytes32(0), "feedId 0");
-    require(ruleRaw <= uint8(type(RuleType).max), "invalid rule");
 
     RuleType rule = RuleType(ruleRaw);
 
@@ -123,6 +154,9 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
       require(paramB != 0, "below threshold required");
       require(interval > 0, "interval required");
     }
+    if (rule == RuleType.RANGE_BUCKET || rule == RuleType.RANGE_BUCKET_HIGH) {
+      require(paramB > param, "upperBound > lowerBound");
+    }
 
     uint256 closesAt = ICREOracleManagerView(manager).getMarketClosesAt(marketId);
 
@@ -140,6 +174,45 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
     });
 
     emit MarketConfigured(marketId, feedId, rule, yesAbove, param);
+  }
+
+  function _initBestPerformerOutcome(uint256 marketId, bytes calldata data) internal {
+    (
+      bytes32 myFeedId,
+      ,
+      uint8 ruleRaw,
+      bytes32[] memory peerFeedIds,
+      uint256 openTimestamp
+    ) = abi.decode(data, (bytes32, bytes32, uint8, bytes32[], uint256));
+
+    require(peerFeedIds.length > 0, "no peers");
+    require(openTimestamp > 0, "openTimestamp required");
+    for (uint256 i = 0; i < peerFeedIds.length; i++) {
+      require(peerFeedIds[i] != bytes32(0), "peer feedId 0");
+      require(peerFeedIds[i] != myFeedId, "peer = self");
+    }
+
+    uint256 closesAt = ICREOracleManagerView(manager).getMarketClosesAt(marketId);
+
+    marketConfigs[marketId] = MarketConfig({
+      feedId: myFeedId,
+      feedIdB: bytes32(0),
+      rule: RuleType(ruleRaw),
+      yesAbove: true,
+      param: 0,
+      closesAt: closesAt,
+      openTimestamp: openTimestamp,
+      paramB: 0,
+      interval: 0,
+      initialized: true
+    });
+
+    bytes32[] storage peers = marketPeerFeedIds[marketId];
+    for (uint256 i = 0; i < peerFeedIds.length; i++) {
+      peers.push(peerFeedIds[i]);
+    }
+
+    emit MarketConfigured(marketId, myFeedId, RuleType(ruleRaw), true, 0);
   }
 
   // ─── ICREReceiver: onReport ──────────────────────────────────────────
@@ -205,6 +278,12 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
       return _resolveCandle(config);
     } else if (config.rule == RuleType.FIRST_TO_HIT) {
       return _resolveFirstToHit(config);
+    } else if (config.rule == RuleType.RANGE_BUCKET) {
+      return _resolveRangeBucket(config, false);
+    } else if (config.rule == RuleType.BEST_PERFORMER_OUTCOME) {
+      return _resolveBestPerformerOutcome(config, marketId);
+    } else if (config.rule == RuleType.RANGE_BUCKET_HIGH) {
+      return _resolveRangeBucket(config, true);
     }
 
     return (Outcomes.VOIDED, true);
@@ -330,6 +409,54 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
     return _outcomeFromCondition(condition, config.yesAbove);
   }
 
+  function _resolveRangeBucket(MarketConfig storage config, bool useHigh) internal view returns (int256, bool) {
+    bytes32 priceKey = keccak256(abi.encode(config.feedId, config.closesAt));
+    if (!priceExists[priceKey]) return (-2, false);
+
+    PriceData storage pd = verifiedPrices[priceKey];
+    int256 price = useHigh ? pd.highPrice : pd.closePrice;
+
+    bool inRange = price >= config.param && price < config.paramB;
+    return inRange ? (int256(Outcomes.YES), true) : (int256(Outcomes.NO), true);
+  }
+
+  function _resolveBestPerformerOutcome(MarketConfig storage config, uint256 marketId)
+    internal
+    view
+    returns (int256, bool)
+  {
+    (int256 myOpen, bool okMyOpen) = _getClosePrice(config.feedId, config.openTimestamp);
+    if (!okMyOpen) return (-2, false);
+    (int256 myClose, bool okMyClose) = _getClosePrice(config.feedId, config.closesAt);
+    if (!okMyClose) return (-2, false);
+
+    // If my open is 0 we can't compute a meaningful % change → can't win.
+    if (myOpen == 0) return (int256(Outcomes.NO), true);
+
+    int256 myAbsOpen = myOpen < 0 ? -myOpen : myOpen;
+    int256 myChange = ((myClose - myOpen) * 10000) / myAbsOpen;
+
+    bytes32[] storage peers = marketPeerFeedIds[marketId];
+    uint256 n = peers.length;
+    for (uint256 i = 0; i < n; i++) {
+      (int256 peerOpen, bool okPeerOpen) = _getClosePrice(peers[i], config.openTimestamp);
+      if (!okPeerOpen) return (-2, false);
+      (int256 peerClose, bool okPeerClose) = _getClosePrice(peers[i], config.closesAt);
+      if (!okPeerClose) return (-2, false);
+
+      // Skip peers with a zero open price — they have no comparable %change.
+      if (peerOpen == 0) continue;
+
+      int256 peerAbsOpen = peerOpen < 0 ? -peerOpen : peerOpen;
+      int256 peerChange = ((peerClose - peerOpen) * 10000) / peerAbsOpen;
+
+      // Strictly greater than every peer to win. Tie at top → NO.
+      if (peerChange >= myChange) return (int256(Outcomes.NO), true);
+    }
+
+    return (int256(Outcomes.YES), true);
+  }
+
   function _resolveFirstToHit(MarketConfig storage config) internal view returns (int256, bool) {
     uint256 start = config.openTimestamp;
     uint256 end = config.closesAt;
@@ -376,7 +503,12 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
     }
   }
 
-  // ─── View helpers (for CryptoCRENegRiskResolver) ───────────────────────────
+  // ─── View helpers ────────────────────────────────────────────────────
+
+  /// @notice Returns the peer feed IDs configured for a BEST_PERFORMER_OUTCOME market.
+  function getMarketPeerFeedIds(uint256 marketId) external view returns (bytes32[] memory) {
+    return marketPeerFeedIds[marketId];
+  }
 
   /// @notice Returns verified price data for a (feedId, timestamp) pair.
   function getVerifiedPrice(bytes32 feedId, uint256 timestamp)
