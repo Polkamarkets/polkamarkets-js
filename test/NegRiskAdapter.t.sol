@@ -250,12 +250,9 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     (bytes32 eventId, uint256[] memory marketIds) = _createThreeOutcomeEvent();
     uint256 amount = 30 ether;
 
-    // Mint wcol to the exchange (simulating what happens during cross-market match)
     collateral.mint(address(exchange), amount);
     vm.startPrank(address(exchange));
-    collateral.approve(address(wcol), amount);
-    wcol.wrap(amount);
-    IERC20(address(wcol)).approve(address(adapter), amount);
+    collateral.approve(address(adapter), amount);
 
     adapter.mintAllYesTokens(eventId, amount, address(exchange));
     vm.stopPrank();
@@ -389,9 +386,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
       address user = i == 0 ? alice : (i == 1 ? bob : charlie);
       collateral.mint(user, fundAmount);
       vm.startPrank(user);
-      collateral.approve(address(wcol), fundAmount);
-      wcol.wrap(fundAmount);
-      IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+      collateral.approve(address(exchange), type(uint256).max);
       conditionalTokens.setApprovalForAll(address(exchange), true);
       vm.stopPrank();
     }
@@ -466,9 +461,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
       address user = i == 0 ? alice : (i == 1 ? bob : charlie);
       collateral.mint(user, fundAmount);
       vm.startPrank(user);
-      collateral.approve(address(wcol), fundAmount);
-      wcol.wrap(fundAmount);
-      IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+      collateral.approve(address(exchange), type(uint256).max);
       conditionalTokens.setApprovalForAll(address(exchange), true);
       vm.stopPrank();
     }
@@ -490,15 +483,15 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     sigs[1] = _signOrder(orders[1], bobPk);
     sigs[2] = _signOrder(orders[2], charliePk);
 
-    uint256 aliceBefore = wcol.balanceOf(alice);
-    uint256 bobBefore = wcol.balanceOf(bob);
-    uint256 charlieBefore = wcol.balanceOf(charlie);
+    uint256 aliceBefore = collateral.balanceOf(alice);
+    uint256 bobBefore = collateral.balanceOf(bob);
+    uint256 charlieBefore = collateral.balanceOf(charlie);
 
     exchange.matchCrossMarketOrders(orders, sigs, amount);
 
-    uint256 aliceSpent = aliceBefore - wcol.balanceOf(alice);
-    uint256 bobSpent = bobBefore - wcol.balanceOf(bob);
-    uint256 charlieSpent = charlieBefore - wcol.balanceOf(charlie);
+    uint256 aliceSpent = aliceBefore - collateral.balanceOf(alice);
+    uint256 bobSpent = bobBefore - collateral.balanceOf(bob);
+    uint256 charlieSpent = charlieBefore - collateral.balanceOf(charlie);
 
     uint256 aliceNotional = (amount * price0) / ONE;
     uint256 aliceFee = (aliceNotional * 100) / BPS;
@@ -513,7 +506,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     assertEq(charlieSpent, charlieNotional + charlieFee, "charlie pays notional + fee");
 
     uint256 totalFees = aliceFee + bobFee + charlieFee;
-    assertEq(wcol.balanceOf(address(feeModule)), totalFees, "feeModule received fees");
+    assertEq(collateral.balanceOf(address(feeModule)), totalFees, "feeModule received fees");
   }
 
   // =========================================================================
@@ -534,9 +527,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     for (uint256 i = 0; i < 3; i++) {
       collateral.mint(users[i], fundAmount);
       vm.startPrank(users[i]);
-      collateral.approve(address(wcol), fundAmount);
-      wcol.wrap(fundAmount);
-      IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+      collateral.approve(address(exchange), type(uint256).max);
       conditionalTokens.setApprovalForAll(address(exchange), true);
       vm.stopPrank();
     }
@@ -556,10 +547,10 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
       sigs[i] = _signOrder(orders[i], pks[i]);
     }
 
-    uint256 aliceBefore = wcol.balanceOf(alice);
-    uint256 bobBefore = wcol.balanceOf(bob);
-    uint256 charlieBefore = wcol.balanceOf(charlie);
-    uint256 feeModuleBefore = wcol.balanceOf(address(feeModule));
+    uint256 aliceBefore = collateral.balanceOf(alice);
+    uint256 bobBefore = collateral.balanceOf(bob);
+    uint256 charlieBefore = collateral.balanceOf(charlie);
+    uint256 feeModuleBefore = collateral.balanceOf(address(feeModule));
 
     exchange.matchCrossMarketOrders(orders, sigs, fillAmount);
 
@@ -568,9 +559,9 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     uint256 bobNotional = (fillAmount * price1) / ONE;
     uint256 charlieNotional = (fillAmount * price2) / ONE;
 
-    assertEq(aliceBefore - wcol.balanceOf(alice), aliceNotional, "alice pays her notional");
-    assertEq(bobBefore - wcol.balanceOf(bob), bobNotional, "bob pays his notional");
-    assertEq(charlieBefore - wcol.balanceOf(charlie), charlieNotional, "charlie pays his notional");
+    assertEq(aliceBefore - collateral.balanceOf(alice), aliceNotional, "alice pays her notional");
+    assertEq(bobBefore - collateral.balanceOf(bob), bobNotional, "bob pays his notional");
+    assertEq(charlieBefore - collateral.balanceOf(charlie), charlieNotional, "charlie pays his notional");
 
     // All three received their YES tokens
     for (uint256 i = 0; i < 3; i++) {
@@ -580,10 +571,11 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     // Surplus = totalNotional - fillAmount = 130 - 100 = 30 → sent to feeModule
     uint256 surplus = (aliceNotional + bobNotional + charlieNotional) - fillAmount;
     assertEq(surplus, 30 ether, "surplus is 30");
-    assertEq(wcol.balanceOf(address(feeModule)) - feeModuleBefore, surplus, "feeModule received surplus");
+    assertEq(collateral.balanceOf(address(feeModule)) - feeModuleBefore, surplus, "feeModule received surplus");
 
-    // Nothing stuck in exchange
-    assertEq(wcol.balanceOf(address(exchange)), 0, "exchange has no stuck funds");
+    // Nothing stuck in exchange (neither underlying nor wcol)
+    assertEq(collateral.balanceOf(address(exchange)), 0, "exchange has no stuck underlying");
+    assertEq(wcol.balanceOf(address(exchange)), 0, "exchange has no stuck wcol");
   }
 
   function testCrossMarketSurplusEmitsEvent() public {
@@ -600,9 +592,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     for (uint256 i = 0; i < 3; i++) {
       collateral.mint(users[i], fundAmount);
       vm.startPrank(users[i]);
-      collateral.approve(address(wcol), fundAmount);
-      wcol.wrap(fundAmount);
-      IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+      collateral.approve(address(exchange), type(uint256).max);
       conditionalTokens.setApprovalForAll(address(exchange), true);
       vm.stopPrank();
     }
@@ -646,9 +636,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     for (uint256 i = 0; i < 3; i++) {
       collateral.mint(users[i], fundAmount);
       vm.startPrank(users[i]);
-      collateral.approve(address(wcol), fundAmount);
-      wcol.wrap(fundAmount);
-      IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+      collateral.approve(address(exchange), type(uint256).max);
       conditionalTokens.setApprovalForAll(address(exchange), true);
       vm.stopPrank();
     }
@@ -668,31 +656,31 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
       sigs[i] = _signOrder(orders[i], pks[i]);
     }
 
-    uint256 aliceBefore = wcol.balanceOf(alice);
-    uint256 bobBefore = wcol.balanceOf(bob);
-    uint256 charlieBefore = wcol.balanceOf(charlie);
-    uint256 feeModuleBefore = wcol.balanceOf(address(feeModule));
+    uint256 aliceBefore = collateral.balanceOf(alice);
+    uint256 bobBefore = collateral.balanceOf(bob);
+    uint256 charlieBefore = collateral.balanceOf(charlie);
+    uint256 feeModuleBefore = collateral.balanceOf(address(feeModule));
 
     exchange.matchCrossMarketOrders(orders, sigs, fillAmount);
 
     // Each buyer pays notional + their respective fee
     uint256 aliceNotional = (fillAmount * price0) / ONE;
     uint256 aliceFee = (aliceNotional * 100) / BPS; // 1% maker
-    assertEq(aliceBefore - wcol.balanceOf(alice), aliceNotional + aliceFee, "alice pays notional + maker fee");
+    assertEq(aliceBefore - collateral.balanceOf(alice), aliceNotional + aliceFee, "alice pays notional + maker fee");
 
     uint256 bobNotional = (fillAmount * price1) / ONE;
     uint256 bobFee = (bobNotional * 100) / BPS; // 1% maker
-    assertEq(bobBefore - wcol.balanceOf(bob), bobNotional + bobFee, "bob pays notional + maker fee");
+    assertEq(bobBefore - collateral.balanceOf(bob), bobNotional + bobFee, "bob pays notional + maker fee");
 
     uint256 charlieNotional = (fillAmount * price2) / ONE;
     uint256 charlieFee = (charlieNotional * 200) / BPS; // 2% taker
-    assertEq(charlieBefore - wcol.balanceOf(charlie), charlieNotional + charlieFee, "charlie pays notional + taker fee");
+    assertEq(charlieBefore - collateral.balanceOf(charlie), charlieNotional + charlieFee, "charlie pays notional + taker fee");
 
     // feeModule receives surplus + all fees
     uint256 surplus = (aliceNotional + bobNotional + charlieNotional) - fillAmount;
     uint256 totalFees = aliceFee + bobFee + charlieFee;
     assertEq(
-      wcol.balanceOf(address(feeModule)) - feeModuleBefore,
+      collateral.balanceOf(address(feeModule)) - feeModuleBefore,
       surplus + totalFees,
       "feeModule received surplus + fees"
     );
@@ -712,9 +700,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     for (uint256 i = 0; i < 3; i++) {
       collateral.mint(users[i], fundAmount);
       vm.startPrank(users[i]);
-      collateral.approve(address(wcol), fundAmount);
-      wcol.wrap(fundAmount);
-      IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+      collateral.approve(address(exchange), type(uint256).max);
       conditionalTokens.setApprovalForAll(address(exchange), true);
       vm.stopPrank();
     }
@@ -734,13 +720,14 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
       sigs[i] = _signOrder(orders[i], pks[i]);
     }
 
-    uint256 feeModuleBefore = wcol.balanceOf(address(feeModule));
+    uint256 feeModuleBefore = collateral.balanceOf(address(feeModule));
 
     exchange.matchCrossMarketOrders(orders, sigs, fillAmount);
 
     // No surplus, no fees → feeModule balance unchanged
-    assertEq(wcol.balanceOf(address(feeModule)), feeModuleBefore, "no surplus when priceSum == ONE");
-    assertEq(wcol.balanceOf(address(exchange)), 0, "exchange has no stuck funds");
+    assertEq(collateral.balanceOf(address(feeModule)), feeModuleBefore, "no surplus when priceSum == ONE");
+    assertEq(collateral.balanceOf(address(exchange)), 0, "exchange has no stuck underlying");
+    assertEq(wcol.balanceOf(address(exchange)), 0, "exchange has no stuck wcol");
   }
 
   function testCrossMarketRoundingShortfallHandled() public {
@@ -758,9 +745,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     for (uint256 i = 0; i < 3; i++) {
       collateral.mint(users[i], fundAmount);
       vm.startPrank(users[i]);
-      collateral.approve(address(wcol), fundAmount);
-      wcol.wrap(fundAmount);
-      IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+      collateral.approve(address(exchange), type(uint256).max);
       conditionalTokens.setApprovalForAll(address(exchange), true);
       vm.stopPrank();
     }
@@ -785,7 +770,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
       sigs[i] = _signOrder(orders[i], pks[i]);
     }
 
-    uint256 charlieBefore = wcol.balanceOf(charlie);
+    uint256 charlieBefore = collateral.balanceOf(charlie);
 
     // Should not revert despite rounding shortfall
     exchange.matchCrossMarketOrders(orders, sigs, fillAmount);
@@ -797,12 +782,13 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
 
     // Charlie (taker) paid 1 wei more than naive notional to cover rounding
     uint256 naiveNotional = (fillAmount * price2) / ONE;
-    uint256 charlieActualPaid = charlieBefore - wcol.balanceOf(charlie);
+    uint256 charlieActualPaid = charlieBefore - collateral.balanceOf(charlie);
     assertGt(charlieActualPaid, naiveNotional, "taker absorbed rounding dust");
     assertLe(charlieActualPaid - naiveNotional, 2, "dust is at most N-1 wei");
 
     // No stuck funds
-    assertEq(wcol.balanceOf(address(exchange)), 0, "exchange has no stuck funds");
+    assertEq(collateral.balanceOf(address(exchange)), 0, "exchange has no stuck underlying");
+    assertEq(wcol.balanceOf(address(exchange)), 0, "exchange has no stuck wcol");
   }
 
   // =========================================================================
@@ -819,9 +805,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
       address user = i == 0 ? alice : bob;
       collateral.mint(user, fundAmount);
       vm.startPrank(user);
-      collateral.approve(address(wcol), fundAmount);
-      wcol.wrap(fundAmount);
-      IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+      collateral.approve(address(exchange), type(uint256).max);
       vm.stopPrank();
     }
     // charlie approves but has no funds
@@ -854,14 +838,11 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     for (uint256 i = 0; i < 3; i++) {
       address user = i == 0 ? alice : (i == 1 ? bob : charlie);
       collateral.mint(user, fundAmount);
-      vm.startPrank(user);
-      collateral.approve(address(wcol), fundAmount);
-      wcol.wrap(fundAmount);
       if (i < 2) {
-        IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+        vm.prank(user);
+        collateral.approve(address(exchange), type(uint256).max);
       }
       // charlie does NOT approve exchange
-      vm.stopPrank();
     }
 
     uint256 price0 = (45 * ONE) / 100;
@@ -921,9 +902,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
       address user = i == 0 ? alice : (i == 1 ? bob : charlie);
       collateral.mint(user, fundAmount);
       vm.startPrank(user);
-      collateral.approve(address(wcol), fundAmount);
-      wcol.wrap(fundAmount);
-      IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+      collateral.approve(address(exchange), type(uint256).max);
       conditionalTokens.setApprovalForAll(address(exchange), true);
       vm.stopPrank();
     }
@@ -958,9 +937,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
       address user = i == 0 ? alice : (i == 1 ? bob : charlie);
       collateral.mint(user, fundAmount);
       vm.startPrank(user);
-      collateral.approve(address(wcol), fundAmount);
-      wcol.wrap(fundAmount);
-      IERC20(address(wcol)).approve(address(exchange), type(uint256).max);
+      collateral.approve(address(exchange), type(uint256).max);
       conditionalTokens.setApprovalForAll(address(exchange), true);
       vm.stopPrank();
     }
@@ -1143,9 +1120,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     uint256 amount = 10 ether;
     collateral.mint(alice, amount);
     vm.startPrank(alice);
-    collateral.approve(address(wcol), amount);
-    wcol.wrap(amount);
-    IERC20(address(wcol)).approve(address(adapter), amount);
+    collateral.approve(address(adapter), amount);
     vm.expectRevert("only exchange");
     adapter.mintAllYesTokens(eventId, amount, alice);
     vm.stopPrank();
@@ -1196,20 +1171,32 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
   // WrappedCollateral tests
   // =========================================================================
 
-  function testWrapUnwrap() public {
+  function testWrapOnlyAdapter() public {
     uint256 amount = 100 ether;
     collateral.mint(alice, amount);
 
     vm.startPrank(alice);
     collateral.approve(address(wcol), amount);
+    vm.expectRevert(WrappedCollateral.OnlyAdapter.selector);
     wcol.wrap(amount);
+    vm.stopPrank();
+  }
+
+  function testUnwrapIsPublic() public {
+    uint256 amount = 100 ether;
+
+    // Mimic a user receiving wcol via CT.redeemPosition: adapter-mints wcol
+    // to alice; back it with matching underlying on the wcol contract.
+    vm.prank(address(adapter));
+    wcol.adapterMint(alice, amount);
+    collateral.mint(address(wcol), amount);
     assertEq(wcol.balanceOf(alice), amount);
     assertEq(collateral.balanceOf(alice), 0);
 
+    vm.prank(alice);
     wcol.unwrap(amount);
     assertEq(wcol.balanceOf(alice), 0);
     assertEq(collateral.balanceOf(alice), amount);
-    vm.stopPrank();
   }
 
   function testAdapterMintOnlyAdapter() public {
