@@ -41,6 +41,42 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
     RANGE_BUCKET_HIGH       // 9 — same as RANGE_BUCKET but on highPrice (for "highest milestone reached" outcomes)
   }
 
+  /// @dev Per-market hint to the off-chain CRE workflow telling it which price
+  ///      source to query. The contract itself doesn't read prices from any
+  ///      source — it only stores prices the workflow delivered. This field
+  ///      makes the routing choice part of the on-chain market config so an
+  ///      off-chain admin can't silently flip it post-creation.
+  enum DataSource {
+    AUTO,             // 0 — workflow decides (Chainlink Feeds for non-OHLC where configured, Binance otherwise)
+    CHAINLINK_FEEDS,  // 1 — force Chainlink Data Feeds (on-chain Aggregator)
+    CHAINLINK_STREAMS,// 2 — force Chainlink Data Streams (off-chain HTTPS)
+    BINANCE           // 3 — force Binance klines REST API
+  }
+
+  /// @dev Per-market candle width for Binance kline reads. Only meaningful when
+  ///      the workflow's resolved data source is BINANCE; ignored otherwise.
+  ///      Mirrors the full set Binance's `/api/v3/klines` endpoint accepts
+  ///      (excluding `1s` which has limited endpoint coverage).
+  ///      Order is ascending by duration; values must not be reordered without
+  ///      a coordinated migration of any markets already initialized.
+  enum BinanceInterval {
+    ONE_MIN,      // 0  → "1m"
+    THREE_MIN,    // 1  → "3m"
+    FIVE_MIN,     // 2  → "5m"
+    FIFTEEN_MIN,  // 3  → "15m"
+    THIRTY_MIN,   // 4  → "30m"
+    ONE_HOUR,     // 5  → "1h"
+    TWO_HOUR,     // 6  → "2h"
+    FOUR_HOUR,    // 7  → "4h"
+    SIX_HOUR,     // 8  → "6h"
+    EIGHT_HOUR,   // 9  → "8h"
+    TWELVE_HOUR,  // 10 → "12h"
+    ONE_DAY,      // 11 → "1d"
+    THREE_DAY,    // 12 → "3d"
+    ONE_WEEK,     // 13 → "1w"
+    ONE_MONTH     // 14 → "1M"
+  }
+
   struct MarketConfig {
     bytes32 feedId;          // primary feed, e.g. keccak256("BTCUSDT")
     bytes32 feedIdB;         // second feed for RELATIVE; 0x0 otherwise
@@ -52,6 +88,8 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
     int256 paramB;           // FIRST_TO_HIT: below threshold; 0 otherwise
     uint256 interval;        // FIRST_TO_HIT: sub-interval in seconds; 0 otherwise
     bool initialized;
+    DataSource dataSource;          // workflow routing hint
+    BinanceInterval binanceInterval; // candle width when source resolves to BINANCE
   }
 
   struct PriceData {
@@ -99,13 +137,15 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
   ///   (rule). Both formats start with `(bytes32 feedId, bytes32 feedIdB, uint8 rule)`
   ///   so we peek at those three slots first.
   ///
-  ///   Standard rules (rule ∈ 0..7):
+  ///   Standard rules (rule ∈ 0..7, 9):
   ///     abi.encode(bytes32 feedId, bytes32 feedIdB, uint8 rule, bool yesAbove,
-  ///                int256 param, uint256 openTimestamp, int256 paramB, uint256 interval)
+  ///                int256 param, uint256 openTimestamp, int256 paramB, uint256 interval,
+  ///                uint8 dataSource, uint8 binanceInterval)
   ///
   ///   BEST_PERFORMER_OUTCOME (rule == 8):
   ///     abi.encode(bytes32 myFeedId, bytes32 unused, uint8 rule,
-  ///                bytes32[] peerFeedIds, uint256 openTimestamp)
+  ///                bytes32[] peerFeedIds, uint256 openTimestamp,
+  ///                uint8 dataSource, uint8 binanceInterval)
   function initialize(uint256 marketId, bytes calldata data) external override {
     require(msg.sender == manager, "!manager");
     require(!marketConfigs[marketId].initialized, "already init");
@@ -131,10 +171,23 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
       int256 param,
       uint256 openTimestamp,
       int256 paramB,
-      uint256 interval
-    ) = abi.decode(data, (bytes32, bytes32, uint8, bool, int256, uint256, int256, uint256));
+      uint256 interval,
+      uint8 dataSourceRaw,
+      uint8 binanceIntervalRaw
+    ) = abi.decode(data, (bytes32, bytes32, uint8, bool, int256, uint256, int256, uint256, uint8, uint8));
 
     RuleType rule = RuleType(ruleRaw);
+    require(dataSourceRaw <= uint8(type(DataSource).max), "invalid dataSource");
+    require(binanceIntervalRaw <= uint8(type(BinanceInterval).max), "invalid binanceInterval");
+    DataSource dataSource = DataSource(dataSourceRaw);
+
+    // OHLC-only rules can't be served by either Chainlink path.
+    if (rule == RuleType.HIT || rule == RuleType.CANDLE || rule == RuleType.FIRST_TO_HIT || rule == RuleType.RANGE_BUCKET_HIGH) {
+      require(
+        dataSource == DataSource.AUTO || dataSource == DataSource.BINANCE,
+        "OHLC rule needs binance/auto"
+      );
+    }
 
     // Validate rule-specific constraints
     if (rule == RuleType.RELATIVE) {
@@ -170,7 +223,9 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
       openTimestamp: openTimestamp,
       paramB: paramB,
       interval: interval,
-      initialized: true
+      initialized: true,
+      dataSource: dataSource,
+      binanceInterval: BinanceInterval(binanceIntervalRaw)
     });
 
     emit MarketConfigured(marketId, feedId, rule, yesAbove, param);
@@ -182,11 +237,15 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
       ,
       uint8 ruleRaw,
       bytes32[] memory peerFeedIds,
-      uint256 openTimestamp
-    ) = abi.decode(data, (bytes32, bytes32, uint8, bytes32[], uint256));
+      uint256 openTimestamp,
+      uint8 dataSourceRaw,
+      uint8 binanceIntervalRaw
+    ) = abi.decode(data, (bytes32, bytes32, uint8, bytes32[], uint256, uint8, uint8));
 
     require(peerFeedIds.length > 0, "no peers");
     require(openTimestamp > 0, "openTimestamp required");
+    require(dataSourceRaw <= uint8(type(DataSource).max), "invalid dataSource");
+    require(binanceIntervalRaw <= uint8(type(BinanceInterval).max), "invalid binanceInterval");
     for (uint256 i = 0; i < peerFeedIds.length; i++) {
       require(peerFeedIds[i] != bytes32(0), "peer feedId 0");
       require(peerFeedIds[i] != myFeedId, "peer = self");
@@ -204,7 +263,9 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
       openTimestamp: openTimestamp,
       paramB: 0,
       interval: 0,
-      initialized: true
+      initialized: true,
+      dataSource: DataSource(dataSourceRaw),
+      binanceInterval: BinanceInterval(binanceIntervalRaw)
     });
 
     bytes32[] storage peers = marketPeerFeedIds[marketId];
