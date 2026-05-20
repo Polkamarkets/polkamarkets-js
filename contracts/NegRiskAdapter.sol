@@ -403,6 +403,16 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     uint256 n = evt.outcomeCount;
     require(yesPayouts.length == n, "length mismatch");
 
+    uint256 totalYesPayout;
+    for (uint256 i = 0; i < n; i++) {
+      require(yesPayouts[i] <= 1e18, "yes payout > 1e18");
+      totalYesPayout += yesPayouts[i];
+    }
+
+    // Event-level solvency invariant:
+    // a full YES basket across named outcomes can never redeem more than 1 unit.
+    require(totalYesPayout <= 1e18, "event payouts overallocated");
+
     evt.resolved = true;
     evt.winningIndex = -2;
 
@@ -413,9 +423,6 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     emit EventVoided(eventId, yesPayouts);
   }
 
-  /// @notice After resolution, redeem the adapter's held NO positions, burn
-  ///         the wcol that was minted during convert/mintAll operations, and
-  ///         send any excess to treasury.
   function redeemNOPositions(bytes32 eventId) external nonReentrant {
     require(registry.hasRole(registry.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
     Event storage evt = _events[eventId];
@@ -425,7 +432,6 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     uint256 n = evt.outcomeCount;
     uint256 wcolBefore = IERC20(address(wcol)).balanceOf(address(this));
 
-    // Redeem NO positions from all markets where NO won
     for (uint256 i = 0; i < n; i++) {
       uint256 marketId = evt.marketIds[i];
       int256 outcome = manager.getMarketResolvedOutcome(marketId);
@@ -445,23 +451,25 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     uint256 wcolAfter = IERC20(address(wcol)).balanceOf(address(this));
     uint256 wcolRecovered = wcolAfter - wcolBefore;
 
-    // Burn the amount we minted during converts
     uint256 minted = mintedWcolPerEvent[eventId];
-    uint256 toBurn = minted < wcolRecovered ? minted : wcolRecovered;
-    if (toBurn > 0) {
-      wcol.adapterBurn(address(this), toBurn);
+
+    // Never silently socialize bad debt.
+    require(wcolRecovered >= minted, "insolvent event payouts");
+
+    if (minted > 0) {
+      wcol.adapterBurn(address(this), minted);
     }
+
     mintedWcolPerEvent[eventId] = 0;
     noPositionsRedeemed[eventId] = true;
 
-    // Any excess is from users' original deposits — send to treasury
-    uint256 excess = wcolRecovered > toBurn ? wcolRecovered - toBurn : 0;
+    uint256 excess = wcolRecovered - minted;
     if (excess > 0) {
       wcol.unwrap(excess);
       underlying.safeTransfer(treasury, excess);
     }
 
-    emit NOPositionsRedeemed(eventId, wcolRecovered, toBurn, excess);
+    emit NOPositionsRedeemed(eventId, wcolRecovered, minted, excess);
   }
 
   // ─── View functions ──────────────────────────────────────────────────

@@ -977,10 +977,11 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     adapter.splitPosition(eventId, 0, amount);
     vm.stopPrank();
 
+    // Payouts must sum to <= ONE (event-level solvency invariant).
     uint256[] memory yesPayouts = new uint256[](3);
     yesPayouts[0] = ONE / 2;
     yesPayouts[1] = ONE / 2;
-    yesPayouts[2] = ONE / 2;
+    yesPayouts[2] = 0;
 
     vm.warp(block.timestamp + 2 days);
     adapter.voidEvent(eventId, yesPayouts);
@@ -1052,10 +1053,11 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     uint256 mintedBefore = adapter.mintedWcolPerEvent(eventId);
     assertGt(mintedBefore, 0);
 
+    // Payouts must sum to <= ONE (event-level solvency invariant).
     uint256[] memory yesPayouts = new uint256[](3);
-    yesPayouts[0] = (50 * ONE) / 100;
-    yesPayouts[1] = (50 * ONE) / 100;
-    yesPayouts[2] = (50 * ONE) / 100;
+    yesPayouts[0] = (40 * ONE) / 100;
+    yesPayouts[1] = (30 * ONE) / 100;
+    yesPayouts[2] = (30 * ONE) / 100;
 
     vm.warp(block.timestamp + 2 days);
     adapter.voidEvent(eventId, yesPayouts);
@@ -1109,6 +1111,55 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
 
     vm.expectRevert("use adapter for neg risk");
     manager.adminVoidMarket(marketIds[0], ONE / 2, ONE / 2);
+  }
+
+  /// @notice Regression for H-01: voiding a neg-risk event with YES payouts that
+  ///         sum above ONE would leave unbacked wcol in circulation that could be
+  ///         used to drain later wrapper deposits. The adapter must reject this.
+  function testVoidEventOverAllocatedReverts() public {
+    (bytes32 eventId,) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    // Reproduce the bad-debt setup: Alice splits + converts so the adapter
+    // mints unbacked wcol against the NO inventory it now holds.
+    collateral.mint(alice, amount);
+    vm.startPrank(alice);
+    collateral.approve(address(adapter), amount);
+    adapter.splitPosition(eventId, 0, amount);
+    conditionalTokens.setApprovalForAll(address(adapter), true);
+    adapter.convertPositions(eventId, 0, amount);
+    vm.stopPrank();
+
+    assertEq(adapter.mintedWcolPerEvent(eventId), 200 ether);
+
+    // 50/50/50 sums to 1.5 ONE — over-allocated.
+    uint256[] memory yesPayouts = new uint256[](3);
+    yesPayouts[0] = ONE / 2;
+    yesPayouts[1] = ONE / 2;
+    yesPayouts[2] = ONE / 2;
+
+    vm.warp(block.timestamp + 2 days);
+    vm.expectRevert("event payouts overallocated");
+    adapter.voidEvent(eventId, yesPayouts);
+
+    // Event remains unresolved — no state was mutated.
+    (, bool resolved, int256 winningIndex,,) = adapter.getEvent(eventId);
+    assertFalse(resolved);
+    assertEq(winningIndex, -2);
+  }
+
+  function testVoidEventPerPayoutCapReverts() public {
+    (bytes32 eventId,) = _createThreeOutcomeEvent();
+
+    // Individual payout above ONE is rejected before the underflow on NO side.
+    uint256[] memory yesPayouts = new uint256[](3);
+    yesPayouts[0] = ONE + 1;
+    yesPayouts[1] = 0;
+    yesPayouts[2] = 0;
+
+    vm.warp(block.timestamp + 2 days);
+    vm.expectRevert("yes payout > 1e18");
+    adapter.voidEvent(eventId, yesPayouts);
   }
 
   // =========================================================================
@@ -1392,10 +1443,11 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     oracle.setResult(marketIds[0], int256(Outcomes.NO), true);
     manager.resolveMarket(marketIds[0]);
 
+    // Sum to ONE so the solvency check passes and the loop reaches market 0.
     uint256[] memory yesPayouts = new uint256[](3);
     yesPayouts[0] = ONE / 2;
-    yesPayouts[1] = ONE / 2;
-    yesPayouts[2] = ONE / 2;
+    yesPayouts[1] = ONE / 4;
+    yesPayouts[2] = ONE / 4;
 
     // adminVoidMarket on the already-resolved market 0 reverts inside the loop
     vm.expectRevert("resolved");
