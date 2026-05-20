@@ -118,7 +118,7 @@ contract CryptoCREOracleTest is Test {
     uint256 interval
   ) internal {
     mockManager.setClosesAt(marketId, closesAt);
-    bytes memory data = abi.encode(feedId, feedIdB, rule, yesAbove, param, openTimestamp, paramB, interval);
+    bytes memory data = abi.encode(feedId, feedIdB, rule, yesAbove, param, openTimestamp, paramB, interval, uint8(0), uint8(0));
     vm.prank(address(mockManager));
     oracle.initialize(marketId, data);
   }
@@ -160,7 +160,8 @@ contract CryptoCREOracleTest is Test {
       bool yesAbove,
       int256 param,
       uint256 storedClosesAt,,,,
-      bool initialized
+      bool initialized,
+      ,
     ) = oracle.marketConfigs(marketId);
 
     assertEq(feedId, BTC_FEED);
@@ -173,7 +174,7 @@ contract CryptoCREOracleTest is Test {
 
   function testInitializeNotManagerReverts() public {
     mockManager.setClosesAt(1, block.timestamp + 1 days);
-    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(0), true, int256(100000e8), uint256(0));
+    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(0), true, int256(100000e8), uint256(0), int256(0), uint256(0), uint8(0), uint8(0));
     vm.prank(other);
     vm.expectRevert("!manager");
     oracle.initialize(1, data);
@@ -182,7 +183,7 @@ contract CryptoCREOracleTest is Test {
   function testInitializeDoubleInitReverts() public {
     _initMarket(1, BTC_FEED, bytes32(0), 0, true, 100000e8, 0, block.timestamp + 1 days);
     mockManager.setClosesAt(1, block.timestamp + 1 days);
-    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(0), true, int256(100000e8), uint256(0));
+    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(0), true, int256(100000e8), uint256(0), int256(0), uint256(0), uint8(0), uint8(0));
     vm.prank(address(mockManager));
     vm.expectRevert("already init");
     oracle.initialize(1, data);
@@ -190,7 +191,7 @@ contract CryptoCREOracleTest is Test {
 
   function testInitializeZeroFeedReverts() public {
     mockManager.setClosesAt(1, block.timestamp + 1 days);
-    bytes memory data = abi.encode(bytes32(0), bytes32(0), uint8(0), true, int256(100000e8), uint256(0), int256(0), uint256(0));
+    bytes memory data = abi.encode(bytes32(0), bytes32(0), uint8(0), true, int256(100000e8), uint256(0), int256(0), uint256(0), uint8(0), uint8(0));
     vm.prank(address(mockManager));
     vm.expectRevert("feedId 0");
     oracle.initialize(1, data);
@@ -198,7 +199,7 @@ contract CryptoCREOracleTest is Test {
 
   function testInitializeRelativeRequiresFeedIdB() public {
     mockManager.setClosesAt(1, block.timestamp + 1 days);
-    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(3), true, int256(0), uint256(100), int256(0), uint256(0));
+    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(3), true, int256(0), uint256(100), int256(0), uint256(0), uint8(0), uint8(0));
     vm.prank(address(mockManager));
     vm.expectRevert("feedIdB required for RELATIVE");
     oracle.initialize(1, data);
@@ -206,7 +207,7 @@ contract CryptoCREOracleTest is Test {
 
   function testInitializeDirectionRequiresOpenTimestamp() public {
     mockManager.setClosesAt(1, block.timestamp + 1 days);
-    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(1), true, int256(0), uint256(0), int256(0), uint256(0));
+    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(1), true, int256(0), uint256(0), int256(0), uint256(0), uint8(0), uint8(0));
     vm.prank(address(mockManager));
     vm.expectRevert("openTimestamp required");
     oracle.initialize(1, data);
@@ -842,7 +843,7 @@ contract CryptoCREOracleTest is Test {
 
   function testRangeBucketRequiresUpperGreaterThanLower() public {
     mockManager.setClosesAt(1, 200);
-    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(7), true, int256(110_000e8), uint256(0), int256(100_000e8), uint256(0));
+    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(7), true, int256(110_000e8), uint256(0), int256(100_000e8), uint256(0), uint8(0), uint8(0));
     vm.prank(address(mockManager));
     vm.expectRevert("upperBound > lowerBound");
     oracle.initialize(1, data);
@@ -887,7 +888,7 @@ contract CryptoCREOracleTest is Test {
     uint256 closesAt
   ) internal {
     mockManager.setClosesAt(marketId, closesAt);
-    bytes memory data = abi.encode(myFeedId, bytes32(0), uint8(8), peers, openTimestamp);
+    bytes memory data = abi.encode(myFeedId, bytes32(0), uint8(8), peers, openTimestamp, uint8(0), uint8(0));
     vm.prank(address(mockManager));
     oracle.initialize(marketId, data);
   }
@@ -1004,7 +1005,7 @@ contract CryptoCREOracleTest is Test {
     bytes32[] memory peers = new bytes32[](1);
     peers[0] = BTC_FEED; // same as myFeedId
     mockManager.setClosesAt(1, 200);
-    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(8), peers, uint256(100));
+    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(8), peers, uint256(100), uint8(0), uint8(0));
     vm.prank(address(mockManager));
     vm.expectRevert("peer = self");
     oracle.initialize(1, data);
@@ -1013,7 +1014,7 @@ contract CryptoCREOracleTest is Test {
   function testBestPerformerOutcomeRejectsEmptyPeers() public {
     bytes32[] memory peers = new bytes32[](0);
     mockManager.setClosesAt(1, 200);
-    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(8), peers, uint256(100));
+    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(8), peers, uint256(100), uint8(0), uint8(0));
     vm.prank(address(mockManager));
     vm.expectRevert("no peers");
     oracle.initialize(1, data);
