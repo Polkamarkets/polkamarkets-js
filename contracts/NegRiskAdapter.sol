@@ -323,6 +323,54 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
   // ─── Resolution ──────────────────────────────────────────────────────
 
+  /// @notice Permissionless per-market resolution for a neg-risk event. Routes
+  ///         through `manager.resolveMarket` and enforces the event-level
+  ///         "at most one YES per event" invariant.
+  function resolveEventMarket(bytes32 eventId, uint256 outcomeIndex) external nonReentrant returns (int256) {
+    Event storage evt = _events[eventId];
+    require(evt.outcomeCount > 0, "event !exist");
+    require(outcomeIndex < evt.outcomeCount, "bad index");
+
+    uint256 marketId = evt.marketIds[outcomeIndex];
+    int256 outcome = manager.resolveMarket(marketId);
+    if (outcome == int256(Outcomes.YES)) {
+      _requireNoOtherYes(evt, marketId);
+    }
+    return outcome;
+  }
+
+  /// @notice Admin per-market override for a neg-risk event. Routes through
+  ///         `manager.adminResolveMarket` and enforces the event-level
+  ///         "at most one YES per event" invariant.
+  function adminResolveEventMarket(
+    bytes32 eventId,
+    uint256 outcomeIndex,
+    int256 outcome
+  ) external nonReentrant returns (int256) {
+    require(registry.hasRole(registry.RESOLUTION_ADMIN_ROLE(), msg.sender), "not resolution admin");
+
+    Event storage evt = _events[eventId];
+    require(evt.outcomeCount > 0, "event !exist");
+    require(outcomeIndex < evt.outcomeCount, "bad index");
+
+    uint256 marketId = evt.marketIds[outcomeIndex];
+    if (outcome == int256(Outcomes.YES)) {
+      _requireNoOtherYes(evt, marketId);
+    }
+    return manager.adminResolveMarket(marketId, outcome);
+  }
+
+  function _requireNoOtherYes(Event storage evt, uint256 marketId) internal view {
+    uint256 n = evt.marketIds.length;
+    for (uint256 i = 0; i < n; i++) {
+      uint256 mid = evt.marketIds[i];
+      if (mid == marketId) continue;
+      if (manager.getMarketResolvedOutcome(mid) == int256(Outcomes.YES)) {
+        revert("event already has YES winner");
+      }
+    }
+  }
+
   /// @notice Permissionless event resolution. Derives `winningIndex` by scanning
   ///         the constituent markets — every market must already be resolved.
   ///         A single YES across the constituents wins; all NO means "Other"
