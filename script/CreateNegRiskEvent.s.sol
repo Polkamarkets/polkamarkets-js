@@ -137,7 +137,9 @@ contract CreateNegRiskEvent is Script {
           lower,          // param = lowerBound
           uint256(0),     // openTimestamp (unused for RANGE_BUCKET*)
           upper,          // paramB = upperBound
-          uint256(0)      // interval (unused)
+          uint256(0),     // interval (unused)
+          uint8(0),       // dataSourceRaw (AUTO)
+          uint8(0)        // binanceIntervalRaw (1m)
         );
       }
       return data;
@@ -166,7 +168,9 @@ contract CreateNegRiskEvent is Script {
           bytes32(0),            // unused
           RULE_BEST_PERFORMER_OUTCOME,
           peers,
-          openTimestamp
+          openTimestamp,
+          uint8(0),              // dataSourceRaw (AUTO)
+          uint8(0)               // binanceIntervalRaw (1m)
         );
       }
       return data;

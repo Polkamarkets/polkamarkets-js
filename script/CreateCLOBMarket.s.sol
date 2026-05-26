@@ -29,6 +29,9 @@ import {PredictionMarketV3ManagerCLOB} from "../contracts/PredictionMarketV3Mana
 ///           YES_ABOVE        — "true" or "false"
 ///           PARAM            — price (THRESHOLD/HIT) or bps (CHANGE_PCT), 0 otherwise
 ///           OPEN_TIMESTAMP   — start timestamp for DIRECTION/CHANGE_PCT/RELATIVE (default: 0)
+///           DATA_SOURCE      — 0=AUTO, 1=CHAINLINK_FEEDS, 2=CHAINLINK_STREAMS, 3=BINANCE (default: 0)
+///           BINANCE_INTERVAL — 0=1m, 1=3m, 2=5m, 3=15m, 4=30m, 5=1h, 6=2h, 7=4h, 8=6h,
+///                              9=8h, 10=12h, 11=1d, 12=3d, 13=1w, 14=1M (default: 0)
 contract CreateCLOBMarket is Script {
   function run() external {
     uint256 privateKey = vm.envUint("PRIVATE_KEY");
@@ -56,11 +59,15 @@ contract CreateCLOBMarket is Script {
       uint256 openTimestamp = vm.envOr("OPEN_TIMESTAMP", uint256(0));
       int256 paramB = vm.envOr("PARAM_B", int256(0));
       uint256 interval = vm.envOr("INTERVAL", uint256(0));
+      uint8 dataSource = uint8(vm.envOr("DATA_SOURCE", uint256(0)));
+      uint8 binanceInterval = uint8(vm.envOr("BINANCE_INTERVAL", uint256(0)));
 
       bytes32 feedId = keccak256(bytes(feedIdStr));
       bytes32 feedIdB = bytes(feedIdBStr).length > 0 ? keccak256(bytes(feedIdBStr)) : bytes32(0);
 
-      oracleData = abi.encode(feedId, feedIdB, ruleType, yesAbove, param, openTimestamp, paramB, interval);
+      oracleData = abi.encode(
+        feedId, feedIdB, ruleType, yesAbove, param, openTimestamp, paramB, interval, dataSource, binanceInterval
+      );
     }
 
     vm.startBroadcast(privateKey);
