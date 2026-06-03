@@ -462,7 +462,8 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     require(totalYesPayout <= 1e18, "event payouts overallocated");
 
     evt.resolved = true;
-    evt.winningIndex = -2;
+    // winningIndex retains its createEvent sentinel (-2); voided events are
+    // distinguished from unresolved ones by evt.resolved, not winningIndex.
 
     for (uint256 i = 0; i < n; i++) {
       manager.adminVoidMarket(evt.marketIds[i], yesPayouts[i], 1e18 - yesPayouts[i]);
