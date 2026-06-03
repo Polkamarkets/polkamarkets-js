@@ -246,21 +246,37 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
     uint256 n = evt.outcomeCount;
     uint256 noMarketId = evt.marketIds[noOutcomeIndex];
+    require(
+      manager.getMarketState(noMarketId) != IMyriadMarketManager.MarketState.resolved,
+      "leg resolved"
+    );
     uint256 noTokenId = conditionalTokens.getTokenId(noMarketId, Outcomes.NO);
+
+    // Count splittable legs (i != noOutcomeIndex AND not resolved).
+    // Resolved legs are treated as if they never existed — their YES would be
+    // worth 0, so skipping them costs the user nothing.
+    uint256 k;
+    for (uint256 i = 0; i < n; i++) {
+      if (i == noOutcomeIndex) continue;
+      if (manager.getMarketState(evt.marketIds[i]) == IMyriadMarketManager.MarketState.resolved) continue;
+      k++;
+    }
+    require(k > 0, "no unresolved legs");
 
     // Take NO(noOutcomeIndex) from caller
     conditionalTokens.safeTransferFrom(msg.sender, address(this), noTokenId, amount, "");
 
-    // Mint wcol for splitting in the other (N-1) markets
-    uint256 wcolToMint = (n - 1) * amount;
+    // Mint wcol for splitting in the K unresolved complementary markets
+    uint256 wcolToMint = k * amount;
     wcol.adapterMint(address(this), wcolToMint);
     mintedWcolPerEvent[eventId] += wcolToMint;
 
-    // Split in each other market and send YES to caller, keep NO
+    // Split in each unresolved other market and send YES to caller, keep NO
     for (uint256 i = 0; i < n; i++) {
       if (i == noOutcomeIndex) continue;
-
       uint256 marketId = evt.marketIds[i];
+      if (manager.getMarketState(marketId) == IMyriadMarketManager.MarketState.resolved) continue;
+
       conditionalTokens.splitPosition(marketId, amount);
 
       // Send YES to caller
@@ -292,27 +308,48 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
     uint256 n = evt.outcomeCount;
 
-    // Pull underlying from the exchange and wrap for the first market's split.
+    // Locate the first unresolved leg — it consumes the freshly-wrapped wcol.
+    // Resolved legs are skipped: YES on a resolved-NO leg is worth 0, so
+    // the recipient losing that share has no economic effect.
+    uint256 firstUnresolved = type(uint256).max;
+    for (uint256 i = 0; i < n; i++) {
+      if (manager.getMarketState(evt.marketIds[i]) != IMyriadMarketManager.MarketState.resolved) {
+        firstUnresolved = i;
+        break;
+      }
+    }
+    require(firstUnresolved != type(uint256).max, "no unresolved legs");
+
+    // Pull underlying from the exchange and wrap for the first unresolved market's split.
     underlying.safeTransferFrom(msg.sender, address(this), amount);
     underlying.forceApprove(address(wcol), amount);
     wcol.wrap(amount);
 
-    // Split first market using the freshly-wrapped wcol
+    // Split first unresolved market using the freshly-wrapped wcol
     {
-      uint256 marketId = evt.marketIds[0];
+      uint256 marketId = evt.marketIds[firstUnresolved];
       conditionalTokens.splitPosition(marketId, amount);
       uint256 yesTokenId = conditionalTokens.getTokenId(marketId, Outcomes.YES);
       conditionalTokens.safeTransferFrom(address(this), recipient, yesTokenId, amount, "");
     }
 
-    // Mint wcol for the remaining (N-1) markets and split each
-    if (n > 1) {
-      uint256 wcolToMint = (n - 1) * amount;
+    // Count remaining unresolved legs after firstUnresolved
+    uint256 remaining;
+    for (uint256 i = firstUnresolved + 1; i < n; i++) {
+      if (manager.getMarketState(evt.marketIds[i]) != IMyriadMarketManager.MarketState.resolved) {
+        remaining++;
+      }
+    }
+
+    // Mint wcol for the remaining unresolved markets and split each
+    if (remaining > 0) {
+      uint256 wcolToMint = remaining * amount;
       wcol.adapterMint(address(this), wcolToMint);
       mintedWcolPerEvent[eventId] += wcolToMint;
 
-      for (uint256 i = 1; i < n; i++) {
+      for (uint256 i = firstUnresolved + 1; i < n; i++) {
         uint256 marketId = evt.marketIds[i];
+        if (manager.getMarketState(marketId) == IMyriadMarketManager.MarketState.resolved) continue;
         conditionalTokens.splitPosition(marketId, amount);
         uint256 yesTokenId = conditionalTokens.getTokenId(marketId, Outcomes.YES);
         conditionalTokens.safeTransferFrom(address(this), recipient, yesTokenId, amount, "");
@@ -451,8 +488,11 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     emit EventResolved(eventId, winningIndex);
   }
 
-  /// @notice Void the event with per-market YES payouts. Each market is voided
-  ///         via adminVoidMarket; NO payout is derived as 1e18 - yesPayout.
+  /// @notice Void the event with per-market YES payouts. Each unresolved market is
+  ///         voided via adminVoidMarket; NO payout is derived as 1e18 - yesPayout.
+  ///         Already-resolved legs (early NO via adminResolveEventMarket) are
+  ///         skipped and keep their existing resolution — their yesPayouts entry
+  ///         MUST be 0 to acknowledge the leg is not being voided.
   /// @param eventId The event identifier.
   /// @param yesPayouts Array of YES (outcome 0) payouts, one per market, in 1e18.
   function voidEvent(
@@ -471,6 +511,12 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     uint256 totalYesPayout;
     for (uint256 i = 0; i < n; i++) {
       require(yesPayouts[i] <= 1e18, "yes payout > 1e18");
+      if (manager.getMarketState(evt.marketIds[i]) == IMyriadMarketManager.MarketState.resolved) {
+        // Already-NO-resolved legs (YES-resolved would have finalized the event
+        // via _forceOthersNoAndFinalize, so we cannot be here) keep their NO
+        // outcome — caller must pass 0 to acknowledge they are not being voided.
+        require(yesPayouts[i] == 0, "resolved leg payout != 0");
+      }
       totalYesPayout += yesPayouts[i];
     }
 
@@ -482,6 +528,7 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     evt.winningIndex = -2;
 
     for (uint256 i = 0; i < n; i++) {
+      if (manager.getMarketState(evt.marketIds[i]) == IMyriadMarketManager.MarketState.resolved) continue;
       manager.adminVoidMarket(evt.marketIds[i], yesPayouts[i], 1e18 - yesPayouts[i]);
     }
 
@@ -556,6 +603,21 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
   function getEventOutcomeCount(bytes32 eventId) external view returns (uint256) {
     return _events[eventId].outcomeCount;
+  }
+
+  /// @notice Number of constituent markets that are NOT yet resolved.
+  ///         Early-resolved legs are excluded — multi-leg paths treat them
+  ///         as if they never existed.
+  function getUnresolvedOutcomeCount(bytes32 eventId) external view returns (uint256) {
+    Event storage evt = _events[eventId];
+    uint256 n = evt.outcomeCount;
+    uint256 count;
+    for (uint256 i = 0; i < n; i++) {
+      if (manager.getMarketState(evt.marketIds[i]) != IMyriadMarketManager.MarketState.resolved) {
+        count++;
+      }
+    }
+    return count;
   }
 
   function isEventResolved(bytes32 eventId) external view returns (bool) {

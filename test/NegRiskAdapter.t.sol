@@ -242,6 +242,61 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     assertEq(adapter.mintedWcolPerEvent(eventId), 2 * amount);
   }
 
+  function testConvertPositionsSkipsResolvedLeg() public {
+    (bytes32 eventId, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 50 ether;
+
+    // Admin early-resolves market 2 as NO (e.g., candidate dropped out).
+    vm.warp(block.timestamp + 2 days);
+    adapter.adminResolveEventMarket(eventId, 2, int256(Outcomes.NO));
+    // Reset timestamp does not matter — the leg is already resolved.
+
+    // Alice splits in outcome 0, then converts NO(0) → YES on the remaining
+    // unresolved sibling only (market 1). Market 2 is skipped.
+    collateral.mint(alice, amount);
+    vm.startPrank(alice);
+    collateral.approve(address(adapter), amount);
+    adapter.splitPosition(eventId, 0, amount);
+    conditionalTokens.setApprovalForAll(address(adapter), true);
+    adapter.convertPositions(eventId, 0, amount);
+    vm.stopPrank();
+
+    // Alice has YES(0) (from split) + YES(1) (from convert). She does NOT have YES(2).
+    assertEq(conditionalTokens.balanceOf(alice, conditionalTokens.getTokenId(marketIds[0], Outcomes.YES)), amount);
+    assertEq(conditionalTokens.balanceOf(alice, conditionalTokens.getTokenId(marketIds[1], Outcomes.YES)), amount);
+    assertEq(conditionalTokens.balanceOf(alice, conditionalTokens.getTokenId(marketIds[2], Outcomes.YES)), 0);
+
+    // wcol minted only for the K=1 unresolved sibling (was 2 in the all-open case).
+    assertEq(adapter.mintedWcolPerEvent(eventId), amount);
+  }
+
+  function testConvertPositionsRevertsIfUserLegResolved() public {
+    (bytes32 eventId,) = _createThreeOutcomeEvent();
+    uint256 amount = 10 ether;
+
+    // Admin early-resolves outcome 0 as NO.
+    vm.warp(block.timestamp + 2 days);
+    adapter.adminResolveEventMarket(eventId, 0, int256(Outcomes.NO));
+
+    vm.prank(alice);
+    vm.expectRevert("leg resolved");
+    adapter.convertPositions(eventId, 0, amount);
+  }
+
+  function testConvertPositionsRevertsIfAllOthersResolved() public {
+    (bytes32 eventId,) = _createThreeOutcomeEvent();
+    uint256 amount = 10 ether;
+
+    // Admin early-resolves both sibling legs to NO.
+    vm.warp(block.timestamp + 2 days);
+    adapter.adminResolveEventMarket(eventId, 1, int256(Outcomes.NO));
+    adapter.adminResolveEventMarket(eventId, 2, int256(Outcomes.NO));
+
+    vm.prank(alice);
+    vm.expectRevert("no unresolved legs");
+    adapter.convertPositions(eventId, 0, amount);
+  }
+
   // =========================================================================
   // MintAllYesTokens (used by exchange for cross-market matching)
   // =========================================================================
@@ -271,6 +326,59 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
 
     // Minted = (3-1) * 30 = 60 ether
     assertEq(adapter.mintedWcolPerEvent(eventId), 2 * amount);
+  }
+
+  function testMintAllYesTokensSkipsResolvedLeg() public {
+    (bytes32 eventId, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 30 ether;
+
+    // Admin early-resolves market 0 as NO.
+    vm.warp(block.timestamp + 2 days);
+    adapter.adminResolveEventMarket(eventId, 0, int256(Outcomes.NO));
+
+    collateral.mint(address(exchange), amount);
+    vm.startPrank(address(exchange));
+    collateral.approve(address(adapter), amount);
+    adapter.mintAllYesTokens(eventId, amount, address(exchange));
+    vm.stopPrank();
+
+    // Exchange has YES on markets 1 and 2; not on the resolved market 0.
+    assertEq(conditionalTokens.balanceOf(address(exchange), conditionalTokens.getTokenId(marketIds[0], Outcomes.YES)), 0);
+    assertEq(conditionalTokens.balanceOf(address(exchange), conditionalTokens.getTokenId(marketIds[1], Outcomes.YES)), amount);
+    assertEq(conditionalTokens.balanceOf(address(exchange), conditionalTokens.getTokenId(marketIds[2], Outcomes.YES)), amount);
+
+    // Minted = (K-1) * amount where K=2 unresolved legs → 1 * amount.
+    assertEq(adapter.mintedWcolPerEvent(eventId), amount);
+  }
+
+  function testMintAllYesTokensRevertsIfAllResolved() public {
+    (bytes32 eventId,) = _createThreeOutcomeEvent();
+    uint256 amount = 10 ether;
+
+    vm.warp(block.timestamp + 2 days);
+    adapter.adminResolveEventMarket(eventId, 0, int256(Outcomes.NO));
+    adapter.adminResolveEventMarket(eventId, 1, int256(Outcomes.NO));
+    adapter.adminResolveEventMarket(eventId, 2, int256(Outcomes.NO));
+
+    collateral.mint(address(exchange), amount);
+    vm.prank(address(exchange));
+    collateral.approve(address(adapter), amount);
+
+    vm.prank(address(exchange));
+    vm.expectRevert("no unresolved legs");
+    adapter.mintAllYesTokens(eventId, amount, address(exchange));
+  }
+
+  function testGetUnresolvedOutcomeCount() public {
+    (bytes32 eventId,) = _createThreeOutcomeEvent();
+    assertEq(adapter.getUnresolvedOutcomeCount(eventId), 3);
+
+    vm.warp(block.timestamp + 2 days);
+    adapter.adminResolveEventMarket(eventId, 1, int256(Outcomes.NO));
+    assertEq(adapter.getUnresolvedOutcomeCount(eventId), 2);
+
+    adapter.adminResolveEventMarket(eventId, 2, int256(Outcomes.NO));
+    assertEq(adapter.getUnresolvedOutcomeCount(eventId), 1);
   }
 
   // =========================================================================
@@ -441,6 +549,88 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
 
     vm.expectRevert(MyriadCTFExchange.PriceSumBelowOne.selector);
     exchange.matchCrossMarketOrders(orders, sigs, 10 ether);
+  }
+
+  function testCrossMarketMatchSkipsEarlyResolvedLeg() public {
+    (bytes32 eventId, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    for (uint256 i = 0; i < 3; i++) {
+      _setUniformFees(marketIds[i], 0, 0);
+    }
+
+    // Admin early-resolves market 2 as NO before any trading.
+    vm.warp(block.timestamp + 2 days);
+    adapter.adminResolveEventMarket(eventId, 2, int256(Outcomes.NO));
+
+    // Two buyers cover the remaining unresolved legs (markets 0 and 1).
+    uint256 fundAmount = 500 ether;
+    address[2] memory users = [alice, bob];
+    uint256[2] memory pks = [alicePk, bobPk];
+    for (uint256 i = 0; i < 2; i++) {
+      collateral.mint(users[i], fundAmount);
+      vm.startPrank(users[i]);
+      collateral.approve(address(exchange), type(uint256).max);
+      conditionalTokens.setApprovalForAll(address(exchange), true);
+      vm.stopPrank();
+    }
+
+    // Parity on the unresolved subset only: 0.55 + 0.45 = 1.00.
+    uint256 price0 = (55 * ONE) / 100;
+    uint256 price1 = (45 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory orders = new MyriadCTFExchange.Order[](2);
+    orders[0] = _buildOrder(alice, marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Buy, amount, price0, 100);
+    orders[1] = _buildOrder(bob,   marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Buy, amount, price1, 101);
+
+    bytes[] memory sigs = new bytes[](2);
+    sigs[0] = _signOrder(orders[0], alicePk);
+    sigs[1] = _signOrder(orders[1], bobPk);
+
+    exchange.matchCrossMarketOrders(orders, sigs, amount);
+
+    // Each buyer received YES tokens for their respective leg.
+    assertEq(conditionalTokens.balanceOf(alice, conditionalTokens.getTokenId(marketIds[0], Outcomes.YES)), amount);
+    assertEq(conditionalTokens.balanceOf(bob,   conditionalTokens.getTokenId(marketIds[1], Outcomes.YES)), amount);
+
+    // No YES was minted for the early-resolved market 2.
+    assertEq(conditionalTokens.balanceOf(address(exchange), conditionalTokens.getTokenId(marketIds[2], Outcomes.YES)), 0);
+    assertEq(conditionalTokens.balanceOf(address(adapter),  conditionalTokens.getTokenId(marketIds[2], Outcomes.YES)), 0);
+
+    // wcol minted for the (K-1)=1 sibling.
+    assertEq(adapter.mintedWcolPerEvent(eventId), amount);
+  }
+
+  function testCrossMarketMatchRejectsFullOrderSetOnPartiallyResolvedEvent() public {
+    (bytes32 eventId, uint256[] memory marketIds) = _createThreeOutcomeEvent();
+    uint256 amount = 10 ether;
+
+    for (uint256 i = 0; i < 3; i++) {
+      _setUniformFees(marketIds[i], 0, 0);
+    }
+
+    // Admin early-resolves market 2.
+    vm.warp(block.timestamp + 2 days);
+    adapter.adminResolveEventMarket(eventId, 2, int256(Outcomes.NO));
+
+    // Operator mistakenly submits orders for all 3 outcomes.
+    uint256 price0 = (40 * ONE) / 100;
+    uint256 price1 = (30 * ONE) / 100;
+    uint256 price2 = (30 * ONE) / 100;
+
+    MyriadCTFExchange.Order[] memory orders = new MyriadCTFExchange.Order[](3);
+    orders[0] = _buildOrder(alice,   marketIds[0], Outcomes.YES, MyriadCTFExchange.Side.Buy, amount, price0, 1);
+    orders[1] = _buildOrder(bob,     marketIds[1], Outcomes.YES, MyriadCTFExchange.Side.Buy, amount, price1, 2);
+    orders[2] = _buildOrder(charlie, marketIds[2], Outcomes.YES, MyriadCTFExchange.Side.Buy, amount, price2, 3);
+
+    bytes[] memory sigs = new bytes[](3);
+    sigs[0] = _signOrder(orders[0], alicePk);
+    sigs[1] = _signOrder(orders[1], bobPk);
+    sigs[2] = _signOrder(orders[2], charliePk);
+
+    // unresolvedCount == 2 but orders.length == 3.
+    vm.expectRevert(MyriadCTFExchange.MustMatchAllOutcomes.selector);
+    exchange.matchCrossMarketOrders(orders, sigs, amount);
   }
 
   // =========================================================================
@@ -1591,25 +1781,60 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     adapter.adminResolveEvent(eventId, 2);
   }
 
-  function testVoidEventStillStrict() public {
+  function testVoidEventRejectsNonZeroPayoutForResolvedLeg() public {
     MockMarketOracle oracle = new MockMarketOracle();
     (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 3);
 
     vm.warp(block.timestamp + 2 days);
 
-    // market 0 pre-resolved
+    // market 0 pre-resolved NO
     oracle.setResult(marketIds[0], int256(Outcomes.NO), true);
     adapter.resolveEventMarket(eventId, 0);
 
-    // Sum to ONE so the solvency check passes and the loop reaches market 0.
+    // Caller must pass 0 for the resolved leg — non-zero is a contract violation.
     uint256[] memory yesPayouts = new uint256[](3);
     yesPayouts[0] = ONE / 2;
     yesPayouts[1] = ONE / 4;
     yesPayouts[2] = ONE / 4;
 
-    // adminVoidMarket on the already-resolved market 0 reverts inside the loop
-    vm.expectRevert("resolved");
+    vm.expectRevert("resolved leg payout != 0");
     adapter.voidEvent(eventId, yesPayouts);
+  }
+
+  function testVoidEventSkipsAlreadyResolvedLeg() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 3);
+
+    vm.warp(block.timestamp + 2 days);
+
+    // market 0 pre-resolved NO
+    oracle.setResult(marketIds[0], int256(Outcomes.NO), true);
+    adapter.resolveEventMarket(eventId, 0);
+
+    // Void the remaining two legs with custom payouts; resolved leg's slot is 0.
+    uint256[] memory yesPayouts = new uint256[](3);
+    yesPayouts[0] = 0;
+    yesPayouts[1] = (60 * ONE) / 100;
+    yesPayouts[2] = (40 * ONE) / 100;
+
+    adapter.voidEvent(eventId, yesPayouts);
+
+    // Pre-resolved leg keeps its NO outcome
+    assertEq(manager.getMarketResolvedOutcome(marketIds[0]), int256(Outcomes.NO));
+
+    // Other legs become voided with the supplied payouts
+    assertEq(manager.getMarketResolvedOutcome(marketIds[1]), -1);
+    assertEq(manager.getMarketResolvedOutcome(marketIds[2]), -1);
+    (uint256 out0Pay1, uint256 out1Pay1) = manager.getVoidedPayouts(marketIds[1]);
+    assertEq(out0Pay1, (60 * ONE) / 100);
+    assertEq(out1Pay1, (40 * ONE) / 100);
+    (uint256 out0Pay2, uint256 out1Pay2) = manager.getVoidedPayouts(marketIds[2]);
+    assertEq(out0Pay2, (40 * ONE) / 100);
+    assertEq(out1Pay2, (60 * ONE) / 100);
+
+    (, bool resolved, int256 winningIndex,,) = adapter.getEvent(eventId);
+    assertTrue(resolved);
+    assertEq(winningIndex, -2);
   }
 
   // =========================================================================
