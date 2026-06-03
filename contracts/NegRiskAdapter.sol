@@ -485,13 +485,18 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
       int256 outcome = manager.getMarketResolvedOutcome(marketId);
 
       uint256 noTokenId = conditionalTokens.getTokenId(marketId, Outcomes.NO);
-      uint256 balance = conditionalTokens.balanceOf(address(this), noTokenId);
-
-      if (balance == 0) continue;
+      uint256 noBalance = conditionalTokens.balanceOf(address(this), noTokenId);
 
       if (outcome == Outcomes.VOIDED) {
+        // Skip when redeemVoided would revert on its zero-payout guard;
+        // otherwise one zero-floored market bricks the whole batch.
+        (uint256 yesPay, uint256 noPay) = manager.getVoidedPayouts(marketId);
+        uint256 yesTokenId = conditionalTokens.getTokenId(marketId, Outcomes.YES);
+        uint256 yesBalance = conditionalTokens.balanceOf(address(this), yesTokenId);
+        if ((yesBalance * yesPay) / 1e18 + (noBalance * noPay) / 1e18 == 0) continue;
         conditionalTokens.redeemVoided(marketId);
       } else if (outcome == int256(Outcomes.NO)) {
+        if (noBalance == 0) continue;
         conditionalTokens.redeemPosition(marketId);
       }
     }
