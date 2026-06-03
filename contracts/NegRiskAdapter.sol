@@ -501,7 +501,9 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
     uint256 minted = mintedWcolPerEvent[eventId];
 
-    // Never silently socialize bad debt.
+    // Guard wcol vault solvency: burning more wcol than recovered would leave
+    // total wcol supply > underlying held by the vault, causing later unwrap
+    // callers to revert on safeTransfer when the underlying runs out.
     require(wcolRecovered >= minted, "insolvent event payouts");
 
     if (minted > 0) {
