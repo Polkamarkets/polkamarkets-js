@@ -1068,6 +1068,42 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     assertTrue(adapter.noPositionsRedeemed(eventId));
   }
 
+  /// @notice Regression for Cyfrin M-? (redeemNOPositions bricks on rounding):
+  ///         a void with fractional payouts whose products don't divide 1e18
+  ///         evenly used to leave wcolRecovered below `minted` by O(n) wei,
+  ///         permanently bricking the one-shot redemption. The dust-bounded
+  ///         reconciliation must absorb the floor loss and complete cleanly.
+  function testVoidEventRedeemHandlesFloorDust() public {
+    (bytes32 eventId, ) = _createThreeOutcomeEvent();
+    uint256 amount = 1_000_000; // USDC-scale, exposes 1e18 rounding
+
+    // Adapter ends up holding 1_000_000 NO across all three markets, minted = 2_000_000.
+    collateral.mint(alice, amount);
+    vm.startPrank(alice);
+    collateral.approve(address(adapter), amount);
+    adapter.splitPosition(eventId, 0, amount);
+    conditionalTokens.setApprovalForAll(address(adapter), true);
+    adapter.convertPositions(eventId, 0, amount);
+    vm.stopPrank();
+
+    uint256 minted = adapter.mintedWcolPerEvent(eventId);
+    assertEq(minted, 2_000_000);
+
+    // Equal thirds summing to exactly 1e18 — every per-market product floors away dust.
+    uint256[] memory yesPayouts = new uint256[](3);
+    yesPayouts[0] = 333333333333333333;
+    yesPayouts[1] = 333333333333333333;
+    yesPayouts[2] = 333333333333333334;
+
+    vm.warp(block.timestamp + 2 days);
+    adapter.voidEvent(eventId, yesPayouts);
+
+    // Pre-fix this reverted with "insolvent event payouts" — recovered is 1_999_998.
+    adapter.redeemNOPositions(eventId);
+    assertEq(adapter.mintedWcolPerEvent(eventId), 0);
+    assertTrue(adapter.noPositionsRedeemed(eventId));
+  }
+
   function testVoidEventLengthMismatchReverts() public {
     (bytes32 eventId,) = _createThreeOutcomeEvent();
 
