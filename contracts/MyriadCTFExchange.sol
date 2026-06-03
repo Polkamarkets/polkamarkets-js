@@ -288,7 +288,7 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
 
     uint256 totalFees = makerFee + takerFee;
     if (totalFees > 0) {
-      (IERC20 tradeToken, , ) = _marketCollaterals(maker.marketId);
+      (IERC20 tradeToken, , , ) = _marketCollaterals(maker.marketId);
       _feeModule.accrueFees(address(tradeToken), totalFees);
     }
   }
@@ -354,7 +354,7 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
     }
 
     if (totalFees > 0) {
-      (IERC20 tradeToken, , ) = _marketCollaterals(taker.marketId);
+      (IERC20 tradeToken, , , ) = _marketCollaterals(taker.marketId);
       _feeModule.accrueFees(address(tradeToken), totalFees);
     }
   }
@@ -427,7 +427,7 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
 
     // Collect tradeToken from each buyer: notional + fee.
     // Convention: last order = taker, all others = makers.
-    (IERC20 collateral, , ) = _marketCollaterals(orders[0].marketId);
+    (IERC20 collateral, , , ) = _marketCollaterals(orders[0].marketId);
     uint256 totalFees;
     uint256 takerIdx = orders.length - 1;
 
@@ -580,7 +580,7 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
     if (maker.side != taker.side) {
       matchType = 0;
       uint256 notional = (fillAmount * maker.price) / ONE;
-      (IERC20 col, , ) = _marketCollaterals(maker.marketId);
+      (IERC20 col, , , ) = _marketCollaterals(maker.marketId);
       bool makerIsBuyer = maker.side == Side.Buy;
       address buyer = makerIsBuyer ? maker.trader : taker.trader;
       address seller = makerIsBuyer ? taker.trader : maker.trader;
@@ -591,7 +591,7 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
       matchType = 1;
       uint256 makerNotional = (fillAmount * maker.price) / ONE;
       uint256 takerNotional = fillAmount - makerNotional;
-      (IERC20 col, , ) = _marketCollaterals(maker.marketId);
+      (IERC20 col, , , ) = _marketCollaterals(maker.marketId);
       _checkCollateralBalance(maker.trader, col, makerNotional + (makerNotional * feeConfig.makerFeeBps) / BPS);
       _checkCollateralBalance(taker.trader, col, takerNotional + (takerNotional * feeConfig.takerFeeBps) / BPS);
     } else {
@@ -694,7 +694,7 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
     uint256 notional = (fillAmount * maker.price) / ONE;
     if (notional == 0) revert ZeroNotional();
 
-    (IERC20 collateral, , ) = _marketCollaterals(maker.marketId);
+    (IERC20 collateral, , , ) = _marketCollaterals(maker.marketId);
 
     address buyer = maker.side == Side.Buy ? maker.trader : taker.trader;
     address seller = maker.side == Side.Sell ? maker.trader : taker.trader;
@@ -744,7 +744,7 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
     (Order calldata outcome0Order, Order calldata outcome1Order) = maker.outcomeId == Outcomes.YES ? (maker, taker) : (taker, maker);
     if (outcome0Order.price + outcome1Order.price < ONE) revert PriceSumBelowOne();
 
-    (IERC20 tradeToken, IERC20 ctToken, bool isNegRiskFlow) = _marketCollaterals(maker.marketId);
+    (IERC20 tradeToken, IERC20 ctToken, bool isNegRiskFlow, address _adapter) = _marketCollaterals(maker.marketId);
 
     uint256 makerNotional = (fillAmount * maker.price) / ONE;
     uint256 takerNotional = fillAmount - makerNotional;
@@ -760,7 +760,6 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
 
     ConditionalTokens _ct = conditionalTokens;
     if (isNegRiskFlow) {
-      address _adapter = negRiskAdapter;
       tradeToken.forceApprove(_adapter, fillAmount);
       INegRiskAdapter(_adapter).wrapForExchange(fillAmount);
     }
@@ -810,7 +809,7 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
     // Merge: burns both outcome tokens, releases ctToken to this contract
     _ct.mergePositions(maker.marketId, fillAmount);
 
-    (IERC20 tradeToken, IERC20 ctToken, bool isNegRiskFlow) = _marketCollaterals(maker.marketId);
+    (IERC20 tradeToken, IERC20 ctToken, bool isNegRiskFlow, ) = _marketCollaterals(maker.marketId);
     if (isNegRiskFlow) {
       IWrappedCollateral(address(ctToken)).unwrap(fillAmount);
     }
@@ -885,12 +884,12 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
   function _marketCollaterals(uint256 marketId)
     internal
     view
-    returns (IERC20 tradeToken, IERC20 ctToken, bool isNegRiskFlow)
+    returns (IERC20 tradeToken, IERC20 ctToken, bool isNegRiskFlow, address adapter)
   {
     ctToken = manager.getMarketCollateral(marketId);
-    address _adapter = negRiskAdapter;
-    isNegRiskFlow = _adapter != address(0) && manager.isNegRisk(marketId);
-    tradeToken = isNegRiskFlow ? INegRiskAdapter(_adapter).underlying() : ctToken;
+    adapter = negRiskAdapter;
+    isNegRiskFlow = adapter != address(0) && manager.isNegRisk(marketId);
+    tradeToken = isNegRiskFlow ? INegRiskAdapter(adapter).underlying() : ctToken;
   }
 
   function _checkTokenBalance(
