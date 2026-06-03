@@ -325,7 +325,9 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
   /// @notice Permissionless per-market resolution for a neg-risk event. Routes
   ///         through `manager.resolveMarket` and enforces the event-level
-  ///         "at most one YES per event" invariant.
+  ///         "at most one YES per event" invariant. When the resolved outcome
+  ///         is YES, reverts with `"event already has YES winner"` if any other
+  ///         constituent market is already resolved YES.
   function resolveEventMarket(bytes32 eventId, uint256 outcomeIndex) external nonReentrant returns (int256) {
     Event storage evt = _events[eventId];
     require(evt.outcomeCount > 0, "event !exist");
@@ -341,7 +343,10 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
   /// @notice Admin per-market override for a neg-risk event. Routes through
   ///         `manager.adminResolveMarket` and enforces the event-level
-  ///         "at most one YES per event" invariant.
+  ///         "at most one YES per event" invariant. Requires
+  ///         `RESOLUTION_ADMIN_ROLE`. When the supplied outcome is YES, reverts
+  ///         with `"event already has YES winner"` if any other constituent
+  ///         market is already resolved YES.
   function adminResolveEventMarket(
     bytes32 eventId,
     uint256 outcomeIndex,
@@ -435,7 +440,14 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
   }
 
   /// @notice Void the event with per-market YES payouts. Each market is voided
-  ///         via adminVoidMarket; NO payout is derived as 1e18 - yesPayout.
+  ///         via `manager.adminVoidMarket`; NO payout is derived as
+  ///         `1e18 - yesPayout`. Requires `RESOLUTION_ADMIN_ROLE`.
+  /// @dev    Enforces two invariants on the payout vector:
+  ///         (1) each `yesPayouts[i] <= 1e18` (per-market well-formedness),
+  ///         (2) `sum(yesPayouts) <= 1e18` (event-level: a full YES basket
+  ///         across named outcomes can never redeem more than 1 unit).
+  ///         Reverts on violation with `"yes payout > 1e18"` or
+  ///         `"event payouts overallocated"`.
   /// @param eventId The event identifier.
   /// @param yesPayouts Array of YES (outcome 0) payouts, one per market, in 1e18.
   function voidEvent(
@@ -471,6 +483,20 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     emit EventVoided(eventId, yesPayouts);
   }
 
+  /// @notice After resolution, redeem the adapter's held outcome tokens, burn
+  ///         the wcol that was minted during convert/mintAll operations, and
+  ///         sweep any excess to treasury.
+  /// @dev    Admin-only (`DEFAULT_ADMIN_ROLE`). Single-shot — sets
+  ///         `noPositionsRedeemed[eventId]` permanently; there is no retry path.
+  ///         Requires the event resolved (or voided). For each constituent
+  ///         market the adapter redeems whatever outcome tokens it holds:
+  ///         NO tokens when outcome == NO, and BOTH YES and NO balances when
+  ///         outcome == VOIDED (per `ConditionalTokens.redeemVoided`). YES-won
+  ///         and "Other"-won markets contribute nothing. The function then
+  ///         burns exactly `mintedWcolPerEvent[eventId]` wcol and reverts with
+  ///         `"insolvent event payouts"` if the recovered wcol is below that
+  ///         amount — operators must resolve the underlying shortfall before
+  ///         retry is possible (which it is not, see single-shot above).
   function redeemNOPositions(bytes32 eventId) external nonReentrant {
     require(registry.hasRole(registry.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
     Event storage evt = _events[eventId];
