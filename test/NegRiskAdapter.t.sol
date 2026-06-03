@@ -246,10 +246,9 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     (bytes32 eventId, uint256[] memory marketIds) = _createThreeOutcomeEvent();
     uint256 amount = 50 ether;
 
-    // Admin early-resolves market 2 as NO (e.g., candidate dropped out).
-    vm.warp(block.timestamp + 2 days);
+    // Admin early-resolves market 2 as NO BEFORE close, e.g. "candidate dropped
+    // out in the group stage". Siblings remain open for trading.
     adapter.adminResolveEventMarket(eventId, 2, int256(Outcomes.NO));
-    // Reset timestamp does not matter — the leg is already resolved.
 
     // Alice splits in outcome 0, then converts NO(0) → YES on the remaining
     // unresolved sibling only (market 1). Market 2 is skipped.
@@ -274,8 +273,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     (bytes32 eventId,) = _createThreeOutcomeEvent();
     uint256 amount = 10 ether;
 
-    // Admin early-resolves outcome 0 as NO.
-    vm.warp(block.timestamp + 2 days);
+    // Admin early-resolves outcome 0 as NO (before close).
     adapter.adminResolveEventMarket(eventId, 0, int256(Outcomes.NO));
 
     vm.prank(alice);
@@ -287,8 +285,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     (bytes32 eventId,) = _createThreeOutcomeEvent();
     uint256 amount = 10 ether;
 
-    // Admin early-resolves both sibling legs to NO.
-    vm.warp(block.timestamp + 2 days);
+    // Admin early-resolves both sibling legs to NO (before close).
     adapter.adminResolveEventMarket(eventId, 1, int256(Outcomes.NO));
     adapter.adminResolveEventMarket(eventId, 2, int256(Outcomes.NO));
 
@@ -332,8 +329,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     (bytes32 eventId, uint256[] memory marketIds) = _createThreeOutcomeEvent();
     uint256 amount = 30 ether;
 
-    // Admin early-resolves market 0 as NO.
-    vm.warp(block.timestamp + 2 days);
+    // Admin early-resolves market 0 as NO (before close).
     adapter.adminResolveEventMarket(eventId, 0, int256(Outcomes.NO));
 
     collateral.mint(address(exchange), amount);
@@ -355,7 +351,6 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     (bytes32 eventId,) = _createThreeOutcomeEvent();
     uint256 amount = 10 ether;
 
-    vm.warp(block.timestamp + 2 days);
     adapter.adminResolveEventMarket(eventId, 0, int256(Outcomes.NO));
     adapter.adminResolveEventMarket(eventId, 1, int256(Outcomes.NO));
     adapter.adminResolveEventMarket(eventId, 2, int256(Outcomes.NO));
@@ -373,7 +368,6 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     (bytes32 eventId,) = _createThreeOutcomeEvent();
     assertEq(adapter.getUnresolvedOutcomeCount(eventId), 3);
 
-    vm.warp(block.timestamp + 2 days);
     adapter.adminResolveEventMarket(eventId, 1, int256(Outcomes.NO));
     assertEq(adapter.getUnresolvedOutcomeCount(eventId), 2);
 
@@ -559,8 +553,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
       _setUniformFees(marketIds[i], 0, 0);
     }
 
-    // Admin early-resolves market 2 as NO before any trading.
-    vm.warp(block.timestamp + 2 days);
+    // Admin early-resolves market 2 as NO before close. Siblings remain tradeable.
     adapter.adminResolveEventMarket(eventId, 2, int256(Outcomes.NO));
 
     // Two buyers cover the remaining unresolved legs (markets 0 and 1).
@@ -609,8 +602,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
       _setUniformFees(marketIds[i], 0, 0);
     }
 
-    // Admin early-resolves market 2.
-    vm.warp(block.timestamp + 2 days);
+    // Admin early-resolves market 2 (before close).
     adapter.adminResolveEventMarket(eventId, 2, int256(Outcomes.NO));
 
     // Operator mistakenly submits orders for all 3 outcomes.
