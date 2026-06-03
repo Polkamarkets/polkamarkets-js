@@ -1333,13 +1333,17 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
   }
 
   function testAdminResolveEventMarketRejectsSecondYes() public {
-    (bytes32 eventId,) = _createThreeOutcomeEvent();
+    (bytes32 eventId, uint256[] memory marketIds) = _createThreeOutcomeEvent();
 
     vm.warp(block.timestamp + 2 days);
 
+    // First admin YES finalizes the event and force-resolves the other markets to NO.
     adapter.adminResolveEventMarket(eventId, 0, int256(Outcomes.YES));
+    assertEq(manager.getMarketResolvedOutcome(marketIds[1]), int256(Outcomes.NO));
+    assertEq(manager.getMarketResolvedOutcome(marketIds[2]), int256(Outcomes.NO));
 
-    vm.expectRevert("event already has YES winner");
+    // A second admin YES is rejected because the event is already finalized.
+    vm.expectRevert("already resolved");
     adapter.adminResolveEventMarket(eventId, 1, int256(Outcomes.YES));
   }
 
@@ -1352,9 +1356,12 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     oracle.setResult(marketIds[0], int256(Outcomes.YES), true);
     oracle.setResult(marketIds[1], int256(Outcomes.YES), true);
 
+    // The first YES finalizes the event and force-resolves the second oracle's
+    // market to NO before the second call can even reach manager.resolveMarket.
     adapter.resolveEventMarket(eventId, 0);
+    assertEq(manager.getMarketResolvedOutcome(marketIds[1]), int256(Outcomes.NO));
 
-    vm.expectRevert("event already has YES winner");
+    vm.expectRevert("already resolved");
     adapter.resolveEventMarket(eventId, 1);
   }
 
@@ -1368,16 +1375,75 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     adapter.adminResolveEventMarket(eventId, 0, int256(Outcomes.NO));
     adapter.adminResolveEventMarket(eventId, 1, int256(Outcomes.NO));
 
-    // Final winner emerges, oracle reports — resolve via permissionless path.
+    // Final winner emerges and the YES per-market call finalizes the event,
+    // force-resolving market 3 to NO atomically.
     oracle.setResult(marketIds[2], int256(Outcomes.YES), true);
-    oracle.setResult(marketIds[3], int256(Outcomes.NO), true);
     adapter.resolveEventMarket(eventId, 2);
-    adapter.resolveEventMarket(eventId, 3);
 
-    adapter.resolveEvent(eventId);
+    assertEq(manager.getMarketResolvedOutcome(marketIds[3]), int256(Outcomes.NO));
+
     (, bool resolved, int256 winningIndex,,) = adapter.getEvent(eventId);
     assertTrue(resolved);
     assertEq(winningIndex, 2);
+  }
+
+  function testResolveEventMarket_YesForcesOthersToNoAndFinalizes() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 3);
+
+    vm.warp(block.timestamp + 2 days);
+
+    oracle.setResult(marketIds[0], int256(Outcomes.YES), true);
+    adapter.resolveEventMarket(eventId, 0);
+
+    assertEq(manager.getMarketResolvedOutcome(marketIds[0]), int256(Outcomes.YES));
+    assertEq(manager.getMarketResolvedOutcome(marketIds[1]), int256(Outcomes.NO));
+    assertEq(manager.getMarketResolvedOutcome(marketIds[2]), int256(Outcomes.NO));
+
+    (, bool resolved, int256 winningIndex,,) = adapter.getEvent(eventId);
+    assertTrue(resolved);
+    assertEq(winningIndex, 0);
+  }
+
+  function testResolveEventMarket_PreResolvedNoIsNotReResolved() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 3);
+
+    vm.warp(block.timestamp + 2 days);
+
+    // Pre-resolve market 1 as NO via its oracle.
+    oracle.setResult(marketIds[1], int256(Outcomes.NO), true);
+    adapter.resolveEventMarket(eventId, 1);
+
+    // YES on market 0 should force market 2 to NO and skip the already-resolved market 1.
+    oracle.setResult(marketIds[0], int256(Outcomes.YES), true);
+    adapter.resolveEventMarket(eventId, 0);
+
+    assertEq(manager.getMarketResolvedOutcome(marketIds[0]), int256(Outcomes.YES));
+    assertEq(manager.getMarketResolvedOutcome(marketIds[1]), int256(Outcomes.NO));
+    assertEq(manager.getMarketResolvedOutcome(marketIds[2]), int256(Outcomes.NO));
+
+    (, bool resolved, int256 winningIndex,,) = adapter.getEvent(eventId);
+    assertTrue(resolved);
+    assertEq(winningIndex, 0);
+  }
+
+  function testResolveEventMarket_EmitsForcedNoForUnresolvedConstituents() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 3);
+
+    vm.warp(block.timestamp + 2 days);
+
+    oracle.setResult(marketIds[0], int256(Outcomes.YES), true);
+
+    vm.expectEmit(true, false, false, true);
+    emit NegRiskAdapter.EventMarketForcedNo(eventId, 1, marketIds[1]);
+    vm.expectEmit(true, false, false, true);
+    emit NegRiskAdapter.EventMarketForcedNo(eventId, 2, marketIds[2]);
+    vm.expectEmit(true, false, false, true);
+    emit NegRiskAdapter.EventResolved(eventId, 0);
+
+    adapter.resolveEventMarket(eventId, 0);
   }
 
   // =========================================================================
@@ -1394,16 +1460,17 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     oracle.setResult(marketIds[1], int256(Outcomes.YES), true);
     oracle.setResult(marketIds[2], int256(Outcomes.NO), true);
     oracle.setResult(marketIds[3], int256(Outcomes.NO), true);
-    for (uint256 i = 0; i < 4; i++) {
-      adapter.resolveEventMarket(eventId, i);
-    }
 
-    vm.prank(alice);
-    adapter.resolveEvent(eventId);
+    // Resolve the NO market first, then the YES market — the YES call
+    // atomically force-resolves remaining markets (2, 3) to NO and finalizes.
+    adapter.resolveEventMarket(eventId, 0);
+    adapter.resolveEventMarket(eventId, 1);
 
     (, bool resolved, int256 winningIndex,,) = adapter.getEvent(eventId);
     assertTrue(resolved);
     assertEq(winningIndex, 1);
+    assertEq(manager.getMarketResolvedOutcome(marketIds[2]), int256(Outcomes.NO));
+    assertEq(manager.getMarketResolvedOutcome(marketIds[3]), int256(Outcomes.NO));
   }
 
   function testResolveEventPermissionless_NoYes_AllNo() public {
@@ -1437,9 +1504,11 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     adapter.resolveEvent(eventId);
   }
 
-  /// @notice The adapter rejects the second YES at resolution time, so resolveEvent's
-  ///         "multiple YES" branch is unreachable through legitimate paths. This test
-  ///         verifies the rejection happens upstream in `resolveEventMarket`.
+  /// @notice The adapter encodes mutual exclusivity forward: the first YES
+  ///         finalizes the event and force-resolves the other markets to NO
+  ///         before any second YES oracle can ever land. The original wedge —
+  ///         where a dual-YES race left the second market permanently
+  ///         unresolvable — is structurally unreachable.
   function testResolveEventPermissionless_RejectsSecondYesUpstream() public {
     MockMarketOracle oracle = new MockMarketOracle();
     (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 3);
@@ -1450,7 +1519,16 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     oracle.setResult(marketIds[1], int256(Outcomes.YES), true);
     adapter.resolveEventMarket(eventId, 0);
 
-    vm.expectRevert("event already has YES winner");
+    // Second market was force-resolved to NO inside the first call; the event is finalized.
+    assertEq(manager.getMarketResolvedOutcome(marketIds[1]), int256(Outcomes.NO));
+    assertEq(manager.getMarketResolvedOutcome(marketIds[2]), int256(Outcomes.NO));
+
+    (, bool resolved, int256 winningIndex,,) = adapter.getEvent(eventId);
+    assertTrue(resolved);
+    assertEq(winningIndex, 0);
+
+    // A redundant second call is rejected because the event is already resolved.
+    vm.expectRevert("already resolved");
     adapter.resolveEventMarket(eventId, 1);
   }
 
@@ -1473,41 +1551,43 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
   // Admin event resolution overrides (Phase B)
   // =========================================================================
 
-  function testAdminResolveEvent_SkipsPreResolved() public {
+  function testAdminResolveEvent_FinalizesAllNoEvent() public {
     MockMarketOracle oracle = new MockMarketOracle();
     (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 4);
 
     vm.warp(block.timestamp + 2 days);
 
-    // market 1 pre-resolved YES via per-market path
-    oracle.setResult(marketIds[1], int256(Outcomes.YES), true);
-    adapter.resolveEventMarket(eventId, 1);
+    // Markets 0 and 2 pre-resolved NO via per-market — event remains unresolved
+    // because there's no YES yet to trigger finalization.
+    oracle.setResult(marketIds[0], int256(Outcomes.NO), true);
+    oracle.setResult(marketIds[2], int256(Outcomes.NO), true);
+    adapter.resolveEventMarket(eventId, 0);
+    adapter.resolveEventMarket(eventId, 2);
 
-    // Admin agrees: outcome 1 wins
-    adapter.adminResolveEvent(eventId, 1);
+    // Admin finalizes with the all-NO ("Other won") outcome, force-resolving the rest.
+    adapter.adminResolveEvent(eventId, -1);
 
-    assertEq(manager.getMarketResolvedOutcome(marketIds[0]), int256(Outcomes.NO));
-    assertEq(manager.getMarketResolvedOutcome(marketIds[1]), int256(Outcomes.YES));
-    assertEq(manager.getMarketResolvedOutcome(marketIds[2]), int256(Outcomes.NO));
-    assertEq(manager.getMarketResolvedOutcome(marketIds[3]), int256(Outcomes.NO));
+    for (uint256 i = 0; i < 4; i++) {
+      assertEq(manager.getMarketResolvedOutcome(marketIds[i]), int256(Outcomes.NO));
+    }
 
     (, bool resolved, int256 winningIndex,,) = adapter.getEvent(eventId);
     assertTrue(resolved);
-    assertEq(winningIndex, 1);
+    assertEq(winningIndex, -1);
   }
 
-  function testAdminResolveEvent_RevertsOnDisagreement() public {
+  function testAdminResolveEvent_RevertsWhenEventAlreadyResolved() public {
     MockMarketOracle oracle = new MockMarketOracle();
     (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 4);
 
     vm.warp(block.timestamp + 2 days);
 
-    // market 0 pre-resolved YES via per-market
+    // A per-market YES atomically finalizes the event — adminResolveEvent is no
+    // longer needed and would conflict with the already-resolved state.
     oracle.setResult(marketIds[0], int256(Outcomes.YES), true);
     adapter.resolveEventMarket(eventId, 0);
 
-    // Admin claims outcome 2 wins → conflict with market 0 = YES
-    vm.expectRevert("winningIndex conflicts with resolved market");
+    vm.expectRevert("already resolved");
     adapter.adminResolveEvent(eventId, 2);
   }
 
@@ -1556,24 +1636,18 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
 
     vm.warp(block.timestamp + 2 days);
 
-    // Outcome 2 wins. Resolve markets 0 and 3 per-market, leave 1 and 2 to resolveEvent.
+    // Outcome 2 wins. Resolve markets 0, 1, 3 as NO via per-market path; the
+    // YES on market 2 then finalizes the event and force-resolves anything
+    // remaining (none here — all NOs already in) to NO.
     oracle.setResult(marketIds[0], int256(Outcomes.NO), true);
+    oracle.setResult(marketIds[1], int256(Outcomes.NO), true);
     oracle.setResult(marketIds[2], int256(Outcomes.YES), true);
     oracle.setResult(marketIds[3], int256(Outcomes.NO), true);
     adapter.resolveEventMarket(eventId, 0);
-    adapter.resolveEventMarket(eventId, 3);
-
-    // Now market 1 is still open. resolveEvent would revert "market !resolved".
-    // Use per-market for market 1 too, then ratify with permissionless resolveEvent.
-    oracle.setResult(marketIds[1], int256(Outcomes.NO), true);
     adapter.resolveEventMarket(eventId, 1);
-
-    // The remaining one (market 2) gets resolved via resolveEvent? No — resolveEvent
-    // doesn't write per-market outcomes anymore. We resolve market 2 per-market too,
-    // then call resolveEvent to ratify event-level state.
+    adapter.resolveEventMarket(eventId, 3);
     adapter.resolveEventMarket(eventId, 2);
 
-    adapter.resolveEvent(eventId);
     (,, int256 winningIndex,,) = adapter.getEvent(eventId);
     assertEq(winningIndex, 2);
 
@@ -1595,6 +1669,44 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     // Treasury should have received nothing extra: alice's deposit (amount) flowed through
     // the YES(2) winning side. The 3 NO redemptions netted exactly the 3*amount minted.
     assertEq(collateral.balanceOf(treasury), 0);
+  }
+
+  /// @notice Original audit scenario: two oracles independently return YES for
+  ///         mutually exclusive constituents (an upstream invariant violation).
+  ///         The forward-invariant fix ensures the first YES finalizes the event
+  ///         and forces the others to NO, so `redeemNOPositions` runs without any
+  ///         admin intervention.
+  function testRedeemNOPositions_WorksAfterDualYesScenario() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory marketIds) = _createEventWithOracle(address(oracle), 3);
+    uint256 amount = 100 ether;
+
+    // Alice creates NO positions in the adapter via split + convert.
+    collateral.mint(alice, amount);
+    vm.startPrank(alice);
+    collateral.approve(address(adapter), amount);
+    adapter.splitPosition(eventId, 0, amount);
+    conditionalTokens.setApprovalForAll(address(adapter), true);
+    adapter.convertPositions(eventId, 0, amount);
+    vm.stopPrank();
+
+    vm.warp(block.timestamp + 2 days);
+
+    // Two oracles report YES for the same event — the upstream fault scenario.
+    oracle.setResult(marketIds[0], int256(Outcomes.YES), true);
+    oracle.setResult(marketIds[1], int256(Outcomes.YES), true);
+
+    // First-mover wins: m0 YES, m1 and m2 forced NO atomically, event finalized.
+    adapter.resolveEventMarket(eventId, 0);
+
+    (, bool resolved, int256 winningIndex,,) = adapter.getEvent(eventId);
+    assertTrue(resolved);
+    assertEq(winningIndex, 0);
+
+    // The previously-wedging redeemNOPositions call now succeeds with no admin.
+    adapter.redeemNOPositions(eventId);
+    assertTrue(adapter.noPositionsRedeemed(eventId));
+    assertEq(adapter.mintedWcolPerEvent(eventId), 0);
   }
 
   // =========================================================================

@@ -56,6 +56,7 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
   event EventCreated(bytes32 indexed eventId, uint256 outcomeCount, uint256[] marketIds);
   event EventResolved(bytes32 indexed eventId, int256 winningIndex);
+  event EventMarketForcedNo(bytes32 indexed eventId, uint256 outcomeIndex, uint256 marketId);
   event EventVoided(bytes32 indexed eventId, uint256[] yesPayouts);
   event PositionsSplit(bytes32 indexed eventId, uint256 outcomeIndex, address indexed user, uint256 amount);
   event PositionsMerged(bytes32 indexed eventId, uint256 outcomeIndex, address indexed user, uint256 amount);
@@ -324,24 +325,28 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
   // ─── Resolution ──────────────────────────────────────────────────────
 
   /// @notice Permissionless per-market resolution for a neg-risk event. Routes
-  ///         through `manager.resolveMarket` and enforces the event-level
-  ///         "at most one YES per event" invariant.
+  ///         through `manager.resolveMarket`. When the resolved outcome is YES,
+  ///         atomically forces every other constituent market to NO and finalizes
+  ///         the event — encoding mutual exclusivity forward so a dual-YES race
+  ///         is structurally impossible.
   function resolveEventMarket(bytes32 eventId, uint256 outcomeIndex) external nonReentrant returns (int256) {
     Event storage evt = _events[eventId];
     require(evt.outcomeCount > 0, "event !exist");
+    require(!evt.resolved, "already resolved");
     require(outcomeIndex < evt.outcomeCount, "bad index");
 
     uint256 marketId = evt.marketIds[outcomeIndex];
     int256 outcome = manager.resolveMarket(marketId);
     if (outcome == int256(Outcomes.YES)) {
-      _requireNoOtherYes(evt, marketId);
+      _forceOthersNoAndFinalize(evt, eventId, outcomeIndex);
     }
     return outcome;
   }
 
   /// @notice Admin per-market override for a neg-risk event. Routes through
-  ///         `manager.adminResolveMarket` and enforces the event-level
-  ///         "at most one YES per event" invariant.
+  ///         `manager.adminResolveMarket`. When the supplied outcome is YES,
+  ///         atomically forces every other constituent market to NO and finalizes
+  ///         the event (same forward invariant as `resolveEventMarket`).
   function adminResolveEventMarket(
     bytes32 eventId,
     uint256 outcomeIndex,
@@ -351,24 +356,36 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
     Event storage evt = _events[eventId];
     require(evt.outcomeCount > 0, "event !exist");
+    require(!evt.resolved, "already resolved");
     require(outcomeIndex < evt.outcomeCount, "bad index");
 
     uint256 marketId = evt.marketIds[outcomeIndex];
+    int256 result = manager.adminResolveMarket(marketId, outcome);
     if (outcome == int256(Outcomes.YES)) {
-      _requireNoOtherYes(evt, marketId);
+      _forceOthersNoAndFinalize(evt, eventId, outcomeIndex);
     }
-    return manager.adminResolveMarket(marketId, outcome);
+    return result;
   }
 
-  function _requireNoOtherYes(Event storage evt, uint256 marketId) internal view {
+  /// @dev Force every constituent market other than `winnerIndex` to NO and
+  ///      finalize the event. Already-resolved markets are skipped (with a
+  ///      defense-in-depth check that they aren't YES — should be unreachable
+  ///      because the forward invariant prevents two YES from co-existing).
+  function _forceOthersNoAndFinalize(Event storage evt, bytes32 eventId, uint256 winnerIndex) internal {
     uint256 n = evt.marketIds.length;
     for (uint256 i = 0; i < n; i++) {
+      if (i == winnerIndex) continue;
       uint256 mid = evt.marketIds[i];
-      if (mid == marketId) continue;
-      if (manager.getMarketResolvedOutcome(mid) == int256(Outcomes.YES)) {
-        revert("event already has YES winner");
+      if (manager.getMarketState(mid) == IMyriadMarketManager.MarketState.resolved) {
+        require(manager.getMarketResolvedOutcome(mid) != int256(Outcomes.YES), "event already has YES winner");
+        continue;
       }
+      manager.adminResolveMarket(mid, int256(Outcomes.NO));
+      emit EventMarketForcedNo(eventId, i, mid);
     }
+    evt.resolved = true;
+    evt.winningIndex = int256(winnerIndex);
+    emit EventResolved(eventId, int256(winnerIndex));
   }
 
   /// @notice Permissionless event resolution. Derives `winningIndex` by scanning
