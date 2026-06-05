@@ -547,6 +547,20 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     emit EventVoided(eventId, yesPayouts);
   }
 
+  /// @notice After resolution, redeem the adapter's held outcome tokens, burn
+  ///         the wcol that was minted during convert/mintAll operations, and
+  ///         sweep any excess to treasury.
+  /// @dev    Admin-only (`DEFAULT_ADMIN_ROLE`). Single-shot — sets
+  ///         `noPositionsRedeemed[eventId]` permanently; there is no retry path.
+  ///         Requires the event resolved (or voided). For each constituent
+  ///         market the adapter redeems whatever outcome tokens it holds:
+  ///         NO tokens when outcome == NO, and BOTH YES and NO balances when
+  ///         outcome == VOIDED (per `ConditionalTokens.redeemVoided`). YES-won
+  ///         and "Other"-won markets contribute nothing. The function then
+  ///         burns exactly `mintedWcolPerEvent[eventId]` wcol and reverts with
+  ///         `"insolvent event payouts"` if the recovered wcol is below that
+  ///         amount — operators must resolve the underlying shortfall before
+  ///         retry is possible (which it is not, see single-shot above).
   function redeemNOPositions(bytes32 eventId) external nonReentrant {
     require(registry.hasRole(registry.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
     Event storage evt = _events[eventId];
