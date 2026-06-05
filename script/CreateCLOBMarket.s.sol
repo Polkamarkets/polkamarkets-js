@@ -6,8 +6,12 @@ import {PredictionMarketV3ManagerCLOB} from "../contracts/PredictionMarketV3Mana
 
 /// @notice Creates a CLOB market with an optional oracle (Realitio or CRE).
 ///
+///         Signing: use an encrypted keystore account, never a plaintext key —
+///           cast wallet import <name> --interactive   # one-time
+///           forge script ... --account <name> --sender <addr>
+///         The signer must have MARKET_ADMIN_ROLE.
+///
 ///         Env vars (required):
-///           PRIVATE_KEY    — signer (must have MARKET_ADMIN_ROLE)
 ///           CLOB_MANAGER   — manager address
 ///           CLOB_FEE_MODULE — fee module address
 ///           CLOSES_AT      — unix timestamp when the market closes
@@ -34,7 +38,6 @@ import {PredictionMarketV3ManagerCLOB} from "../contracts/PredictionMarketV3Mana
 ///                              9=8h, 10=12h, 11=1d, 12=3d, 13=1w, 14=1M (default: 0)
 contract CreateCLOBMarket is Script {
   function run() external {
-    uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address managerAddr = vm.envAddress("CLOB_MANAGER");
     address feeModule = vm.envAddress("CLOB_FEE_MODULE");
     uint256 closesAt = vm.envUint("CLOSES_AT");
@@ -70,7 +73,8 @@ contract CreateCLOBMarket is Script {
       );
     }
 
-    vm.startBroadcast(privateKey);
+    // Signer comes from the --account keystore; no private key in env.
+    vm.startBroadcast();
 
     uint256 marketId = PredictionMarketV3ManagerCLOB(managerAddr).createMarket(
       PredictionMarketV3ManagerCLOB.CreateMarketParams({

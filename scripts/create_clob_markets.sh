@@ -119,9 +119,11 @@ MODE_CHOICE="${MODE_CHOICE:-1}"
 # ═══════════════════════════════════════════════════════════════════════
 banner "Configuration"
 
-prompt_secret "PRIVATE_KEY" "Deployer private key (hex)"
-PRIVATE_KEY="${PRIVATE_KEY#0x}"
-PRIVATE_KEY="0x${PRIVATE_KEY}"
+# Signing uses an encrypted keystore account (one-time: `cast wallet import <name>
+# --interactive`). The private key is never read into the environment or a
+# plaintext file — only the account name and the public signer address.
+prompt_value "ACCOUNT" "Keystore account name (cast wallet import <name>)" "${ACCOUNT:-}"
+prompt_value "SENDER" "Signer address (0x...)" "${SENDER:-}"
 
 prompt_value "RPC_URL" "RPC URL" "${CLOB_RPC_URL:-${RPC_URL:-}}"
 prompt_value "CLOB_MANAGER" "CLOB_MANAGER address" "${CLOB_MANAGER:-}"
@@ -200,6 +202,7 @@ if [[ "${MODE_CHOICE}" == "2" ]]; then
   if ! run_forge "Create neg-risk event" \
     forge script script/CreateNegRiskEvent.s.sol:CreateNegRiskEvent \
       --rpc-url "${RPC_URL}" \
+      --account "${ACCOUNT}" --sender "${SENDER}" \
       --broadcast; then
     error "Neg-risk event creation failed."
     exit 1
@@ -228,6 +231,7 @@ if [[ "${MODE_CHOICE}" == "2" ]]; then
         if ! run_forge "Set fees for market #${i}" \
           forge script script/SetCLOBFees.s.sol:SetCLOBFees \
             --rpc-url "${RPC_URL}" \
+            --account "${ACCOUNT}" --sender "${SENDER}" \
             --broadcast; then
           warn "Fee setting failed for market #${i}, continuing..."
         else
@@ -394,6 +398,7 @@ for ((i=1; i<=MARKET_COUNT; i++)); do
   if ! run_forge "Create market #${i}" \
     forge script script/CreateCLOBMarket.s.sol:CreateCLOBMarket \
       --rpc-url "${RPC_URL}" \
+      --account "${ACCOUNT}" --sender "${SENDER}" \
       --broadcast; then
     warn "Market #${i} creation failed, skipping..."
     continue
@@ -418,6 +423,7 @@ for ((i=1; i<=MARKET_COUNT; i++)); do
     if ! run_forge "Set fees for market #${MARKET_ID}" \
       forge script script/SetCLOBFees.s.sol:SetCLOBFees \
         --rpc-url "${RPC_URL}" \
+        --account "${ACCOUNT}" --sender "${SENDER}" \
         --broadcast; then
       warn "Fee setting failed for market #${MARKET_ID}, continuing..."
     fi
