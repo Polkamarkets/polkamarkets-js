@@ -119,9 +119,11 @@ MODE_CHOICE="${MODE_CHOICE:-1}"
 # ═══════════════════════════════════════════════════════════════════════
 banner "Configuration"
 
-prompt_secret "PRIVATE_KEY" "Deployer private key (hex)"
-PRIVATE_KEY="${PRIVATE_KEY#0x}"
-PRIVATE_KEY="0x${PRIVATE_KEY}"
+# Signing uses an encrypted keystore account (one-time: `cast wallet import <name>
+# --interactive`). The private key is never read into the environment or a
+# plaintext file — only the account name and the public signer address.
+prompt_value "ACCOUNT" "Keystore account name (cast wallet import <name>)" "${ACCOUNT:-}"
+prompt_value "SENDER" "Signer address (0x...)" "${SENDER:-}"
 
 prompt_value "RPC_URL" "RPC URL" "${CLOB_RPC_URL:-${RPC_URL:-}}"
 prompt_value "CLOB_MANAGER" "CLOB_MANAGER address" "${CLOB_MANAGER:-}"
@@ -200,6 +202,7 @@ if [[ "${MODE_CHOICE}" == "2" ]]; then
   if ! run_forge "Create neg-risk event" \
     forge script script/CreateNegRiskEvent.s.sol:CreateNegRiskEvent \
       --rpc-url "${RPC_URL}" \
+      --account "${ACCOUNT}" --sender "${SENDER}" \
       --broadcast; then
     error "Neg-risk event creation failed."
     exit 1
@@ -228,6 +231,7 @@ if [[ "${MODE_CHOICE}" == "2" ]]; then
         if ! run_forge "Set fees for market #${i}" \
           forge script script/SetCLOBFees.s.sol:SetCLOBFees \
             --rpc-url "${RPC_URL}" \
+            --account "${ACCOUNT}" --sender "${SENDER}" \
             --broadcast; then
           warn "Fee setting failed for market #${i}, continuing..."
         else
@@ -261,7 +265,12 @@ echo ""
 echo -e "${YELLOW}Oracle type for all markets:${NC}"
 echo "  1) No oracle (admin-only resolution)"
 echo "  2) Realitio (human-answered questions)"
-read -r -p "  Choose [1-2]: " ORACLE_CHOICE
+if [[ -n "${CRE_ORACLE:-}" ]]; then
+  echo "  3) CRE (Chainlink deterministic crypto)"
+else
+  echo -e "  3) CRE ${RED}(unavailable — CRE_ORACLE not in deploy env)${NC}"
+fi
+read -r -p "  Choose [1-3]: " ORACLE_CHOICE
 ORACLE_CHOICE="${ORACLE_CHOICE:-1}"
 
 ORACLE_TYPE="none"
@@ -276,6 +285,33 @@ case "${ORACLE_CHOICE}" in
     read -r -p "  Realitio timeout in seconds [3600]: " REALITIO_TIMEOUT_INPUT
     export REALITIO_TIMEOUT="${REALITIO_TIMEOUT_INPUT:-3600}"
     export ARBITRATOR
+    ;;
+  3)
+    ORACLE_TYPE="cre"
+    if [[ -z "${CRE_ORACLE:-}" ]]; then
+      error "CRE_ORACLE address not available. Deploy the CRE oracle first."
+      exit 1
+    fi
+    ORACLE_ADDR="${CRE_ORACLE}"
+
+    echo -e "  ${YELLOW}CRE Rule types:${NC} 0=Threshold 1=Direction 2=Change% 3=Relative 4=Hit 5=Candle"
+    read -r -p "  Rule type [1]: " RULE_TYPE
+    export RULE_TYPE="${RULE_TYPE:-1}"
+
+    read -r -p "  YES when above? (true/false) [true]: " YES_ABOVE
+    export YES_ABOVE="${YES_ABOVE:-true}"
+
+    read -r -p "  Feed ID (e.g. BTCUSDT) [BTCUSDT]: " FEED_ID
+    export FEED_ID="${FEED_ID:-BTCUSDT}"
+
+    read -r -p "  Second feed (Relative only, empty otherwise): " FEED_ID_B
+    export FEED_ID_B="${FEED_ID_B:-}"
+
+    read -r -p "  Param (price 8-dec / bps / candle interval) [0]: " PARAM
+    export PARAM="${PARAM:-0}"
+
+    read -r -p "  Open timestamp (unix, 0 for threshold/hit) [0]: " OPEN_TIMESTAMP
+    export OPEN_TIMESTAMP="${OPEN_TIMESTAMP:-0}"
     ;;
   *)
     ORACLE_TYPE="none"
@@ -362,6 +398,7 @@ for ((i=1; i<=MARKET_COUNT; i++)); do
   if ! run_forge "Create market #${i}" \
     forge script script/CreateCLOBMarket.s.sol:CreateCLOBMarket \
       --rpc-url "${RPC_URL}" \
+      --account "${ACCOUNT}" --sender "${SENDER}" \
       --broadcast; then
     warn "Market #${i} creation failed, skipping..."
     continue
@@ -386,6 +423,7 @@ for ((i=1; i<=MARKET_COUNT; i++)); do
     if ! run_forge "Set fees for market #${MARKET_ID}" \
       forge script script/SetCLOBFees.s.sol:SetCLOBFees \
         --rpc-url "${RPC_URL}" \
+        --account "${ACCOUNT}" --sender "${SENDER}" \
         --broadcast; then
       warn "Fee setting failed for market #${MARKET_ID}, continuing..."
     fi

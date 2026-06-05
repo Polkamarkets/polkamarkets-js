@@ -7,9 +7,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title WrappedCollateral
 /// @notice ERC20 wrapper around the real collateral token (e.g. USDC).
-///         Anyone can wrap/unwrap. Only the NegRiskAdapter can mint/burn
-///         unbacked tokens (used during convertPositions to create the wcol
-///         needed for splitting in complementary markets).
+///         Only the NegRiskAdapter can wrap or mint; anyone holding wcol
+///         may unwrap it back to underlying.
 contract WrappedCollateral is ERC20 {
   using SafeERC20 for IERC20;
 
@@ -38,14 +37,15 @@ contract WrappedCollateral is ERC20 {
     return IERC20Metadata(address(underlying)).decimals();
   }
 
-  /// @notice Deposit underlying and receive an equal amount of wcol.
-  function wrap(uint256 amount) external {
+  /// @notice Deposit underlying and receive an equal amount of wcol. Adapter-only.
+  function wrap(uint256 amount) external onlyAdapter {
     require(amount > 0, "amount 0");
     underlying.safeTransferFrom(msg.sender, address(this), amount);
     _mint(msg.sender, amount);
   }
 
-  /// @notice Burn wcol and receive an equal amount of underlying.
+  /// @notice Burn wcol and receive an equal amount of underlying. Public so
+  ///         holders receiving wcol from CT.redeemPosition can always exit.
   function unwrap(uint256 amount) external {
     require(amount > 0, "amount 0");
     _burn(msg.sender, amount);

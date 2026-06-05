@@ -6,8 +6,12 @@ import {FeeModule} from "../contracts/FeeModule.sol";
 
 /// @notice Sets fees for a CLOB market.
 ///
+///         Signing: use an encrypted keystore account, never a plaintext key —
+///           cast wallet import <name> --interactive   # one-time
+///           forge script ... --account <name> --sender <addr>
+///         The signer must have FEE_ADMIN_ROLE.
+///
 ///         Env vars (required):
-///           PRIVATE_KEY      — signer (must have FEE_ADMIN_ROLE)
 ///           CLOB_FEE_MODULE  — FeeModule address
 ///           MARKET_ID        — market to configure
 ///           MAKER_FEE_BPS    — peak maker fee in basis points
@@ -20,7 +24,6 @@ contract SetCLOBFees is Script {
   uint256 private constant BUCKETS = 100;
 
   function run() external {
-    uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address feeModuleAddr = vm.envAddress("CLOB_FEE_MODULE");
     uint256 marketId = vm.envUint("MARKET_ID");
     uint64 makerFeeBps = uint64(vm.envUint("MAKER_FEE_BPS"));
@@ -42,7 +45,8 @@ contract SetCLOBFees is Script {
     console.log("Maker BPS (peak):", makerFeeBps);
     console.log("Taker BPS (peak):", takerFeeBps);
 
-    vm.startBroadcast(privateKey);
+    // Signer comes from the --account keystore; no private key in env.
+    vm.startBroadcast();
     FeeModule(feeModuleAddr).setMarketFees(marketId, tiers);
     vm.stopBroadcast();
 
