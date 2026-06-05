@@ -582,9 +582,10 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
     uint256 minted = mintedWcolPerEvent[eventId];
 
-    // Real insolvency is rejected at void time by the un-floored projection in
-    // voidEvent. The only shortfall that can reach this point is per-market
-    // floor dust from redeemVoided (at most 2 wei per market, 1 per side).
+    // Guard wcol vault solvency: real insolvency is rejected at void time by
+    // the un-floored projection in voidEvent, so any shortfall that reaches
+    // this point should only be per-market floor dust from redeemVoided (at
+    // most 2 wei per market, 1 per side).
     require(wcolRecovered + 2 * n >= minted, "insolvent beyond rounding");
 
     uint256 toBurn = wcolRecovered < minted ? wcolRecovered : minted;
