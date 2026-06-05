@@ -536,7 +536,8 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     require(totalProduct >= mintedWcolPerEvent[eventId] * 1e18, "void leaves event insolvent");
 
     evt.resolved = true;
-    evt.winningIndex = -2;
+    // winningIndex retains its createEvent sentinel (-2); voided events are
+    // distinguished from unresolved ones by evt.resolved, not winningIndex.
 
     for (uint256 i = 0; i < n; i++) {
       if (manager.getMarketState(evt.marketIds[i]) == IMyriadMarketManager.MarketState.resolved) continue;
