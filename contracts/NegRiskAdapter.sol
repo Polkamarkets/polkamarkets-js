@@ -65,6 +65,8 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
   event NOPositionsRedeemed(bytes32 indexed eventId, uint256 wcolRecovered, uint256 wcolBurned, uint256 excessToTreasury);
   event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
   event ExchangeUpdated(address indexed oldExchange, address indexed newExchange);
+  event EventClosesAtUpdated(bytes32 indexed eventId, uint256 newClosesAt);
+  event EventOracleUpdated(bytes32 indexed eventId, address newOracle);
 
   // ─── Constructor ─────────────────────────────────────────────────────
 
@@ -164,6 +166,59 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     }
 
     emit EventCreated(eventId, marketParams.length, evt.marketIds);
+  }
+
+  /// @notice Atomically rewrite `closesAt` for every still-unresolved constituent
+  ///         market of a neg-risk event, preserving the shared-close invariant
+  ///         that `createEvent` enforces. Per-leg `adminSetClosesAt` is gated to
+  ///         this path for neg-risk markets, so one leg cannot be rescheduled in
+  ///         isolation (which would break cross-market matching / convert / void).
+  function adminSetEventClosesAt(bytes32 eventId, uint256 newClosesAt) external nonReentrant {
+    require(registry.hasRole(registry.MARKET_ADMIN_ROLE(), msg.sender), "not market admin");
+    Event storage evt = _events[eventId];
+    require(evt.outcomeCount > 0, "event !exist");
+    require(!evt.resolved, "event resolved");
+
+    uint256 n = evt.outcomeCount;
+    for (uint256 i = 0; i < n; i++) {
+      uint256 marketId = evt.marketIds[i];
+      // A leg resolved on its own keeps its (now-moot) close time; adminSetClosesAt
+      // would revert on it. Only realign legs that can still trade/resolve.
+      if (manager.getMarketState(marketId) == IMyriadMarketManager.MarketState.resolved) continue;
+      manager.adminSetClosesAt(marketId, newClosesAt);
+    }
+
+    emit EventClosesAtUpdated(eventId, newClosesAt);
+  }
+
+  /// @notice Re-point the whole event's resolution oracle through the adapter,
+  ///         re-initializing every still-unresolved leg with its own payload.
+  ///         All legs share one oracle contract (per-leg `oracleData`), matching
+  ///         how `createEvent` wires them, so a leg's resolution source cannot be
+  ///         swapped independently of the event.
+  /// @param oracleData One initialization payload per outcome (length == outcomeCount).
+  function updateEventOracle(
+    bytes32 eventId,
+    address newOracle,
+    bytes[] calldata oracleData
+  ) external nonReentrant {
+    require(registry.hasRole(registry.MARKET_ADMIN_ROLE(), msg.sender), "not market admin");
+    Event storage evt = _events[eventId];
+    require(evt.outcomeCount > 0, "event !exist");
+    require(!evt.resolved, "event resolved");
+
+    uint256 n = evt.outcomeCount;
+    require(oracleData.length == n, "oracleData length");
+
+    for (uint256 i = 0; i < n; i++) {
+      uint256 marketId = evt.marketIds[i];
+      // A resolved leg's oracle is moot and updateMarketOracle would revert on it;
+      // only re-point legs that can still resolve. oracleData[i] maps to leg i.
+      if (manager.getMarketState(marketId) == IMyriadMarketManager.MarketState.resolved) continue;
+      manager.updateMarketOracle(marketId, newOracle, oracleData[i]);
+    }
+
+    emit EventOracleUpdated(eventId, newOracle);
   }
 
   // ─── Position operations ─────────────────────────────────────────────

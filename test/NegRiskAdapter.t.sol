@@ -2033,6 +2033,144 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
   }
 
   // =========================================================================
+  // Per-leg mutator carve-out (adminSetClosesAt / updateMarketOracle) + the
+  // coordinated adapter entrypoints (adminSetEventClosesAt / updateEventOracle)
+  // =========================================================================
+
+  function testCarveout_DirectSetClosesAtOnNegRiskLegReverts() public {
+    (, uint256[] memory mids) = _createThreeOutcomeEvent();
+    // admin holds MARKET_ADMIN_ROLE, so it clears the role gate and hits the carve-out.
+    vm.expectRevert("use adapter for neg risk");
+    manager.adminSetClosesAt(mids[0], block.timestamp + 3 days);
+  }
+
+  function testCarveout_DirectUpdateOracleOnNegRiskLegReverts() public {
+    (, uint256[] memory mids) = _createThreeOutcomeEvent();
+    MockMarketOracle newOracle = new MockMarketOracle();
+    vm.expectRevert("use adapter for neg risk");
+    manager.updateMarketOracle(mids[0], address(newOracle), "");
+  }
+
+  function testCarveout_NonAdminStillRoleGated() public {
+    (, uint256[] memory mids) = _createThreeOutcomeEvent();
+    vm.prank(alice);
+    vm.expectRevert("not market admin");
+    manager.adminSetClosesAt(mids[0], block.timestamp + 3 days);
+  }
+
+  function testAdminSetEventClosesAt_RewritesAllLegs() public {
+    (bytes32 eventId, uint256[] memory mids) = _createThreeOutcomeEvent();
+    uint256 newClose = block.timestamp + 10 days;
+
+    adapter.adminSetEventClosesAt(eventId, newClose);
+
+    for (uint256 i = 0; i < mids.length; i++) {
+      assertEq(manager.getMarketClosesAt(mids[i]), newClose, "leg close not realigned");
+    }
+  }
+
+  function testAdminSetEventClosesAt_OnlyMarketAdmin() public {
+    (bytes32 eventId,) = _createThreeOutcomeEvent();
+    vm.prank(alice);
+    vm.expectRevert("not market admin");
+    adapter.adminSetEventClosesAt(eventId, block.timestamp + 5 days);
+  }
+
+  function testAdminSetEventClosesAt_RevertsIfEventResolved() public {
+    (bytes32 eventId,) = _createThreeOutcomeEvent();
+    vm.warp(block.timestamp + 2 days);
+    adapter.adminResolveEvent(eventId, 0);
+
+    vm.expectRevert("event resolved");
+    adapter.adminSetEventClosesAt(eventId, block.timestamp + 5 days);
+  }
+
+  function testAdminSetEventClosesAt_RevertsForUnknownEvent() public {
+    vm.expectRevert("event !exist");
+    adapter.adminSetEventClosesAt(bytes32(uint256(0xdead)), block.timestamp + 5 days);
+  }
+
+  /// @notice A leg resolved on its own is skipped; siblings still realign without
+  ///         reverting on the resolved leg's `adminSetClosesAt`.
+  function testAdminSetEventClosesAt_SkipsResolvedLeg() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory mids) = _createEventWithOracle(address(oracle), 3);
+
+    vm.warp(block.timestamp + 2 days);
+    oracle.setResult(mids[0], int256(Outcomes.NO), true);
+    adapter.resolveEventMarket(eventId, 0); // leg 0 resolved; event NOT finalized
+
+    uint256 leg0Close = manager.getMarketClosesAt(mids[0]);
+    uint256 newClose = block.timestamp + 10 days;
+    adapter.adminSetEventClosesAt(eventId, newClose);
+
+    assertEq(manager.getMarketClosesAt(mids[0]), leg0Close, "resolved leg should be untouched");
+    assertEq(manager.getMarketClosesAt(mids[1]), newClose);
+    assertEq(manager.getMarketClosesAt(mids[2]), newClose);
+  }
+
+  function testUpdateEventOracle_RepointsAllLegs() public {
+    (bytes32 eventId, uint256[] memory mids) = _createThreeOutcomeEvent();
+    MockMarketOracle newOracle = new MockMarketOracle();
+
+    bytes[] memory data = new bytes[](3);
+    data[0] = "";
+    data[1] = "";
+    data[2] = "";
+    adapter.updateEventOracle(eventId, address(newOracle), data);
+
+    for (uint256 i = 0; i < mids.length; i++) {
+      assertEq(manager.getMarketOracle(mids[i]), address(newOracle), "leg oracle not repointed");
+    }
+  }
+
+  function testUpdateEventOracle_OnlyMarketAdmin() public {
+    (bytes32 eventId,) = _createThreeOutcomeEvent();
+    MockMarketOracle newOracle = new MockMarketOracle();
+    bytes[] memory data = new bytes[](3);
+    vm.prank(alice);
+    vm.expectRevert("not market admin");
+    adapter.updateEventOracle(eventId, address(newOracle), data);
+  }
+
+  function testUpdateEventOracle_RevertsOnDataLengthMismatch() public {
+    (bytes32 eventId,) = _createThreeOutcomeEvent();
+    MockMarketOracle newOracle = new MockMarketOracle();
+    bytes[] memory data = new bytes[](2); // event has 3 legs
+    vm.expectRevert("oracleData length");
+    adapter.updateEventOracle(eventId, address(newOracle), data);
+  }
+
+  function testUpdateEventOracle_RevertsIfEventResolved() public {
+    (bytes32 eventId,) = _createThreeOutcomeEvent();
+    vm.warp(block.timestamp + 2 days);
+    adapter.adminResolveEvent(eventId, 0);
+
+    MockMarketOracle newOracle = new MockMarketOracle();
+    bytes[] memory data = new bytes[](3);
+    vm.expectRevert("event resolved");
+    adapter.updateEventOracle(eventId, address(newOracle), data);
+  }
+
+  /// @notice Bulk re-point skips a resolved leg and re-points the rest.
+  function testUpdateEventOracle_SkipsResolvedLeg() public {
+    MockMarketOracle oracle = new MockMarketOracle();
+    (bytes32 eventId, uint256[] memory mids) = _createEventWithOracle(address(oracle), 3);
+
+    vm.warp(block.timestamp + 2 days);
+    oracle.setResult(mids[0], int256(Outcomes.NO), true);
+    adapter.resolveEventMarket(eventId, 0); // leg 0 resolved
+
+    MockMarketOracle newOracle = new MockMarketOracle();
+    bytes[] memory data = new bytes[](3);
+    adapter.updateEventOracle(eventId, address(newOracle), data);
+
+    assertEq(manager.getMarketOracle(mids[0]), address(oracle), "resolved leg oracle untouched");
+    assertEq(manager.getMarketOracle(mids[1]), address(newOracle));
+    assertEq(manager.getMarketOracle(mids[2]), address(newOracle));
+  }
+
+  // =========================================================================
   // Helpers
   // =========================================================================
 
