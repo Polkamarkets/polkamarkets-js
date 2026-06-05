@@ -29,6 +29,7 @@ interface IFeeModule {
 interface INegRiskAdapter {
   function mintAllYesTokens(bytes32 eventId, uint256 amount, address recipient) external;
   function getEventOutcomeCount(bytes32 eventId) external view returns (uint256);
+  function getUnresolvedOutcomeCount(bytes32 eventId) external view returns (uint256);
   function underlying() external view returns (IERC20);
   function wrapForExchange(uint256 amount) external;
 }
@@ -389,7 +390,10 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
     if (eventId == bytes32(0)) revert NotNegRisk();
 
     {
-      uint256 expectedCount = INegRiskAdapter(_adapter).getEventOutcomeCount(eventId);
+      // Match orders only against unresolved legs — early-resolved legs are
+      // treated as if they never existed. The per-order `_requireMarketOpen`
+      // below additionally rejects any order naming a resolved market.
+      uint256 expectedCount = INegRiskAdapter(_adapter).getUnresolvedOutcomeCount(eventId);
       if (orders.length != expectedCount) revert MustMatchAllOutcomes();
     }
 
