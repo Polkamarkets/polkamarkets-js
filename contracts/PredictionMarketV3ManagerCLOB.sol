@@ -248,6 +248,10 @@ contract PredictionMarketV3ManagerCLOB is Initializable, ReentrancyGuardTransien
     Market storage market = _requireMarketExists(marketId);
     require(market.state != MarketState.resolved, "resolved");
 
+    // Neg-risk legs must be re-pointed through the adapter so a leg's resolution
+    // source cannot be swapped in isolation from the rest of the event.
+    require(!market.negRisk || msg.sender == negRiskAdapter, "use adapter for neg risk");
+
     address oldOracle = market.oracle;
     market.oracle = newOracle;
 
@@ -264,6 +268,11 @@ contract PredictionMarketV3ManagerCLOB is Initializable, ReentrancyGuardTransien
 
     Market storage market = _requireMarketExists(marketId);
     require(market.state != MarketState.resolved, "resolved");
+
+    // Neg-risk legs must be rescheduled through the adapter (setEventClosesAt),
+    // which rewrites every constituent atomically and preserves the shared-close
+    // invariant. A single leg cannot be desynced in isolation.
+    require(!market.negRisk || msg.sender == negRiskAdapter, "use adapter for neg risk");
 
     uint256 oldClosesAt = market.closesAt;
     market.closesAt = newClosesAt;

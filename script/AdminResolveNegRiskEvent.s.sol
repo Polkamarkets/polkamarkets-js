@@ -9,21 +9,25 @@ import {NegRiskAdapter} from "../contracts/NegRiskAdapter.sol";
 ///         Already-resolved constituent markets are skipped, but their existing
 ///         outcome must agree with the supplied index — otherwise reverts.
 ///
+///         Signing: use an encrypted keystore account, never a plaintext key —
+///           cast wallet import <name> --interactive   # one-time
+///           forge script ... --account <name> --sender <addr>
+///         The signer must have RESOLUTION_ADMIN_ROLE.
+///
 ///         Env vars:
-///           PRIVATE_KEY          — signer (must have RESOLUTION_ADMIN_ROLE)
 ///           NEG_RISK_ADAPTER     — NegRiskAdapter address
 ///           EVENT_ID             — bytes32 hex event identifier
 ///           WINNING_INDEX        — int: -1 = "Other" wins (all NO), 0..N-1 = named outcome wins
 ///           REDEEM               — "true" to also call redeemNOPositions (default: true)
 contract AdminResolveNegRiskEvent is Script {
   function run() external {
-    uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address adapterAddr = vm.envAddress("NEG_RISK_ADAPTER");
     bytes32 eventId = vm.envBytes32("EVENT_ID");
     int256 winningIndex = vm.envInt("WINNING_INDEX");
     bool redeem = vm.envOr("REDEEM", true);
 
-    vm.startBroadcast(privateKey);
+    // Signer comes from the --account keystore; no private key in env.
+    vm.startBroadcast();
 
     NegRiskAdapter adapter = NegRiskAdapter(adapterAddr);
     adapter.adminResolveEvent(eventId, winningIndex);

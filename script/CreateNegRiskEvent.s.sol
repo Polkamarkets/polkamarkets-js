@@ -10,8 +10,12 @@ import {PredictionMarketV3ManagerCLOB} from "../contracts/PredictionMarketV3Mana
 ///         Each constituent market carries per-market oracle config encoded in
 ///         `oracleData` so it resolves independently — see `EVENT_RULE_TYPE` modes.
 ///
+///         Signing: use an encrypted keystore account, never a plaintext key —
+///           cast wallet import <name> --interactive   # one-time
+///           forge script ... --account <name> --sender <addr>
+///         The signer must have MARKET_ADMIN_ROLE.
+///
 ///         Common env vars (required):
-///           PRIVATE_KEY          — signer (must have MARKET_ADMIN_ROLE)
 ///           NEG_RISK_ADAPTER     — NegRiskAdapter address
 ///           CLOB_FEE_MODULE      — FeeModule address (used per-market)
 ///           CLOSES_AT            — unix timestamp when all outcome markets close
@@ -55,7 +59,6 @@ contract CreateNegRiskEvent is Script {
   uint8 internal constant EVENT_BEST_PERFORMER = 3;
 
   function run() external {
-    uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address adapterAddr = vm.envAddress("NEG_RISK_ADAPTER");
     address feeModule = vm.envAddress("CLOB_FEE_MODULE");
     uint256 closesAt = vm.envUint("CLOSES_AT");
@@ -83,7 +86,8 @@ contract CreateNegRiskEvent is Script {
       });
     }
 
-    vm.startBroadcast(privateKey);
+    // Signer comes from the --account keystore; no private key in env.
+    vm.startBroadcast();
     bytes32 eventId = NegRiskAdapter(adapterAddr).createEvent(eventQuestion, params);
     vm.stopBroadcast();
 
