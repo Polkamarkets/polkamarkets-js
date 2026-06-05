@@ -22,10 +22,18 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
   // ─── Types ───────────────────────────────────────────────────────────
 
+  /// @dev `winningIndex` is sentinel-encoded and -2 is OVERLOADED: it is the value
+  ///      both at creation (not yet finalized) AND after voidEvent (finalized).
+  ///      Disambiguate with `resolved` (and the EventVoided / EventResolved events),
+  ///      never `winningIndex` alone:
+  ///        resolved == false                      → open / not finalized (always -2)
+  ///        resolved == true  && winningIndex == -2 → voided  (see EventVoided)
+  ///        resolved == true  && winningIndex == -1 → "Other" wins, no named outcome
+  ///        resolved == true  && winningIndex 0..N-1 → that named outcome wins
   struct Event {
     uint256 outcomeCount;
     bool resolved;
-    int256 winningIndex;   // -1 = no winner ("Other"), 0..N-1 = specific outcome
+    int256 winningIndex;   // -2 unresolved OR voided, -1 "Other", 0..N-1 named winner (see @dev above)
     uint256[] marketIds;
     string question;       // parent event question (e.g. "Who will win the election?")
   }
@@ -686,6 +694,10 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
   // ─── View functions ──────────────────────────────────────────────────
 
+  /// @notice Returns an event's resolution state.
+  /// @dev Branch on `resolved` first, not `winningIndex` alone: a voided event
+  ///      returns winningIndex == -2 (identical to an unresolved one) but with
+  ///      resolved == true. See the Event struct @dev for the full encoding.
   function getEvent(bytes32 eventId) external view returns (
     uint256 outcomeCount,
     bool resolved,
