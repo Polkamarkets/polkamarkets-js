@@ -228,8 +228,16 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     emit PositionsMerged(eventId, outcomeIndex, msg.sender, amount);
   }
 
-  /// @notice Convert NO tokens for one outcome into YES tokens for all other outcomes.
-  ///         The adapter mints wcol to facilitate splitting in the complementary markets.
+  /// @notice Convert `amount` of NO(noOutcomeIndex) into `amount` of YES on every
+  ///         other outcome. The adapter mints `(n-1) * amount` unbacked wcol to
+  ///         split the complementary markets and keeps the caller's supplied
+  ///         NO(noOutcomeIndex) as backing for that mint.
+  /// @dev One-way swap (no inverse). Versus just holding NO(noOutcomeIndex), it pays
+  ///      the same on every resolution except all-NO "Other" (winningIndex == -1):
+  ///      there the held NO would have won, but the converted YES bundle is worthless
+  ///      and the retained NO is swept to the treasury as `excess` in
+  ///      redeemNOPositions — the caller forfeits `amount`. Named-winner resolutions
+  ///      are break-even. Price this before converting.
   /// @param eventId The event identifier.
   /// @param noOutcomeIndex The outcome whose NO token the caller is giving up.
   /// @param amount Number of NO tokens to convert.
@@ -283,7 +291,9 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
       uint256 yesTokenId = conditionalTokens.getTokenId(marketId, Outcomes.YES);
       conditionalTokens.safeTransferFrom(address(this), msg.sender, yesTokenId, amount, "");
 
-      // Adapter retains the NO token (backing for the minted wcol)
+      // Adapter retains the NO token (backing for the minted wcol). On an all-NO
+      // "Other" resolution this retained NO is swept to the treasury, not returned
+      // to the caller — see the @dev note on forfeiture above.
     }
 
     emit PositionsConverted(eventId, noOutcomeIndex, msg.sender, amount);
