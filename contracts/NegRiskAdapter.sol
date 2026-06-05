@@ -509,6 +509,7 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     require(yesPayouts.length == n, "length mismatch");
 
     uint256 totalYesPayout;
+    uint256 totalProduct;
     for (uint256 i = 0; i < n; i++) {
       require(yesPayouts[i] <= 1e18, "yes payout > 1e18");
       if (manager.getMarketState(evt.marketIds[i]) == IMyriadMarketManager.MarketState.resolved) {
@@ -518,11 +519,21 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
         require(yesPayouts[i] == 0, "resolved leg payout != 0");
       }
       totalYesPayout += yesPayouts[i];
+
+      // Project the exact (un-floored) post-void recovery against the adapter's
+      // current YES + NO inventory. Summing products before the single 1e18
+      // division eliminates the per-market floor that redeemVoided applies,
+      // so this rejects only genuine insolvency — never rounding dust.
+      uint256 mid = evt.marketIds[i];
+      uint256 noBal  = conditionalTokens.balanceOf(address(this), conditionalTokens.getTokenId(mid, Outcomes.NO));
+      uint256 yesBal = conditionalTokens.balanceOf(address(this), conditionalTokens.getTokenId(mid, Outcomes.YES));
+      totalProduct += noBal * (1e18 - yesPayouts[i]) + yesBal * yesPayouts[i];
     }
 
     // Event-level solvency invariant:
     // a full YES basket across named outcomes can never redeem more than 1 unit.
     require(totalYesPayout <= 1e18, "event payouts overallocated");
+    require(totalProduct >= mintedWcolPerEvent[eventId] * 1e18, "void leaves event insolvent");
 
     evt.resolved = true;
     evt.winningIndex = -2;
@@ -548,14 +559,19 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
       uint256 marketId = evt.marketIds[i];
       int256 outcome = manager.getMarketResolvedOutcome(marketId);
 
-      uint256 noTokenId = conditionalTokens.getTokenId(marketId, Outcomes.NO);
-      uint256 balance = conditionalTokens.balanceOf(address(this), noTokenId);
-
-      if (balance == 0) continue;
+      uint256 noBal = conditionalTokens.balanceOf(address(this), conditionalTokens.getTokenId(marketId, Outcomes.NO));
 
       if (outcome == Outcomes.VOIDED) {
+        // Skip when both sides floor to zero. redeemVoided would revert with
+        // "zero payout" in that case, which (because this function is one-shot)
+        // would permanently brick the redemption.
+        uint256 yesBal = conditionalTokens.balanceOf(address(this), conditionalTokens.getTokenId(marketId, Outcomes.YES));
+        if (yesBal == 0 && noBal == 0) continue;
+        (uint256 yesPay, uint256 noPay) = manager.getVoidedPayouts(marketId);
+        if ((yesBal * yesPay) / 1e18 + (noBal * noPay) / 1e18 == 0) continue;
         conditionalTokens.redeemVoided(marketId);
       } else if (outcome == int256(Outcomes.NO)) {
+        if (noBal == 0) continue;
         conditionalTokens.redeemPosition(marketId);
       }
     }
@@ -565,23 +581,26 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
     uint256 minted = mintedWcolPerEvent[eventId];
 
-    // Never silently socialize bad debt.
-    require(wcolRecovered >= minted, "insolvent event payouts");
+    // Real insolvency is rejected at void time by the un-floored projection in
+    // voidEvent. The only shortfall that can reach this point is per-market
+    // floor dust from redeemVoided (at most 2 wei per market, 1 per side).
+    require(wcolRecovered + 2 * n >= minted, "insolvent beyond rounding");
 
-    if (minted > 0) {
-      wcol.adapterBurn(address(this), minted);
+    uint256 toBurn = wcolRecovered < minted ? wcolRecovered : minted;
+    if (toBurn > 0) {
+      wcol.adapterBurn(address(this), toBurn);
     }
 
     mintedWcolPerEvent[eventId] = 0;
     noPositionsRedeemed[eventId] = true;
 
-    uint256 excess = wcolRecovered - minted;
+    uint256 excess = wcolRecovered > toBurn ? wcolRecovered - toBurn : 0;
     if (excess > 0) {
       wcol.unwrap(excess);
       underlying.safeTransfer(treasury, excess);
     }
 
-    emit NOPositionsRedeemed(eventId, wcolRecovered, minted, excess);
+    emit NOPositionsRedeemed(eventId, wcolRecovered, toBurn, excess);
   }
 
   // ─── View functions ──────────────────────────────────────────────────

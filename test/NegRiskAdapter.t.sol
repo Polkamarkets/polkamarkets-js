@@ -1250,6 +1250,112 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     assertTrue(adapter.noPositionsRedeemed(eventId));
   }
 
+  /// @notice Regression for Cyfrin M-? (redeemNOPositions bricks on rounding):
+  ///         a void with fractional payouts whose products don't divide 1e18
+  ///         evenly used to leave wcolRecovered below `minted` by O(n) wei,
+  ///         permanently bricking the one-shot redemption. The dust-bounded
+  ///         reconciliation must absorb the floor loss and complete cleanly.
+  function testVoidEventRedeemHandlesFloorDust() public {
+    (bytes32 eventId, ) = _createThreeOutcomeEvent();
+    uint256 amount = 1_000_000; // USDC-scale, exposes 1e18 rounding
+
+    // Adapter ends up holding 1_000_000 NO across all three markets, minted = 2_000_000.
+    collateral.mint(alice, amount);
+    vm.startPrank(alice);
+    collateral.approve(address(adapter), amount);
+    adapter.splitPosition(eventId, 0, amount);
+    conditionalTokens.setApprovalForAll(address(adapter), true);
+    adapter.convertPositions(eventId, 0, amount);
+    vm.stopPrank();
+
+    uint256 minted = adapter.mintedWcolPerEvent(eventId);
+    assertEq(minted, 2_000_000);
+
+    // Equal thirds summing to exactly 1e18 — every per-market product floors away dust.
+    uint256[] memory yesPayouts = new uint256[](3);
+    yesPayouts[0] = 333333333333333333;
+    yesPayouts[1] = 333333333333333333;
+    yesPayouts[2] = 333333333333333334;
+
+    vm.warp(block.timestamp + 2 days);
+    adapter.voidEvent(eventId, yesPayouts);
+
+    // Pre-fix this reverted with "insolvent event payouts" — recovered is 1_999_998.
+    adapter.redeemNOPositions(eventId);
+    assertEq(adapter.mintedWcolPerEvent(eventId), 0);
+    assertTrue(adapter.noPositionsRedeemed(eventId));
+  }
+
+  /// @notice Regression for audit finding #2: a void config that gives one market the
+  ///         full 1e18 YES payout (and zero NO payout) used to brick redeemNOPositions
+  ///         via ConditionalTokens.redeemVoided's "zero payout" guard. The skip in
+  ///         redeemNOPositions must now handle this without reverting.
+  function testVoidEventFullYesToOneMarketStillRedeems() public {
+    (bytes32 eventId,) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    collateral.mint(alice, amount);
+    vm.startPrank(alice);
+    collateral.approve(address(adapter), amount);
+    adapter.splitPosition(eventId, 0, amount);
+    conditionalTokens.setApprovalForAll(address(adapter), true);
+    adapter.convertPositions(eventId, 0, amount);
+    vm.stopPrank();
+
+    uint256 mintedBefore = adapter.mintedWcolPerEvent(eventId);
+    assertEq(mintedBefore, 200 ether);
+
+    // Full payout to outcome 0 — the natural "outcome 0 won, refund fully" config.
+    // Market 0 has NO payout 0; redeemVoided would revert on it without the skip.
+    uint256[] memory yesPayouts = new uint256[](3);
+    yesPayouts[0] = ONE;
+    yesPayouts[1] = 0;
+    yesPayouts[2] = 0;
+
+    vm.warp(block.timestamp + 2 days);
+    adapter.voidEvent(eventId, yesPayouts);
+
+    uint256 treasuryWcolBefore = wcol.balanceOf(treasury);
+    uint256 treasuryCollateralBefore = collateral.balanceOf(treasury);
+
+    adapter.redeemNOPositions(eventId);
+
+    // Markets 1 & 2 cover the minted wcol exactly; no excess to treasury.
+    assertEq(adapter.mintedWcolPerEvent(eventId), 0);
+    assertTrue(adapter.noPositionsRedeemed(eventId));
+    assertEq(wcol.balanceOf(treasury), treasuryWcolBefore);
+    assertEq(collateral.balanceOf(treasury), treasuryCollateralBefore);
+  }
+
+  /// @notice Regression for audit finding #2: skip must be indexed per-market, not
+  ///         only for index 0. A zero NO payout at a middle market should be skipped
+  ///         and the surrounding markets should still redeem.
+  function testVoidEventZeroYesPayoutAtMiddleMarket() public {
+    (bytes32 eventId,) = _createThreeOutcomeEvent();
+    uint256 amount = 100 ether;
+
+    collateral.mint(alice, amount);
+    vm.startPrank(alice);
+    collateral.approve(address(adapter), amount);
+    adapter.splitPosition(eventId, 0, amount);
+    conditionalTokens.setApprovalForAll(address(adapter), true);
+    adapter.convertPositions(eventId, 0, amount);
+    vm.stopPrank();
+
+    // Full payout to outcome 1 — market 1 has NO payout 0 and must be skipped.
+    uint256[] memory yesPayouts = new uint256[](3);
+    yesPayouts[0] = 0;
+    yesPayouts[1] = ONE;
+    yesPayouts[2] = 0;
+
+    vm.warp(block.timestamp + 2 days);
+    adapter.voidEvent(eventId, yesPayouts);
+
+    adapter.redeemNOPositions(eventId);
+    assertEq(adapter.mintedWcolPerEvent(eventId), 0);
+    assertTrue(adapter.noPositionsRedeemed(eventId));
+  }
+
   function testVoidEventLengthMismatchReverts() public {
     (bytes32 eventId,) = _createThreeOutcomeEvent();
 
