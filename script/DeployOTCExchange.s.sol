@@ -21,10 +21,10 @@ import {OTCQuerier} from "../contracts/OTCQuerier.sol";
  *                      e.g. 0x6413734f92248D4B29ae35883290BD93212654Dc
  *   MARKET_MANAGER     Myriad market manager address (resolution source, CLOB);
  *                      must equal CONDITIONAL_TOKEN.manager() — asserted on-chain
- *   USD1               primary collateral token address
+ *   COLLATERAL         collateral token allowed as payment (more can be added
+ *                      later via setCollateralAllowed)
  *
  * Optional env vars:
- *   USDT               second collateral token (skipped if unset / zero)
  *   FINAL_ADMIN        multisig/owner to hold roles after setup (defaults to deployer)
  *
  * Example:
@@ -40,8 +40,7 @@ contract DeployOTCExchange is Script {
         uint256 feeBps = vm.envUint("FEE_BPS");
         address conditionalToken = vm.envAddress("CONDITIONAL_TOKEN");
         address marketManager = vm.envAddress("MARKET_MANAGER");
-        address usd1 = vm.envAddress("USD1");
-        address usdt = vm.envOr("USDT", address(0));
+        address collateral = vm.envAddress("COLLATERAL");
         address finalAdmin = vm.envOr("FINAL_ADMIN", deployer);
 
         vm.startBroadcast(pk);
@@ -50,10 +49,7 @@ contract DeployOTCExchange is Script {
         OTCExchange otc = new OTCExchange(deployer, feeRecipient, feeBps);
 
         otc.allowConditionalToken(conditionalToken, marketManager);
-        otc.setCollateralAllowed(usd1, true);
-        if (usdt != address(0)) {
-            otc.setCollateralAllowed(usdt, true);
-        }
+        otc.setCollateralAllowed(collateral, true);
 
         // Read-only lens for order discovery (no roles, no funds).
         OTCQuerier querier = new OTCQuerier(otc);
