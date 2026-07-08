@@ -95,17 +95,18 @@ contract OTCQuerier {
     // ------------------------------ Reads --------------------------------- //
 
     /// @notice Contiguous page of orders by id window (all sides, all statuses,
-    ///         public and directed alike — the raw feed).
+    ///         public and directed alike — the raw feed). limit == 0 or
+    ///         > MAX_LIMIT is treated as MAX_LIMIT, same as the filtered reads.
     function getOrders(uint256 cursor, uint256 limit)
         external
         view
         returns (OrderView[] memory page, uint256 nextCursor)
     {
         uint256 total = totalOrders();
-        if (cursor >= total || limit == 0) {
+        if (cursor >= total) {
             return (new OrderView[](0), total);
         }
-        if (limit > MAX_LIMIT) limit = MAX_LIMIT;
+        if (limit == 0 || limit > MAX_LIMIT) limit = MAX_LIMIT;
 
         uint256 end = cursor + limit;
         if (end > total) end = total;
@@ -118,10 +119,10 @@ contract OTCQuerier {
         nextCursor = end;
     }
 
-    /// @notice Open orders, optionally restricted to one side, filtered by fill
-    ///         eligibility. fillableBy == address(0): public orders only (the
-    ///         marketplace default — directed orders are excluded). fillableBy set:
-    ///         public orders PLUS orders directed at that address.
+    /// @notice Open, unexpired orders, optionally restricted to one side, filtered
+    ///         by fill eligibility. fillableBy == address(0): public orders only
+    ///         (the marketplace default — directed orders are excluded). fillableBy
+    ///         set: public orders PLUS orders directed at that address.
     function getOpenOrders(SideFilter side, address fillableBy, uint256 cursor, uint256 limit)
         external
         view
@@ -152,9 +153,10 @@ contract OTCQuerier {
         return _scan(cursor, limit, f);
     }
 
-    /// @notice Open orders for a given (conditionalToken, marketId), optionally one
-    ///         side, same fillableBy semantics as getOpenOrders. Returning both
-    ///         sides is what powers a per-market two-sided view (bids vs asks).
+    /// @notice Open, unexpired orders for a given (conditionalToken, marketId),
+    ///         optionally one side, same fillableBy semantics as getOpenOrders.
+    ///         Returning both sides is what powers a per-market two-sided view
+    ///         (bids vs asks).
     function getOrdersByMarket(
         address conditionalToken,
         uint256 marketId,
@@ -218,7 +220,7 @@ contract OTCQuerier {
         nextCursor = id >= total ? total : id;
     }
 
-    function _matches(OTCExchange.Order memory o, Filter memory f) internal pure returns (bool) {
+    function _matches(OTCExchange.Order memory o, Filter memory f) internal view returns (bool) {
         if (f.kind == FilterKind.ByMaker) {
             return o.maker == f.account;
         }
@@ -227,8 +229,12 @@ contract OTCQuerier {
             return f.account != address(0) && o.allowedTaker == f.account;
         }
 
-        // Open and ByMarket both require an open, side-matching, fill-eligible order.
+        // Open and ByMarket both require an open, unexpired, side-matching,
+        // fill-eligible order — everything fillOrder itself would check, so a
+        // listed order is never a guaranteed revert. (ByMaker/ByTaker keep
+        // expired orders visible: makers need them to cancel.)
         if (o.status != OTCExchange.OrderStatus.Open) return false;
+        if (o.expiry != 0 && block.timestamp > o.expiry) return false;
         if (!_sideMatches(o.side, f.side)) return false;
         if (!_fillableBy(o.allowedTaker, f.fillableBy)) return false;
 

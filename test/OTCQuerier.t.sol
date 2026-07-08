@@ -92,6 +92,18 @@ contract OTCQuerierTest is Test {
         vm.stopPrank();
     }
 
+    // Creates a Sell order on `market` with an expiry, optionally directed.
+    function _sellExpiring(uint256 market, uint64 expiry, address directedTo) internal returns (uint256 id) {
+        ct.mint(maker, market, OUTCOME, TOKEN_AMOUNT);
+        vm.startPrank(maker);
+        ct.setApprovalForAll(address(otc), true);
+        id = otc.createOrder(
+            OTCExchange.Side.Sell, address(ct), market, OUTCOME, TOKEN_AMOUNT,
+            address(collateral), COLLATERAL_AMOUNT, expiry, directedTo
+        );
+        vm.stopPrank();
+    }
+
     // Creates a Buy order on `market`, open to anyone.
     function _buy(uint256 market) internal returns (uint256 id) {
         collateral.mint(maker, COLLATERAL_AMOUNT);
@@ -153,6 +165,15 @@ contract OTCQuerierTest is Test {
         assertEq(c4, 5);
     }
 
+    function test_GetOrders_LimitZeroDefaultsToMax() public {
+        for (uint256 i = 0; i < 3; i++) _sell(MARKET, address(0));
+
+        // limit == 0 means MAX_LIMIT on the raw feed, same as the filtered reads.
+        (OrderView[] memory page, uint256 nextCursor) = lens.getOrders(0, 0);
+        assertEq(page.length, 3, "limit 0 pages at MAX_LIMIT");
+        assertEq(nextCursor, 3, "sentinel");
+    }
+
     function test_GetOpenOrders_HidesDirectedFromPublic() public {
         _sell(MARKET, address(0));   // public
         _sell(MARKET, taker);        // directed at taker
@@ -194,6 +215,44 @@ contract OTCQuerierTest is Test {
 
         (OrderView[] memory page,) = lens.getOpenOrders(SideFilter.Any, address(0), 0, 100);
         assertEq(page.length, 0, "cancelled excluded");
+    }
+
+    function test_OpenOrderListings_ExcludeExpired() public {
+        uint64 expiry = uint64(block.timestamp + 1 days);
+        uint256 expiring = _sellExpiring(MARKET, expiry, address(0));
+        uint256 perpetual = _sell(MARKET, address(0));
+
+        // Before expiry both are listed.
+        (OrderView[] memory before,) = lens.getOpenOrders(SideFilter.Any, address(0), 0, 100);
+        assertEq(before.length, 2, "both listed before expiry");
+
+        vm.warp(expiry + 1);
+
+        // Expired order drops out of the marketplace and per-market listings
+        // (fillOrder on it would revert), the perpetual one remains.
+        (OrderView[] memory open,) = lens.getOpenOrders(SideFilter.Any, address(0), 0, 100);
+        assertEq(open.length, 1, "expired excluded from open orders");
+        assertEq(open[0].orderId, perpetual);
+
+        (OrderView[] memory byMarket,) = lens.getOrdersByMarket(address(ct), MARKET, SideFilter.Any, address(0), 0, 100);
+        assertEq(byMarket.length, 1, "expired excluded per-market");
+        assertEq(byMarket[0].orderId, perpetual);
+
+        // The maker still sees it (needed to cancel and reclaim escrow).
+        (OrderView[] memory mine,) = lens.getOrdersByMaker(maker, 0, 100);
+        assertEq(mine.length, 2, "maker still sees expired order");
+        assertEq(mine[0].orderId, expiring);
+    }
+
+    function test_GetOrdersByTaker_IncludesExpired() public {
+        uint64 expiry = uint64(block.timestamp + 1 days);
+        uint256 directed = _sellExpiring(MARKET, expiry, taker);
+        vm.warp(expiry + 1);
+
+        // "Offers to me" keeps expired offers visible (shown as expired, not hidden).
+        (OrderView[] memory offers,) = lens.getOrdersByTaker(taker, 0, 100);
+        assertEq(offers.length, 1, "expired directed order still visible to taker");
+        assertEq(offers[0].orderId, directed);
     }
 
     function test_GetOrdersByMaker_AnyStatusIncludingDirected() public {
