@@ -8,6 +8,7 @@ import {AdminRegistry} from "../contracts/AdminRegistry.sol";
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 // --------------------------------- Mocks ----------------------------------- //
 
@@ -69,10 +70,15 @@ contract OTCQuerierTest is Test {
         manager = new QMarketManager();
         ct = new QConditionalTokens(address(manager));
         collateral = new QCollateral(COLLATERAL_DECIMALS);
-        otc = new OTCExchange(
-            new AdminRegistry(admin), feeRecipient, 0,
-            address(ct), address(manager), address(collateral), 0
+        OTCExchange impl = new OTCExchange();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeCall(
+                OTCExchange.initialize,
+                (new AdminRegistry(admin), feeRecipient, 0, address(ct), address(manager), address(collateral), 0)
+            )
         );
+        otc = OTCExchange(address(proxy));
         lens = new OTCQuerier(otc);
 
         manager.setTradeable(MARKET, true);

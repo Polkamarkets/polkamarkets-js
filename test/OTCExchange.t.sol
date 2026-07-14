@@ -7,6 +7,12 @@ import {AdminRegistry} from "../contracts/AdminRegistry.sol";
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+
+/// @dev Trivial upgrade target: adds a view to prove the proxy state survives an upgrade.
+contract OTCExchangeV2 is OTCExchange {
+    function version() external pure returns (uint256) { return 2; }
+}
 
 // --------------------------------- Mocks ----------------------------------- //
 
@@ -80,12 +86,22 @@ contract OTCExchangeTest is Test {
         vm.prank(admin);
         registry.grantRole(feeAdminRole, feeAdmin);
 
-        otc = new OTCExchange(
-            registry, feeRecipient, START_FEE_BPS,
-            address(ct), address(manager), address(collateral), 0
-        );
+        otc = _deployProxy(address(manager), 0);
 
         manager.setTradeable(MARKET, true);
+    }
+
+    /// @dev Deploy the impl + an ERC-1967 proxy that runs initialize(), as production does.
+    function _deployProxy(address manager_, uint256 minOrder) internal returns (OTCExchange) {
+        OTCExchange impl = new OTCExchange();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeCall(
+                OTCExchange.initialize,
+                (registry, feeRecipient, START_FEE_BPS, address(ct), manager_, address(collateral), minOrder)
+            )
+        );
+        return OTCExchange(address(proxy));
     }
 
     function _tokenId() internal view returns (uint256) {
@@ -119,9 +135,9 @@ contract OTCExchangeTest is Test {
         vm.stopPrank();
     }
 
-    // ---- Constructor wiring ----
+    // ---- Initialize / proxy wiring ----
 
-    function test_ConstructorSeedsConfig() public view {
+    function test_InitializeSeedsConfig() public view {
         assertEq(address(otc.registry()), address(registry), "registry");
         assertTrue(otc.allowedConditionalToken(address(ct)), "ct allowed");
         assertEq(otc.marketManagerOf(address(ct)), address(manager), "manager bound");
@@ -131,13 +147,66 @@ contract OTCExchangeTest is Test {
         assertEq(otc.minOrderAmount(), 0, "min order");
     }
 
-    function test_ConstructorRevertsOnManagerMismatch() public {
+    function test_InitializeRevertsOnManagerMismatch() public {
+        // The manager assertion runs inside initialize, so it bubbles out of the
+        // proxy constructor when the deploy passes a mismatched manager. Deploy the
+        // impl first so expectRevert latches onto only the proxy construction.
         MockMarketManager other = new MockMarketManager();
-        vm.expectRevert(OTCExchange.ManagerMismatch.selector);
-        new OTCExchange(
-            registry, feeRecipient, START_FEE_BPS,
-            address(ct), address(other), address(collateral), 0
+        OTCExchange impl = new OTCExchange();
+        bytes memory initData = abi.encodeCall(
+            OTCExchange.initialize,
+            (registry, feeRecipient, START_FEE_BPS, address(ct), address(other), address(collateral), 0)
         );
+        vm.expectRevert(OTCExchange.ManagerMismatch.selector);
+        new ERC1967Proxy(address(impl), initData);
+    }
+
+    function test_Initialize_CannotBeCalledTwice() public {
+        vm.expectRevert(); // InvalidInitialization
+        otc.initialize(
+            registry, feeRecipient, START_FEE_BPS,
+            address(ct), address(manager), address(collateral), 0
+        );
+    }
+
+    function test_Impl_InitializersDisabled() public {
+        OTCExchange impl = new OTCExchange();
+        vm.expectRevert(); // InvalidInitialization — _disableInitializers in constructor
+        impl.initialize(
+            registry, feeRecipient, START_FEE_BPS,
+            address(ct), address(manager), address(collateral), 0
+        );
+    }
+
+    // ---- UUPS upgrade ----
+
+    function test_Upgrade_PreservesState() public {
+        uint256 id = _createSell(); // open order + escrow live before the upgrade
+
+        OTCExchangeV2 newImpl = new OTCExchangeV2();
+        vm.prank(admin);
+        otc.upgradeToAndCall(address(newImpl), "");
+
+        // State persists through the proxy: order, escrow, and config unchanged.
+        assertEq(OTCExchangeV2(address(otc)).version(), 2, "upgraded");
+        assertEq(otc.getOrder(id).maker, seller, "order survived");
+        assertEq(ct.balanceOf(address(otc), _tokenId()), TOKEN_AMOUNT, "escrow survived");
+        assertEq(address(otc.registry()), address(registry), "registry survived");
+
+        // ...and the surviving order is still fillable post-upgrade.
+        collateral.mint(buyer, COLLATERAL_AMOUNT);
+        vm.startPrank(buyer);
+        collateral.approve(address(otc), type(uint256).max);
+        otc.fillOrder(id);
+        vm.stopPrank();
+        assertEq(ct.balanceOf(buyer, _tokenId()), TOKEN_AMOUNT, "filled after upgrade");
+    }
+
+    function test_Upgrade_OnlyAdmin() public {
+        OTCExchangeV2 newImpl = new OTCExchangeV2();
+        vm.prank(seller);
+        vm.expectRevert(OTCExchange.NotAdmin.selector);
+        otc.upgradeToAndCall(address(newImpl), "");
     }
 
     // ---- Sell (Ask): maker escrows tokens, taker pays collateral ----

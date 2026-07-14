@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {Script, console2} from "forge-std/Script.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {OTCExchange} from "../contracts/OTCExchange.sol";
 import {OTCQuerier} from "../contracts/OTCQuerier.sol";
 import {AdminRegistry} from "../contracts/AdminRegistry.sol";
@@ -48,22 +49,33 @@ contract DeployOTCExchange is Script {
 
         vm.startBroadcast(pk);
 
-        OTCExchange otc = new OTCExchange(
-            AdminRegistry(registry),
-            feeRecipient,
-            feeBps,
-            conditionalToken,
-            marketManager,
-            collateral,
-            minOrderAmount
+        // UUPS: deploy the implementation, then an ERC-1967 proxy that runs
+        // initialize() in its constructor. All interaction goes through the proxy.
+        OTCExchange impl = new OTCExchange();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeCall(
+                OTCExchange.initialize,
+                (
+                    AdminRegistry(registry),
+                    feeRecipient,
+                    feeBps,
+                    conditionalToken,
+                    marketManager,
+                    collateral,
+                    minOrderAmount
+                )
+            )
         );
+        OTCExchange otc = OTCExchange(address(proxy));
 
-        // Read-only lens for order discovery (no roles, no funds).
+        // Read-only lens for order discovery (no roles, no funds). Points at the proxy.
         OTCQuerier querier = new OTCQuerier(otc);
 
         vm.stopBroadcast();
 
-        console2.log("OTCExchange deployed at:", address(otc));
+        console2.log("OTCExchange proxy deployed at:", address(otc));
+        console2.log("OTCExchange implementation at:", address(impl));
         console2.log("OTCQuerier deployed at:", address(querier));
         console2.log("AdminRegistry:", registry);
         console2.log("Fee recipient:", feeRecipient);

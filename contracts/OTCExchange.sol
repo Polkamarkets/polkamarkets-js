@@ -5,8 +5,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
-import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {ReentrancyGuardTransientUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import {AdminRegistry} from "./AdminRegistry.sol";
 
@@ -61,7 +63,7 @@ interface IMarketManager {
  *
  *         THIS CODE IS UNAUDITED. Have it independently audited before mainnet use.
  */
-contract OTCExchange is ReentrancyGuardTransient, Pausable, ERC1155Holder {
+contract OTCExchange is Initializable, ReentrancyGuardTransientUpgradeable, PausableUpgradeable, ERC1155Holder, UUPSUpgradeable {
     using SafeERC20 for IERC20;
 
     uint256 public constant BPS_DENOMINATOR = 10_000; // 100% = 10_000 bps
@@ -88,8 +90,8 @@ contract OTCExchange is ReentrancyGuardTransient, Pausable, ERC1155Holder {
         OrderStatus status;
     }
 
-    /// @notice Shared role registry (same instance as the CLOB stack).
-    AdminRegistry public immutable registry;
+    /// @notice Shared role registry (same instance as the CLOB stack). Set once in initialize.
+    AdminRegistry public registry;
 
     /// @dev conditional-token contract => allowed for trading
     mapping(address => bool) public allowedConditionalToken;
@@ -182,6 +184,11 @@ contract OTCExchange is ReentrancyGuardTransient, Pausable, ERC1155Holder {
     event FeeRecipientUpdated(address indexed oldRecipient, address indexed newRecipient);
     event FeesWithdrawn(address indexed collateralToken, address indexed to, uint256 amount);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
      * @param _registry        shared AdminRegistry (governance + two-step admin hand-off)
      * @param _feeRecipient    initial fee recipient
@@ -192,7 +199,7 @@ contract OTCExchange is ReentrancyGuardTransient, Pausable, ERC1155Holder {
      * @param _collateral      initial allow-listed collateral ERC-20
      * @param _minOrderAmount  initial minimum order.tokenAmount (0 = no minimum)
      */
-    constructor(
+    function initialize(
         AdminRegistry _registry,
         address _feeRecipient,
         uint256 _feeBps,
@@ -200,10 +207,13 @@ contract OTCExchange is ReentrancyGuardTransient, Pausable, ERC1155Holder {
         address _manager,
         address _collateral,
         uint256 _minOrderAmount
-    ) {
+    ) public initializer {
         if (address(_registry) == address(0)) revert ZeroAddress();
         if (_feeRecipient == address(0)) revert ZeroAddress();
         if (_feeBps > MAX_FEE_BPS) revert FeeTooHigh();
+
+        __Pausable_init();
+        __UUPSUpgradeable_init();
 
         registry = _registry;
         feeRecipient = _feeRecipient;
@@ -224,6 +234,11 @@ contract OTCExchange is ReentrancyGuardTransient, Pausable, ERC1155Holder {
 
     function _requireFeeAdmin() internal view {
         if (!registry.hasRole(registry.FEE_ADMIN_ROLE(), msg.sender)) revert NotFeeAdmin();
+    }
+
+    /// @dev UUPS upgrade authorization — DEFAULT_ADMIN_ROLE only (mirrors MyriadCTFExchange).
+    function _authorizeUpgrade(address) internal view override {
+        _requireAdmin();
     }
 
     // ------------------------------- Admin -------------------------------- //
@@ -478,4 +493,7 @@ contract OTCExchange is ReentrancyGuardTransient, Pausable, ERC1155Holder {
         if (manager == address(0)) revert ManagerNotSet();
         return IMarketManager(manager).isMarketTradeable(marketId);
     }
+
+    /// @dev Reserved storage for future upgrades (append new vars before this gap).
+    uint256[50] private __gap;
 }
