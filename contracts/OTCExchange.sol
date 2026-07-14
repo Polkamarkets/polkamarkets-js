@@ -5,9 +5,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC1155} from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+
+import {AdminRegistry} from "./AdminRegistry.sol";
 
 /// @notice Minimal interface for Myriad's conditional-token (ERC-1155) contract.
 interface IConditionalTokens is IERC1155 {
@@ -52,12 +53,16 @@ interface IMarketManager {
  *         and directed orders. The restriction is public on-chain (execution
  *         safety, not privacy).
  *
+ *         Governance lives in the shared AdminRegistry (same instance as the CLOB
+ *         stack): DEFAULT_ADMIN_ROLE gates allow-lists, minimum order size, and
+ *         pause; FEE_ADMIN_ROLE gates fee rate, recipient, and withdrawals —
+ *         mirroring MyriadCTFExchange / FeeModule. Admin hand-off is the registry's
+ *         two-step proposeAdmin/acceptAdmin.
+ *
  *         THIS CODE IS UNAUDITED. Have it independently audited before mainnet use.
  */
-contract OTCExchange is AccessControl, ReentrancyGuard, Pausable, ERC1155Holder {
+contract OTCExchange is ReentrancyGuardTransient, Pausable, ERC1155Holder {
     using SafeERC20 for IERC20;
-
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     uint256 public constant BPS_DENOMINATOR = 10_000; // 100% = 10_000 bps
     uint256 public constant MAX_FEE_BPS = 1_000;      // hard cap: 10%
@@ -83,12 +88,20 @@ contract OTCExchange is AccessControl, ReentrancyGuard, Pausable, ERC1155Holder 
         OrderStatus status;
     }
 
+    /// @notice Shared role registry (same instance as the CLOB stack).
+    AdminRegistry public immutable registry;
+
     /// @dev conditional-token contract => allowed for trading
     mapping(address => bool) public allowedConditionalToken;
     /// @dev conditional-token contract => market manager used for resolution checks
     mapping(address => address) public marketManagerOf;
     /// @dev collateral ERC-20 => allowed as payment
     mapping(address => bool) public allowedCollateral;
+
+    /// @notice Minimum order.tokenAmount; 0 = no minimum. Mirrors MyriadCTFExchange's
+    ///         minOrderAmount (shares-denominated). No remainder rule is needed here —
+    ///         OTC orders are all-or-nothing.
+    uint256 public minOrderAmount;
 
     /// @dev current fee rate (bps) applied to NEW orders only
     uint256 public feeBps;
@@ -101,6 +114,33 @@ contract OTCExchange is AccessControl, ReentrancyGuard, Pausable, ERC1155Holder 
     uint256 public nextOrderId;
     /// @dev orderId => Order
     mapping(uint256 => Order) public orders;
+
+    // ------------------------------- Errors ------------------------------- //
+
+    error NotAdmin();
+    error NotFeeAdmin();
+    error ZeroAddress();
+    error FeeTooHigh();
+    error ManagerMismatch();
+    error ManagerNotSet();
+    error ConditionalTokenNotAllowed();
+    error CollateralNotAllowed();
+    error InvalidOutcome();
+    error ZeroAmount();
+    error BelowMinAmount();
+    error InvalidExpiry();
+    error SelfTrade();
+    error OrderNotFound();
+    error OrderNotOpen();
+    error NotMaker();
+    error NotAllowedTaker();
+    error OrderExpired();
+    error MarketNotTradeable();
+    error NotAuthorized();
+    error CollateralShort();
+    error InsufficientAccruedFees();
+
+    // ------------------------------- Events ------------------------------- //
 
     event OrderCreated(
         uint256 indexed orderId,
@@ -117,31 +157,73 @@ contract OTCExchange is AccessControl, ReentrancyGuard, Pausable, ERC1155Holder 
         uint64 expiry,
         address allowedTaker
     );
-    event OrderFilled(uint256 indexed orderId, address indexed taker, uint256 feeAmount, uint256 collateralToSeller);
-    event OrderCancelled(uint256 indexed orderId);
+    event OrderFilled(
+        uint256 indexed orderId,
+        address indexed maker,
+        address indexed taker,
+        Side side,
+        address conditionalToken,
+        uint256 marketId,
+        uint256 outcome,
+        uint256 tokenId,
+        uint256 tokenAmount,
+        address collateralToken,
+        uint256 collateralAmount,
+        uint256 feeAmount,
+        uint256 collateralToSeller
+    );
+    event OrderCancelled(uint256 indexed orderId, address indexed maker);
     event AllowedTakerUpdated(uint256 indexed orderId, address indexed oldTaker, address indexed newTaker);
 
     event ConditionalTokenAllowed(address indexed conditionalToken, address indexed manager, bool allowed);
     event CollateralAllowed(address indexed collateralToken, bool allowed);
+    event MinOrderAmountUpdated(uint256 oldAmount, uint256 newAmount);
     event FeeBpsUpdated(uint256 oldFeeBps, uint256 newFeeBps);
     event FeeRecipientUpdated(address indexed oldRecipient, address indexed newRecipient);
     event FeesWithdrawn(address indexed collateralToken, address indexed to, uint256 amount);
 
     /**
-     * @param admin         address granted DEFAULT_ADMIN_ROLE and ADMIN_ROLE
-     * @param feeRecipient_ initial fee recipient
-     * @param feeBps_       initial fee rate in basis points (0 allowed, <= MAX_FEE_BPS)
+     * @param _registry        shared AdminRegistry (governance + two-step admin hand-off)
+     * @param _feeRecipient    initial fee recipient
+     * @param _feeBps          initial fee rate in basis points (0 allowed, <= MAX_FEE_BPS)
+     * @param _conditionalToken initial allow-listed conditional-token (ERC-1155) contract
+     * @param _manager         market manager bound to _conditionalToken; must equal
+     *                         _conditionalToken.manager() — asserted on-chain
+     * @param _collateral      initial allow-listed collateral ERC-20
+     * @param _minOrderAmount  initial minimum order.tokenAmount (0 = no minimum)
      */
-    constructor(address admin, address feeRecipient_, uint256 feeBps_) {
-        require(admin != address(0), "admin=0");
-        require(feeRecipient_ != address(0), "feeRecipient=0");
-        require(feeBps_ <= MAX_FEE_BPS, "fee too high");
+    constructor(
+        AdminRegistry _registry,
+        address _feeRecipient,
+        uint256 _feeBps,
+        address _conditionalToken,
+        address _manager,
+        address _collateral,
+        uint256 _minOrderAmount
+    ) {
+        if (address(_registry) == address(0)) revert ZeroAddress();
+        if (_feeRecipient == address(0)) revert ZeroAddress();
+        if (_feeBps > MAX_FEE_BPS) revert FeeTooHigh();
 
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(ADMIN_ROLE, admin);
+        registry = _registry;
+        feeRecipient = _feeRecipient;
+        feeBps = _feeBps;
 
-        feeRecipient = feeRecipient_;
-        feeBps = feeBps_;
+        _allowConditionalToken(_conditionalToken, _manager);
+        _setCollateralAllowed(_collateral, true);
+
+        minOrderAmount = _minOrderAmount;
+        emit MinOrderAmountUpdated(0, _minOrderAmount);
+    }
+
+    // ------------------------------- Roles -------------------------------- //
+
+    function _requireAdmin() internal view {
+        if (!registry.hasRole(registry.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
+    }
+
+    function _requireFeeAdmin() internal view {
+        if (!registry.hasRole(registry.FEE_ADMIN_ROLE(), msg.sender)) revert NotFeeAdmin();
     }
 
     // ------------------------------- Admin -------------------------------- //
@@ -149,53 +231,77 @@ contract OTCExchange is AccessControl, ReentrancyGuard, Pausable, ERC1155Holder 
     /// @notice Allow a conditional-token contract and bind its resolution manager.
     /// @dev    The manager must match the one the token itself is bound to
     ///         (ConditionalTokens exposes it as a public immutable).
-    function allowConditionalToken(address conditionalToken, address manager) external onlyRole(ADMIN_ROLE) {
-        require(conditionalToken != address(0), "ct=0");
-        require(manager != address(0), "manager=0");
-        require(IConditionalTokens(conditionalToken).manager() == manager, "manager mismatch");
+    function allowConditionalToken(address conditionalToken, address manager) external {
+        _requireAdmin();
+        _allowConditionalToken(conditionalToken, manager);
+    }
+
+    function _allowConditionalToken(address conditionalToken, address manager) internal {
+        if (conditionalToken == address(0)) revert ZeroAddress();
+        if (manager == address(0)) revert ZeroAddress();
+        if (IConditionalTokens(conditionalToken).manager() != manager) revert ManagerMismatch();
         allowedConditionalToken[conditionalToken] = true;
         marketManagerOf[conditionalToken] = manager;
         emit ConditionalTokenAllowed(conditionalToken, manager, true);
     }
 
-    /// @notice Disallow a conditional-token contract for new orders. Existing escrow is unaffected.
-    function disallowConditionalToken(address conditionalToken) external onlyRole(ADMIN_ROLE) {
+    /// @notice Disallow a conditional-token contract for new orders. Existing escrow
+    ///         is unaffected and resting orders remain fillable — pause() as well if
+    ///         fills must stop.
+    function disallowConditionalToken(address conditionalToken) external {
+        _requireAdmin();
         allowedConditionalToken[conditionalToken] = false;
         emit ConditionalTokenAllowed(conditionalToken, marketManagerOf[conditionalToken], false);
     }
 
     /// @notice Allow or disallow a collateral ERC-20.
-    function setCollateralAllowed(address collateralToken, bool allowed) external onlyRole(ADMIN_ROLE) {
-        require(collateralToken != address(0), "collateral=0");
+    function setCollateralAllowed(address collateralToken, bool allowed) external {
+        _requireAdmin();
+        _setCollateralAllowed(collateralToken, allowed);
+    }
+
+    function _setCollateralAllowed(address collateralToken, bool allowed) internal {
+        if (collateralToken == address(0)) revert ZeroAddress();
         allowedCollateral[collateralToken] = allowed;
         emit CollateralAllowed(collateralToken, allowed);
     }
 
+    /// @notice Update the minimum order size (in conditional-token amount).
+    ///         Only affects orders created AFTER this call; 0 disables the minimum.
+    function setMinOrderAmount(uint256 newAmount) external {
+        _requireAdmin();
+        emit MinOrderAmountUpdated(minOrderAmount, newAmount);
+        minOrderAmount = newAmount;
+    }
+
     /// @notice Update the fee rate. Only affects orders created AFTER this call.
-    function setFeeBps(uint256 newFeeBps) external onlyRole(ADMIN_ROLE) {
-        require(newFeeBps <= MAX_FEE_BPS, "fee too high");
+    function setFeeBps(uint256 newFeeBps) external {
+        _requireFeeAdmin();
+        if (newFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         emit FeeBpsUpdated(feeBps, newFeeBps);
         feeBps = newFeeBps;
     }
 
     /// @notice Update the fee recipient.
-    function setFeeRecipient(address newRecipient) external onlyRole(ADMIN_ROLE) {
-        require(newRecipient != address(0), "feeRecipient=0");
+    function setFeeRecipient(address newRecipient) external {
+        _requireFeeAdmin();
+        if (newRecipient == address(0)) revert ZeroAddress();
         emit FeeRecipientUpdated(feeRecipient, newRecipient);
         feeRecipient = newRecipient;
     }
 
     /// @notice Withdraw accrued fees for a collateral token to the fee recipient.
-    function withdrawFees(address collateralToken, uint256 amount) external onlyRole(ADMIN_ROLE) nonReentrant {
+    function withdrawFees(address collateralToken, uint256 amount) external nonReentrant {
+        _requireFeeAdmin();
         uint256 available = accruedFees[collateralToken];
-        require(amount <= available, "amount > accrued");
+        if (amount > available) revert InsufficientAccruedFees();
         accruedFees[collateralToken] = available - amount;
         IERC20(collateralToken).safeTransfer(feeRecipient, amount);
         emit FeesWithdrawn(collateralToken, feeRecipient, amount);
     }
 
-    function pause() external onlyRole(ADMIN_ROLE) { _pause(); }
-    function unpause() external onlyRole(ADMIN_ROLE) { _unpause(); }
+    function pause() external { _requireAdmin(); _pause(); }
+    function unpause() external { _requireAdmin(); _unpause(); }
 
     // ------------------------- Core: create / fill ------------------------ //
 
@@ -219,17 +325,17 @@ contract OTCExchange is AccessControl, ReentrancyGuard, Pausable, ERC1155Holder 
         uint64 expiry,
         address allowedTaker
     ) external whenNotPaused nonReentrant returns (uint256 orderId) {
-        require(allowedConditionalToken[conditionalToken], "CT not allowed");
-        require(allowedCollateral[collateralToken], "collateral not allowed");
+        if (!allowedConditionalToken[conditionalToken]) revert ConditionalTokenNotAllowed();
+        if (!allowedCollateral[collateralToken]) revert CollateralNotAllowed();
         // Myriad CLOB markets are strictly binary (0 = YES, 1 = NO). getTokenId does
         // NOT validate outcome — an out-of-range value derives a tokenId belonging to
         // a DIFFERENT market, which would bypass the declared-market tradeability guard.
-        require(outcome <= 1, "bad outcome");
-        require(tokenAmount > 0, "tokenAmount=0");
-        require(collateralAmount > 0, "collateralAmount=0");
-        require(expiry == 0 || expiry > block.timestamp, "bad expiry");
-        require(allowedTaker != msg.sender, "taker=maker");
-        require(_isTradeable(conditionalToken, marketId), "market not tradeable");
+        if (outcome > 1) revert InvalidOutcome();
+        if (tokenAmount == 0 || collateralAmount == 0) revert ZeroAmount();
+        if (minOrderAmount != 0 && tokenAmount < minOrderAmount) revert BelowMinAmount();
+        if (expiry != 0 && expiry <= block.timestamp) revert InvalidExpiry();
+        if (allowedTaker == msg.sender) revert SelfTrade();
+        if (!_isTradeable(conditionalToken, marketId)) revert MarketNotTradeable();
 
         uint256 tokenId = IConditionalTokens(conditionalToken).getTokenId(marketId, outcome);
 
@@ -261,7 +367,7 @@ contract OTCExchange is AccessControl, ReentrancyGuard, Pausable, ERC1155Holder 
             IERC20 c = IERC20(collateralToken);
             uint256 balBefore = c.balanceOf(address(this));
             c.safeTransferFrom(msg.sender, address(this), collateralAmount);
-            require(c.balanceOf(address(this)) - balBefore >= collateralAmount, "collateral short");
+            if (c.balanceOf(address(this)) - balBefore < collateralAmount) revert CollateralShort();
         }
 
         emit OrderCreated(
@@ -278,9 +384,10 @@ contract OTCExchange is AccessControl, ReentrancyGuard, Pausable, ERC1155Holder 
      */
     function setAllowedTaker(uint256 orderId, address newTaker) external nonReentrant {
         Order storage o = orders[orderId];
-        require(o.status == OrderStatus.Open, "order not open");
-        require(msg.sender == o.maker, "not maker");
-        require(newTaker != o.maker, "taker=maker");
+        if (o.maker == address(0)) revert OrderNotFound();
+        if (o.status != OrderStatus.Open) revert OrderNotOpen();
+        if (msg.sender != o.maker) revert NotMaker();
+        if (newTaker == o.maker) revert SelfTrade();
         emit AllowedTakerUpdated(orderId, o.allowedTaker, newTaker);
         o.allowedTaker = newTaker;
     }
@@ -294,10 +401,12 @@ contract OTCExchange is AccessControl, ReentrancyGuard, Pausable, ERC1155Holder 
      */
     function fillOrder(uint256 orderId) external whenNotPaused nonReentrant {
         Order storage o = orders[orderId];
-        require(o.status == OrderStatus.Open, "order not open");
-        require(o.allowedTaker == address(0) || msg.sender == o.allowedTaker, "not allowed taker");
-        require(o.expiry == 0 || block.timestamp <= o.expiry, "order expired");
-        require(_isTradeable(o.conditionalToken, o.marketId), "market not tradeable");
+        if (o.maker == address(0)) revert OrderNotFound();
+        if (o.status != OrderStatus.Open) revert OrderNotOpen();
+        if (msg.sender == o.maker) revert SelfTrade();
+        if (o.allowedTaker != address(0) && msg.sender != o.allowedTaker) revert NotAllowedTaker();
+        if (o.expiry != 0 && block.timestamp > o.expiry) revert OrderExpired();
+        if (!_isTradeable(o.conditionalToken, o.marketId)) revert MarketNotTradeable();
 
         // Effects first.
         o.status = OrderStatus.Filled;
@@ -312,7 +421,7 @@ contract OTCExchange is AccessControl, ReentrancyGuard, Pausable, ERC1155Holder 
             // Maker = seller (tokens escrowed). Taker = buyer, pays collateral now.
             uint256 balBefore = c.balanceOf(address(this));
             c.safeTransferFrom(msg.sender, address(this), o.collateralAmount);
-            require(c.balanceOf(address(this)) - balBefore >= o.collateralAmount, "collateral short");
+            if (c.balanceOf(address(this)) - balBefore < o.collateralAmount) revert CollateralShort();
 
             c.safeTransfer(o.maker, collateralToSeller);
             IConditionalTokens(o.conditionalToken).safeTransferFrom(
@@ -326,7 +435,10 @@ contract OTCExchange is AccessControl, ReentrancyGuard, Pausable, ERC1155Holder 
             c.safeTransfer(msg.sender, collateralToSeller);
         }
 
-        emit OrderFilled(orderId, msg.sender, feeAmount, collateralToSeller);
+        emit OrderFilled(
+            orderId, o.maker, msg.sender, o.side, o.conditionalToken, o.marketId, o.outcome,
+            o.tokenId, o.tokenAmount, o.collateralToken, o.collateralAmount, feeAmount, collateralToSeller
+        );
     }
 
     /**
@@ -336,11 +448,11 @@ contract OTCExchange is AccessControl, ReentrancyGuard, Pausable, ERC1155Holder 
      */
     function cancelOrder(uint256 orderId) external nonReentrant {
         Order storage o = orders[orderId];
-        require(o.status == OrderStatus.Open, "order not open");
-        require(
-            msg.sender == o.maker || (o.expiry != 0 && block.timestamp > o.expiry),
-            "not authorized"
-        );
+        if (o.maker == address(0)) revert OrderNotFound();
+        if (o.status != OrderStatus.Open) revert OrderNotOpen();
+        if (msg.sender != o.maker && (o.expiry == 0 || block.timestamp <= o.expiry)) {
+            revert NotAuthorized();
+        }
 
         o.status = OrderStatus.Cancelled;
 
@@ -352,7 +464,7 @@ contract OTCExchange is AccessControl, ReentrancyGuard, Pausable, ERC1155Holder 
             IERC20(o.collateralToken).safeTransfer(o.maker, o.collateralAmount);
         }
 
-        emit OrderCancelled(orderId);
+        emit OrderCancelled(orderId, o.maker);
     }
 
     // ------------------------------- Views -------------------------------- //
@@ -363,19 +475,7 @@ contract OTCExchange is AccessControl, ReentrancyGuard, Pausable, ERC1155Holder 
 
     function _isTradeable(address conditionalToken, uint256 marketId) internal view returns (bool) {
         address manager = marketManagerOf[conditionalToken];
-        require(manager != address(0), "no manager set");
+        if (manager == address(0)) revert ManagerNotSet();
         return IMarketManager(manager).isMarketTradeable(marketId);
-    }
-
-    // ------------------------------ ERC-165 ------------------------------- //
-
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        virtual
-        override(AccessControl, ERC1155Holder)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
     }
 }

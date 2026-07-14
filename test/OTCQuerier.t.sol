@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import {Test} from "forge-std/Test.sol";
 import {OTCExchange} from "../contracts/OTCExchange.sol";
 import {OTCQuerier, OrderView, SideFilter} from "../contracts/OTCQuerier.sol";
+import {AdminRegistry} from "../contracts/AdminRegistry.sol";
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
@@ -68,13 +69,11 @@ contract OTCQuerierTest is Test {
         manager = new QMarketManager();
         ct = new QConditionalTokens(address(manager));
         collateral = new QCollateral(COLLATERAL_DECIMALS);
-        otc = new OTCExchange(admin, feeRecipient, 0);
+        otc = new OTCExchange(
+            new AdminRegistry(admin), feeRecipient, 0,
+            address(ct), address(manager), address(collateral), 0
+        );
         lens = new OTCQuerier(otc);
-
-        vm.startPrank(admin);
-        otc.allowConditionalToken(address(ct), address(manager));
-        otc.setCollateralAllowed(address(collateral), true);
-        vm.stopPrank();
 
         manager.setTradeable(MARKET, true);
         manager.setTradeable(MARKET_B, true);
