@@ -3,9 +3,16 @@ pragma solidity ^0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {OTCExchange} from "../contracts/OTCExchange.sol";
+import {AdminRegistry} from "../contracts/AdminRegistry.sol";
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+
+/// @dev Trivial upgrade target: adds a view to prove the proxy state survives an upgrade.
+contract OTCExchangeV2 is OTCExchange {
+    function version() external pure returns (uint256) { return 2; }
+}
 
 // --------------------------------- Mocks ----------------------------------- //
 
@@ -51,6 +58,7 @@ contract MockMarketManager {
 
 contract OTCExchangeTest is Test {
     OTCExchange internal otc;
+    AdminRegistry internal registry;
     MockConditionalTokens internal ct;
     MockMarketManager internal manager;
     MockERC20 internal collateral;
@@ -71,14 +79,25 @@ contract OTCExchangeTest is Test {
         manager = new MockMarketManager();
         ct = new MockConditionalTokens(address(manager));
         collateral = new MockERC20();
-        otc = new OTCExchange(admin, feeRecipient, START_FEE_BPS);
 
-        vm.startPrank(admin);
-        otc.allowConditionalToken(address(ct), address(manager));
-        otc.setCollateralAllowed(address(collateral), true);
-        vm.stopPrank();
+        registry = new AdminRegistry(admin);
+
+        otc = _deployProxy(address(manager), 0);
 
         manager.setTradeable(MARKET, true);
+    }
+
+    /// @dev Deploy the impl + an ERC-1967 proxy that runs initialize(), as production does.
+    function _deployProxy(address manager_, uint256 minOrder) internal returns (OTCExchange) {
+        OTCExchange impl = new OTCExchange();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeCall(
+                OTCExchange.initialize,
+                (registry, feeRecipient, START_FEE_BPS, address(ct), manager_, address(collateral), minOrder)
+            )
+        );
+        return OTCExchange(address(proxy));
     }
 
     function _tokenId() internal view returns (uint256) {
@@ -112,6 +131,80 @@ contract OTCExchangeTest is Test {
         vm.stopPrank();
     }
 
+    // ---- Initialize / proxy wiring ----
+
+    function test_InitializeSeedsConfig() public view {
+        assertEq(address(otc.registry()), address(registry), "registry");
+        assertTrue(otc.allowedConditionalToken(address(ct)), "ct allowed");
+        assertEq(otc.marketManagerOf(address(ct)), address(manager), "manager bound");
+        assertTrue(otc.allowedCollateral(address(collateral)), "collateral allowed");
+        assertEq(otc.feeRecipient(), feeRecipient, "fee recipient");
+        assertEq(otc.feeBps(), START_FEE_BPS, "fee bps");
+        assertEq(otc.minOrderAmount(), 0, "min order");
+    }
+
+    function test_InitializeRevertsOnManagerMismatch() public {
+        // The manager assertion runs inside initialize, so it bubbles out of the
+        // proxy constructor when the deploy passes a mismatched manager. Deploy the
+        // impl first so expectRevert latches onto only the proxy construction.
+        MockMarketManager other = new MockMarketManager();
+        OTCExchange impl = new OTCExchange();
+        bytes memory initData = abi.encodeCall(
+            OTCExchange.initialize,
+            (registry, feeRecipient, START_FEE_BPS, address(ct), address(other), address(collateral), 0)
+        );
+        vm.expectRevert(OTCExchange.ManagerMismatch.selector);
+        new ERC1967Proxy(address(impl), initData);
+    }
+
+    function test_Initialize_CannotBeCalledTwice() public {
+        vm.expectRevert(); // InvalidInitialization
+        otc.initialize(
+            registry, feeRecipient, START_FEE_BPS,
+            address(ct), address(manager), address(collateral), 0
+        );
+    }
+
+    function test_Impl_InitializersDisabled() public {
+        OTCExchange impl = new OTCExchange();
+        vm.expectRevert(); // InvalidInitialization — _disableInitializers in constructor
+        impl.initialize(
+            registry, feeRecipient, START_FEE_BPS,
+            address(ct), address(manager), address(collateral), 0
+        );
+    }
+
+    // ---- UUPS upgrade ----
+
+    function test_Upgrade_PreservesState() public {
+        uint256 id = _createSell(); // open order + escrow live before the upgrade
+
+        OTCExchangeV2 newImpl = new OTCExchangeV2();
+        vm.prank(admin);
+        otc.upgradeToAndCall(address(newImpl), "");
+
+        // State persists through the proxy: order, escrow, and config unchanged.
+        assertEq(OTCExchangeV2(address(otc)).version(), 2, "upgraded");
+        assertEq(otc.getOrder(id).maker, seller, "order survived");
+        assertEq(ct.balanceOf(address(otc), _tokenId()), TOKEN_AMOUNT, "escrow survived");
+        assertEq(address(otc.registry()), address(registry), "registry survived");
+
+        // ...and the surviving order is still fillable post-upgrade.
+        collateral.mint(buyer, COLLATERAL_AMOUNT);
+        vm.startPrank(buyer);
+        collateral.approve(address(otc), type(uint256).max);
+        otc.fillOrder(id);
+        vm.stopPrank();
+        assertEq(ct.balanceOf(buyer, _tokenId()), TOKEN_AMOUNT, "filled after upgrade");
+    }
+
+    function test_Upgrade_OnlyAdmin() public {
+        OTCExchangeV2 newImpl = new OTCExchangeV2();
+        vm.prank(seller);
+        vm.expectRevert(OTCExchange.NotAdmin.selector);
+        otc.upgradeToAndCall(address(newImpl), "");
+    }
+
     // ---- Sell (Ask): maker escrows tokens, taker pays collateral ----
 
     function test_Sell_CreateEscrowsTokens() public {
@@ -139,8 +232,29 @@ contract OTCExchangeTest is Test {
         assertEq(ct.balanceOf(address(otc), _tokenId()), 0, "escrow released");
     }
 
+    function test_Sell_FillEmitsFullTradeDetail() public {
+        // OrderFilled mirrors OrdersMatched's richness: the API ingests fills
+        // from the event alone, no getOrder read.
+        uint256 id = _createSell();
+        collateral.mint(buyer, COLLATERAL_AMOUNT);
+        vm.startPrank(buyer);
+        collateral.approve(address(otc), type(uint256).max);
+
+        uint256 fee = (COLLATERAL_AMOUNT * START_FEE_BPS) / 10_000;
+        vm.expectEmit(true, true, true, true, address(otc));
+        emit OTCExchange.OrderFilled(
+            id, seller, buyer, OTCExchange.Side.Sell, address(ct), MARKET, OUTCOME,
+            _tokenId(), TOKEN_AMOUNT, address(collateral), COLLATERAL_AMOUNT,
+            fee, COLLATERAL_AMOUNT - fee
+        );
+        otc.fillOrder(id);
+        vm.stopPrank();
+    }
+
     function test_Sell_CancelReturnsTokens() public {
         uint256 id = _createSell();
+        vm.expectEmit(true, true, false, true, address(otc));
+        emit OTCExchange.OrderCancelled(id, seller);
         vm.prank(seller);
         otc.cancelOrder(id);
         assertEq(ct.balanceOf(seller, _tokenId()), TOKEN_AMOUNT, "returned");
@@ -186,7 +300,7 @@ contract OTCExchangeTest is Test {
         fot.mint(buyer, COLLATERAL_AMOUNT);
         vm.startPrank(buyer);
         fot.approve(address(otc), type(uint256).max);
-        vm.expectRevert(bytes("collateral short"));
+        vm.expectRevert(OTCExchange.CollateralShort.selector);
         otc.createOrder(
             OTCExchange.Side.Buy, address(ct), MARKET, OUTCOME, TOKEN_AMOUNT,
             address(fot), COLLATERAL_AMOUNT, 0, address(0)
@@ -203,7 +317,7 @@ contract OTCExchangeTest is Test {
         collateral.mint(stranger, COLLATERAL_AMOUNT);
         vm.startPrank(stranger);
         collateral.approve(address(otc), type(uint256).max);
-        vm.expectRevert(bytes("not allowed taker"));
+        vm.expectRevert(OTCExchange.NotAllowedTaker.selector);
         otc.fillOrder(id);
         vm.stopPrank();
 
@@ -226,7 +340,7 @@ contract OTCExchangeTest is Test {
         collateral.mint(buyer, COLLATERAL_AMOUNT);
         vm.startPrank(buyer);
         collateral.approve(address(otc), type(uint256).max);
-        vm.expectRevert(bytes("not allowed taker"));
+        vm.expectRevert(OTCExchange.NotAllowedTaker.selector);
         otc.fillOrder(id);
         vm.stopPrank();
 
@@ -241,7 +355,7 @@ contract OTCExchangeTest is Test {
     function test_Directed_OnlyMakerCanSetAllowedTaker() public {
         uint256 id = _createSell();
         vm.prank(buyer);
-        vm.expectRevert(bytes("not maker"));
+        vm.expectRevert(OTCExchange.NotMaker.selector);
         otc.setAllowedTaker(id, buyer);
     }
 
@@ -254,7 +368,7 @@ contract OTCExchangeTest is Test {
         vm.stopPrank();
 
         vm.prank(seller);
-        vm.expectRevert(bytes("order not open"));
+        vm.expectRevert(OTCExchange.OrderNotOpen.selector);
         otc.setAllowedTaker(id, buyer);
     }
 
@@ -262,8 +376,20 @@ contract OTCExchangeTest is Test {
         ct.mint(seller, MARKET, OUTCOME, TOKEN_AMOUNT);
         vm.startPrank(seller);
         ct.setApprovalForAll(address(otc), true);
-        vm.expectRevert(bytes("taker=maker"));
+        vm.expectRevert(OTCExchange.SelfTrade.selector);
         otc.createOrder(OTCExchange.Side.Sell, address(ct), MARKET, OUTCOME, TOKEN_AMOUNT, address(collateral), COLLATERAL_AMOUNT, 0, seller);
+        vm.stopPrank();
+    }
+
+    function test_Fill_RevertsWhenMakerFillsOwnOrder() public {
+        // Self-trade guard, mirroring MyriadCTFExchange's SelfTrade: a maker
+        // self-fill would only burn fee and fabricate volume.
+        uint256 id = _createSell();
+        collateral.mint(seller, COLLATERAL_AMOUNT);
+        vm.startPrank(seller);
+        collateral.approve(address(otc), type(uint256).max);
+        vm.expectRevert(OTCExchange.SelfTrade.selector);
+        otc.fillOrder(id);
         vm.stopPrank();
     }
 
@@ -275,15 +401,43 @@ contract OTCExchangeTest is Test {
         ct.mint(seller, MARKET, OUTCOME, TOKEN_AMOUNT);
         vm.startPrank(seller);
         ct.setApprovalForAll(address(otc), true);
-        vm.expectRevert(bytes("bad outcome"));
+        vm.expectRevert(OTCExchange.InvalidOutcome.selector);
         otc.createOrder(OTCExchange.Side.Sell, address(ct), MARKET, 2, TOKEN_AMOUNT, address(collateral), COLLATERAL_AMOUNT, 0, address(0));
         vm.stopPrank();
+    }
+
+    function test_Create_RevertsBelowMinOrderAmount() public {
+        vm.prank(admin);
+        otc.setMinOrderAmount(TOKEN_AMOUNT + 1);
+
+        ct.mint(seller, MARKET, OUTCOME, TOKEN_AMOUNT);
+        vm.startPrank(seller);
+        ct.setApprovalForAll(address(otc), true);
+        vm.expectRevert(OTCExchange.BelowMinAmount.selector);
+        otc.createOrder(OTCExchange.Side.Sell, address(ct), MARKET, OUTCOME, TOKEN_AMOUNT, address(collateral), COLLATERAL_AMOUNT, 0, address(0));
+        vm.stopPrank();
+    }
+
+    function test_SetMinOrderAmount_AdminOnlyAndZeroDisables() public {
+        vm.prank(seller);
+        vm.expectRevert(OTCExchange.NotAdmin.selector);
+        otc.setMinOrderAmount(1e18);
+
+        vm.prank(admin);
+        otc.setMinOrderAmount(TOKEN_AMOUNT + 1);
+        assertEq(otc.minOrderAmount(), TOKEN_AMOUNT + 1, "min set");
+
+        // Zero disables the minimum entirely; the order goes through again.
+        vm.prank(admin);
+        otc.setMinOrderAmount(0);
+        uint256 id = _createSell();
+        assertEq(otc.getOrder(id).tokenAmount, TOKEN_AMOUNT, "created with min disabled");
     }
 
     function test_Allow_RevertsOnManagerMismatch() public {
         MockMarketManager other = new MockMarketManager();
         vm.prank(admin);
-        vm.expectRevert(bytes("manager mismatch"));
+        vm.expectRevert(OTCExchange.ManagerMismatch.selector);
         otc.allowConditionalToken(address(ct), address(other));
     }
 
@@ -292,7 +446,7 @@ contract OTCExchangeTest is Test {
         ct.mint(seller, MARKET, OUTCOME, TOKEN_AMOUNT);
         vm.startPrank(seller);
         ct.setApprovalForAll(address(otc), true);
-        vm.expectRevert(bytes("market not tradeable"));
+        vm.expectRevert(OTCExchange.MarketNotTradeable.selector);
         otc.createOrder(OTCExchange.Side.Sell, address(ct), MARKET, OUTCOME, TOKEN_AMOUNT, address(collateral), COLLATERAL_AMOUNT, 0, address(0));
         vm.stopPrank();
     }
@@ -303,9 +457,15 @@ contract OTCExchangeTest is Test {
         collateral.mint(buyer, COLLATERAL_AMOUNT);
         vm.startPrank(buyer);
         collateral.approve(address(otc), type(uint256).max);
-        vm.expectRevert(bytes("market not tradeable"));
+        vm.expectRevert(OTCExchange.MarketNotTradeable.selector);
         otc.fillOrder(id);
         vm.stopPrank();
+    }
+
+    function test_Fill_RevertsOrderNotFound() public {
+        vm.prank(buyer);
+        vm.expectRevert(OTCExchange.OrderNotFound.selector);
+        otc.fillOrder(999);
     }
 
     function test_Fill_UsesSnapshottedFee() public {
@@ -362,9 +522,32 @@ contract OTCExchangeTest is Test {
         assertEq(collateral.balanceOf(feeRecipient), fee, "recipient paid");
     }
 
-    function test_OnlyAdminCanSetFee() public {
-        vm.prank(seller);
-        vm.expectRevert(); // AccessControlUnauthorizedAccount
+    // ---- Role gating: DEFAULT_ADMIN_ROLE gates everything ----
+
+    function test_Roles_StrangerCannotAdminister() public {
+        vm.startPrank(seller);
+        vm.expectRevert(OTCExchange.NotAdmin.selector);
+        otc.pause();
+        vm.expectRevert(OTCExchange.NotAdmin.selector);
+        otc.setMinOrderAmount(1);
+        vm.expectRevert(OTCExchange.NotAdmin.selector);
+        otc.setCollateralAllowed(address(collateral), false);
+        vm.expectRevert(OTCExchange.NotAdmin.selector);
         otc.setFeeBps(200);
+        vm.expectRevert(OTCExchange.NotAdmin.selector);
+        otc.setFeeRecipient(seller);
+        vm.expectRevert(OTCExchange.NotAdmin.selector);
+        otc.withdrawFees(address(collateral), 0);
+        vm.stopPrank();
+    }
+
+    function test_Roles_AdminCanTouchFees() public {
+        vm.startPrank(admin);
+        otc.setFeeBps(200);
+        otc.setFeeRecipient(admin);
+        otc.withdrawFees(address(collateral), 0);
+        vm.stopPrank();
+        assertEq(otc.feeBps(), 200, "fee set");
+        assertEq(otc.feeRecipient(), admin, "recipient set");
     }
 }

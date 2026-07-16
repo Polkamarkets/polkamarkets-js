@@ -2,19 +2,23 @@
 pragma solidity ^0.8.26;
 
 import {Script, console2} from "forge-std/Script.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {OTCExchange} from "../contracts/OTCExchange.sol";
 import {OTCQuerier} from "../contracts/OTCQuerier.sol";
+import {AdminRegistry} from "../contracts/AdminRegistry.sol";
 
 /**
  * @title DeployOTCExchange
- * @notice Deploys OTCExchange (and its read-only OTCQuerier lens) to BNB Chain and
- *         wires the initial config in one broadcast. The deployer is the temporary
- *         admin so it can run the config calls; if FINAL_ADMIN differs from the
- *         deployer, roles are handed over and the deployer renounces its own roles
- *         at the end.
+ * @notice Deploys OTCExchange (and its read-only OTCQuerier lens) to BNB Chain.
+ *         All initial config is wired through the constructor, so the deployer
+ *         needs no roles: governance lives in the shared AdminRegistry from day
+ *         one (DEFAULT_ADMIN_ROLE gates everything — allow-lists, min order,
+ *         pause, fees, withdrawals), and admin hand-off is the registry's
+ *         two-step proposeAdmin/acceptAdmin.
  *
  * Required env vars:
- *   PRIVATE_KEY        deployer key (the deployer becomes the temporary admin)
+ *   PRIVATE_KEY        deployer key (holds no roles on the deployed contract)
+ *   ADMIN_REGISTRY     shared AdminRegistry address (same instance as the CLOB stack)
  *   FEE_RECIPIENT      address that receives withdrawn fees
  *   FEE_BPS            initial fee in basis points (e.g. 100 = 1%, 0 = no fee)
  *   CONDITIONAL_TOKEN  Myriad conditional-token (ERC-1155) address
@@ -25,7 +29,7 @@ import {OTCQuerier} from "../contracts/OTCQuerier.sol";
  *                      later via setCollateralAllowed)
  *
  * Optional env vars:
- *   FINAL_ADMIN        multisig/owner to hold roles after setup (defaults to deployer)
+ *   MIN_ORDER_AMOUNT   minimum order.tokenAmount (defaults to 0 = no minimum)
  *
  * Example:
  *   forge script script/DeployOTCExchange.s.sol:DeployOTCExchange \
@@ -34,40 +38,48 @@ import {OTCQuerier} from "../contracts/OTCQuerier.sol";
 contract DeployOTCExchange is Script {
     function run() external {
         uint256 pk = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(pk);
 
+        address registry = vm.envAddress("ADMIN_REGISTRY");
         address feeRecipient = vm.envAddress("FEE_RECIPIENT");
         uint256 feeBps = vm.envUint("FEE_BPS");
         address conditionalToken = vm.envAddress("CONDITIONAL_TOKEN");
         address marketManager = vm.envAddress("MARKET_MANAGER");
         address collateral = vm.envAddress("COLLATERAL");
-        address finalAdmin = vm.envOr("FINAL_ADMIN", deployer);
+        uint256 minOrderAmount = vm.envOr("MIN_ORDER_AMOUNT", uint256(0));
 
         vm.startBroadcast(pk);
 
-        // Deploy with the deployer as initial admin so the config calls below pass.
-        OTCExchange otc = new OTCExchange(deployer, feeRecipient, feeBps);
+        // UUPS: deploy the implementation, then an ERC-1967 proxy that runs
+        // initialize() in its constructor. All interaction goes through the proxy.
+        OTCExchange impl = new OTCExchange();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeCall(
+                OTCExchange.initialize,
+                (
+                    AdminRegistry(registry),
+                    feeRecipient,
+                    feeBps,
+                    conditionalToken,
+                    marketManager,
+                    collateral,
+                    minOrderAmount
+                )
+            )
+        );
+        OTCExchange otc = OTCExchange(address(proxy));
 
-        otc.allowConditionalToken(conditionalToken, marketManager);
-        otc.setCollateralAllowed(collateral, true);
-
-        // Read-only lens for order discovery (no roles, no funds).
+        // Read-only lens for order discovery (no roles, no funds). Points at the proxy.
         OTCQuerier querier = new OTCQuerier(otc);
-
-        // Hand over control if a separate admin was specified.
-        if (finalAdmin != deployer) {
-            otc.grantRole(otc.DEFAULT_ADMIN_ROLE(), finalAdmin);
-            otc.grantRole(otc.ADMIN_ROLE(), finalAdmin);
-            otc.renounceRole(otc.ADMIN_ROLE(), deployer);
-            otc.renounceRole(otc.DEFAULT_ADMIN_ROLE(), deployer);
-        }
 
         vm.stopBroadcast();
 
-        console2.log("OTCExchange deployed at:", address(otc));
+        console2.log("OTCExchange proxy deployed at:", address(otc));
+        console2.log("OTCExchange implementation at:", address(impl));
         console2.log("OTCQuerier deployed at:", address(querier));
-        console2.log("Admin:", finalAdmin);
+        console2.log("AdminRegistry:", registry);
         console2.log("Fee recipient:", feeRecipient);
         console2.log("Fee bps:", feeBps);
+        console2.log("Min order amount:", minOrderAmount);
     }
 }
