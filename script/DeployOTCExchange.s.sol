@@ -12,9 +12,9 @@ import {AdminRegistry} from "../contracts/AdminRegistry.sol";
  * @notice Deploys OTCExchange (and its read-only OTCQuerier lens) to BNB Chain.
  *         All initial config is wired through the constructor, so the deployer
  *         needs no roles: governance lives in the shared AdminRegistry from day
- *         one (DEFAULT_ADMIN_ROLE = allow-lists / min order / pause,
- *         FEE_ADMIN_ROLE = fee rate / recipient / withdrawals), and admin
- *         hand-off is the registry's two-step proposeAdmin/acceptAdmin.
+ *         one (DEFAULT_ADMIN_ROLE gates everything — allow-lists, min order,
+ *         pause, fees, withdrawals), and admin hand-off is the registry's
+ *         two-step proposeAdmin/acceptAdmin.
  *
  * Required env vars:
  *   PRIVATE_KEY        deployer key (holds no roles on the deployed contract)

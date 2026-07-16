@@ -64,7 +64,6 @@ contract OTCExchangeTest is Test {
     MockERC20 internal collateral;
 
     address internal admin = makeAddr("admin");
-    address internal feeAdmin = makeAddr("feeAdmin");
     address internal feeRecipient = makeAddr("feeRecipient");
     address internal seller = makeAddr("seller");
     address internal buyer = makeAddr("buyer");
@@ -82,9 +81,6 @@ contract OTCExchangeTest is Test {
         collateral = new MockERC20();
 
         registry = new AdminRegistry(admin);
-        bytes32 feeAdminRole = registry.FEE_ADMIN_ROLE();
-        vm.prank(admin);
-        registry.grantRole(feeAdminRole, feeAdmin);
 
         otc = _deployProxy(address(manager), 0);
 
@@ -474,7 +470,7 @@ contract OTCExchangeTest is Test {
 
     function test_Fill_UsesSnapshottedFee() public {
         uint256 id = _createSell();
-        vm.prank(feeAdmin);
+        vm.prank(admin);
         otc.setFeeBps(500); // raise live fee AFTER creation
         collateral.mint(buyer, COLLATERAL_AMOUNT);
         vm.startPrank(buyer);
@@ -521,38 +517,37 @@ contract OTCExchangeTest is Test {
         vm.stopPrank();
 
         uint256 fee = otc.accruedFees(address(collateral));
-        vm.prank(feeAdmin);
+        vm.prank(admin);
         otc.withdrawFees(address(collateral), fee);
         assertEq(collateral.balanceOf(feeRecipient), fee, "recipient paid");
     }
 
-    // ---- Role separation (mirrors MyriadCTFExchange / FeeModule gating) ----
+    // ---- Role gating: DEFAULT_ADMIN_ROLE gates everything ----
 
-    function test_Roles_FeeAdminCannotPauseOrConfigure() public {
-        vm.startPrank(feeAdmin);
+    function test_Roles_StrangerCannotAdminister() public {
+        vm.startPrank(seller);
         vm.expectRevert(OTCExchange.NotAdmin.selector);
         otc.pause();
         vm.expectRevert(OTCExchange.NotAdmin.selector);
         otc.setMinOrderAmount(1);
         vm.expectRevert(OTCExchange.NotAdmin.selector);
         otc.setCollateralAllowed(address(collateral), false);
-        vm.stopPrank();
-    }
-
-    function test_Roles_DefaultAdminCannotTouchFees() public {
-        vm.startPrank(admin);
-        vm.expectRevert(OTCExchange.NotFeeAdmin.selector);
+        vm.expectRevert(OTCExchange.NotAdmin.selector);
         otc.setFeeBps(200);
-        vm.expectRevert(OTCExchange.NotFeeAdmin.selector);
-        otc.setFeeRecipient(admin);
-        vm.expectRevert(OTCExchange.NotFeeAdmin.selector);
+        vm.expectRevert(OTCExchange.NotAdmin.selector);
+        otc.setFeeRecipient(seller);
+        vm.expectRevert(OTCExchange.NotAdmin.selector);
         otc.withdrawFees(address(collateral), 0);
         vm.stopPrank();
     }
 
-    function test_Roles_StrangerCannotSetFee() public {
-        vm.prank(seller);
-        vm.expectRevert(OTCExchange.NotFeeAdmin.selector);
+    function test_Roles_AdminCanTouchFees() public {
+        vm.startPrank(admin);
         otc.setFeeBps(200);
+        otc.setFeeRecipient(admin);
+        otc.withdrawFees(address(collateral), 0);
+        vm.stopPrank();
+        assertEq(otc.feeBps(), 200, "fee set");
+        assertEq(otc.feeRecipient(), admin, "recipient set");
     }
 }

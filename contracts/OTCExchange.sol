@@ -56,9 +56,8 @@ interface IMarketManager {
  *         safety, not privacy).
  *
  *         Governance lives in the shared AdminRegistry (same instance as the CLOB
- *         stack): DEFAULT_ADMIN_ROLE gates allow-lists, minimum order size, and
- *         pause; FEE_ADMIN_ROLE gates fee rate, recipient, and withdrawals —
- *         mirroring MyriadCTFExchange / FeeModule. Admin hand-off is the registry's
+ *         stack): DEFAULT_ADMIN_ROLE gates everything — allow-lists, minimum order
+ *         size, pause, fees, and withdrawals. Admin hand-off is the registry's
  *         two-step proposeAdmin/acceptAdmin.
  *
  *         THIS CODE IS UNAUDITED. Have it independently audited before mainnet use.
@@ -120,7 +119,6 @@ contract OTCExchange is Initializable, ReentrancyGuardTransientUpgradeable, Paus
     // ------------------------------- Errors ------------------------------- //
 
     error NotAdmin();
-    error NotFeeAdmin();
     error ZeroAddress();
     error FeeTooHigh();
     error ManagerMismatch();
@@ -232,10 +230,6 @@ contract OTCExchange is Initializable, ReentrancyGuardTransientUpgradeable, Paus
         if (!registry.hasRole(registry.DEFAULT_ADMIN_ROLE(), msg.sender)) revert NotAdmin();
     }
 
-    function _requireFeeAdmin() internal view {
-        if (!registry.hasRole(registry.FEE_ADMIN_ROLE(), msg.sender)) revert NotFeeAdmin();
-    }
-
     /// @dev UUPS upgrade authorization — DEFAULT_ADMIN_ROLE only (mirrors MyriadCTFExchange).
     function _authorizeUpgrade(address) internal view override {
         _requireAdmin();
@@ -291,7 +285,7 @@ contract OTCExchange is Initializable, ReentrancyGuardTransientUpgradeable, Paus
 
     /// @notice Update the fee rate. Only affects orders created AFTER this call.
     function setFeeBps(uint256 newFeeBps) external {
-        _requireFeeAdmin();
+        _requireAdmin();
         if (newFeeBps > MAX_FEE_BPS) revert FeeTooHigh();
         emit FeeBpsUpdated(feeBps, newFeeBps);
         feeBps = newFeeBps;
@@ -299,7 +293,7 @@ contract OTCExchange is Initializable, ReentrancyGuardTransientUpgradeable, Paus
 
     /// @notice Update the fee recipient.
     function setFeeRecipient(address newRecipient) external {
-        _requireFeeAdmin();
+        _requireAdmin();
         if (newRecipient == address(0)) revert ZeroAddress();
         emit FeeRecipientUpdated(feeRecipient, newRecipient);
         feeRecipient = newRecipient;
@@ -307,7 +301,7 @@ contract OTCExchange is Initializable, ReentrancyGuardTransientUpgradeable, Paus
 
     /// @notice Withdraw accrued fees for a collateral token to the fee recipient.
     function withdrawFees(address collateralToken, uint256 amount) external nonReentrant {
-        _requireFeeAdmin();
+        _requireAdmin();
         uint256 available = accruedFees[collateralToken];
         if (amount > available) revert InsufficientAccruedFees();
         accruedFees[collateralToken] = available - amount;
