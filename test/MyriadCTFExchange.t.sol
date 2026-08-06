@@ -745,6 +745,43 @@ contract MyriadCTFExchangeTest is Test {
     assertEq(tFilled, fillAmount);
   }
 
+  /// @dev Mint match with priceSum > ONE: the taker's limit (0.50) exceeds the
+  ///      complement of the maker's price (1 − 0.60 = 0.40). The taker must be
+  ///      charged the COMPLEMENT, capturing the price improvement — the same
+  ///      convention matchCrossMarketOrders follows for its taker leg. Guards
+  ///      the behavior enabled by ebaecc1 (allow mint above one), previously
+  ///      only exercised at priceSum == ONE where the two formulas coincide.
+  function testMintMatchTakerPriceImprovement() public {
+    uint256 fillAmount = 100 ether;
+    uint256 makerPrice = (60 * ONE) / 100;
+    uint256 takerPrice = (50 * ONE) / 100; // sum 1.10 — crossed by 0.10
+
+    collateral.mint(maker, 1000 ether);
+    collateral.mint(taker, 1000 ether);
+    _approveAll(maker);
+    _approveAll(taker);
+
+    MyriadCTFExchange.Order memory m = _buildOrder(maker, marketId, Outcomes.YES, MyriadCTFExchange.Side.Buy, fillAmount, makerPrice, 650);
+    MyriadCTFExchange.Order memory t = _buildOrder(taker, marketId, Outcomes.NO, MyriadCTFExchange.Side.Buy, fillAmount, takerPrice, 651);
+
+    uint256 makerNotional = (fillAmount * makerPrice) / ONE; // 60e18
+    uint256 takerNotional = fillAmount - makerNotional;      // 40e18, NOT 50e18
+    uint256 makerFee      = (makerNotional * 100) / BPS;
+    uint256 takerFee      = (takerNotional * 200) / BPS;
+
+    uint256 makerColBefore = collateral.balanceOf(maker);
+    uint256 takerColBefore = collateral.balanceOf(taker);
+
+    exchange.matchOrdersWithFees(m, _signOrder(m, makerPk), t, _signOrder(t, takerPk), fillAmount);
+
+    assertEq(collateral.balanceOf(maker), makerColBefore - makerNotional - makerFee, "maker pays limit notional");
+    assertEq(collateral.balanceOf(taker), takerColBefore - takerNotional - takerFee, "taker pays complement, not limit");
+    assertEq(conditionalTokens.balanceOf(maker, conditionalTokens.getTokenId(marketId, Outcomes.YES)), fillAmount);
+    assertEq(conditionalTokens.balanceOf(taker, conditionalTokens.getTokenId(marketId, Outcomes.NO)), fillAmount);
+    assertEq(collateral.balanceOf(address(feeModule)), makerFee + takerFee, "fees only, no surplus");
+    assertEq(collateral.balanceOf(address(exchange)), 0, "exchange has no stuck collateral");
+  }
+
   /// @dev Two sequential partial fills of the same mint-match orders.
   ///      Confirms cumulative filledAmounts and token balances accumulate correctly.
   function testMintMatchPartialFill() public {

@@ -692,10 +692,10 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
   }
 
   // =========================================================================
-  // Cross-market surplus (priceSum > ONE)
+  // Cross-market taker price improvement (priceSum > ONE)
   // =========================================================================
 
-  function testCrossMarketSurplusGoesToFeeModule() public {
+  function testCrossMarketMakersCoverFillReverts() public {
     (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
     uint256 fillAmount = 100 ether;
 
@@ -714,7 +714,9 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
       vm.stopPrank();
     }
 
-    // priceSum = 0.60 + 0.60 + 0.10 = 1.30
+    // Maker prices alone (0.60 + 0.60 = 1.20) already cover the fill, so the
+    // taker's complement would be zero — the old free-tokens case. The match
+    // must revert ZeroNotional: completing a set can never be free.
     uint256 price0 = (60 * ONE) / 100;
     uint256 price1 = (60 * ONE) / 100;
     uint256 price2 = (10 * ONE) / 100;
@@ -732,35 +734,20 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     uint256 aliceBefore = collateral.balanceOf(alice);
     uint256 bobBefore = collateral.balanceOf(bob);
     uint256 charlieBefore = collateral.balanceOf(charlie);
-    uint256 feeModuleBefore = collateral.balanceOf(address(feeModule));
 
+    vm.expectRevert(MyriadCTFExchange.ZeroNotional.selector);
     exchange.matchCrossMarketOrders(orders, sigs, fillAmount);
 
-    // Each buyer pays their own notional — no free tokens
-    uint256 aliceNotional = (fillAmount * price0) / ONE;
-    uint256 bobNotional = (fillAmount * price1) / ONE;
-    uint256 charlieNotional = (fillAmount * price2) / ONE;
-
-    assertEq(aliceBefore - collateral.balanceOf(alice), aliceNotional, "alice pays her notional");
-    assertEq(bobBefore - collateral.balanceOf(bob), bobNotional, "bob pays his notional");
-    assertEq(charlieBefore - collateral.balanceOf(charlie), charlieNotional, "charlie pays his notional");
-
-    // All three received their YES tokens
+    // Nothing moved
+    assertEq(collateral.balanceOf(alice), aliceBefore, "alice untouched");
+    assertEq(collateral.balanceOf(bob), bobBefore, "bob untouched");
+    assertEq(collateral.balanceOf(charlie), charlieBefore, "charlie untouched");
     for (uint256 i = 0; i < 3; i++) {
-      assertEq(conditionalTokens.balanceOf(users[i], conditionalTokens.getTokenId(marketIds[i], Outcomes.YES)), fillAmount);
+      assertEq(conditionalTokens.balanceOf(users[i], conditionalTokens.getTokenId(marketIds[i], Outcomes.YES)), 0);
     }
-
-    // Surplus = totalNotional - fillAmount = 130 - 100 = 30 → sent to feeModule
-    uint256 surplus = (aliceNotional + bobNotional + charlieNotional) - fillAmount;
-    assertEq(surplus, 30 ether, "surplus is 30");
-    assertEq(collateral.balanceOf(address(feeModule)) - feeModuleBefore, surplus, "feeModule received surplus");
-
-    // Nothing stuck in exchange (neither underlying nor wcol)
-    assertEq(collateral.balanceOf(address(exchange)), 0, "exchange has no stuck underlying");
-    assertEq(wcol.balanceOf(address(exchange)), 0, "exchange has no stuck wcol");
   }
 
-  function testCrossMarketSurplusEmitsEvent() public {
+  function testCrossMarketTakerPriceImprovement() public {
     (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
     uint256 fillAmount = 100 ether;
 
@@ -781,7 +768,8 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
 
     bytes32 eventId = manager.getEventId(marketIds[0]);
 
-    // priceSum = 0.50 + 0.40 + 0.30 = 1.20
+    // priceSum = 0.50 + 0.40 + 0.30 = 1.20; makers cover 0.90, so the taker
+    // (charlie) pays the 0.10 complement — a 0.20 improvement on his limit.
     uint256 price0 = (50 * ONE) / 100;
     uint256 price1 = (40 * ONE) / 100;
     uint256 price2 = (30 * ONE) / 100;
@@ -796,15 +784,39 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
       sigs[i] = _signOrder(orders[i], pks[i]);
     }
 
-    uint256 expectedSurplus = (fillAmount * price0) / ONE + (fillAmount * price1) / ONE + (fillAmount * price2) / ONE - fillAmount;
+    uint256 aliceNotional = (fillAmount * price0) / ONE;
+    uint256 bobNotional = (fillAmount * price1) / ONE;
+    uint256 charlieNotional = fillAmount - aliceNotional - bobNotional; // complement, not limit
 
-    vm.expectEmit(true, false, false, true, address(exchange));
-    emit MyriadCTFExchange.SurplusCollected(eventId, expectedSurplus);
+    uint256 aliceBefore = collateral.balanceOf(alice);
+    uint256 bobBefore = collateral.balanceOf(bob);
+    uint256 charlieBefore = collateral.balanceOf(charlie);
+    uint256 feeModuleBefore = collateral.balanceOf(address(feeModule));
+
+    // The taker's leg event reports the improved notional (fee 0 here).
+    vm.expectEmit(true, true, false, true, address(exchange));
+    emit MyriadCTFExchange.CrossMarketOrderFilled(
+      exchange.hashOrder(orders[2]), eventId, marketIds[2], fillAmount, fillAmount, charlieNotional, 0
+    );
 
     exchange.matchCrossMarketOrders(orders, sigs, fillAmount);
+
+    assertEq(aliceBefore - collateral.balanceOf(alice), aliceNotional, "alice pays her limit notional");
+    assertEq(bobBefore - collateral.balanceOf(bob), bobNotional, "bob pays his limit notional");
+    assertEq(charlieBefore - collateral.balanceOf(charlie), charlieNotional, "taker pays the complement");
+    assertEq(charlieNotional, 10 ether, "improvement captured by taker");
+
+    for (uint256 i = 0; i < 3; i++) {
+      assertEq(conditionalTokens.balanceOf(users[i], conditionalTokens.getTokenId(marketIds[i], Outcomes.YES)), fillAmount);
+    }
+
+    // Collected == fillAmount exactly: no surplus, feeModule untouched, nothing stuck.
+    assertEq(collateral.balanceOf(address(feeModule)), feeModuleBefore, "feeModule receives no surplus");
+    assertEq(collateral.balanceOf(address(exchange)), 0, "exchange has no stuck underlying");
+    assertEq(wcol.balanceOf(address(exchange)), 0, "exchange has no stuck wcol");
   }
 
-  function testCrossMarketSurplusWithFees() public {
+  function testCrossMarketTakerImprovementWithFees() public {
     (, uint256[] memory marketIds) = _createThreeOutcomeEvent();
     uint256 fillAmount = 100 ether;
 
@@ -823,7 +835,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
       vm.stopPrank();
     }
 
-    // priceSum = 0.50 + 0.40 + 0.20 = 1.10
+    // priceSum = 0.50 + 0.40 + 0.20 = 1.10; taker complement = 0.10
     uint256 price0 = (50 * ONE) / 100;
     uint256 price1 = (40 * ONE) / 100;
     uint256 price2 = (20 * ONE) / 100;
@@ -845,7 +857,7 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
 
     exchange.matchCrossMarketOrders(orders, sigs, fillAmount);
 
-    // Each buyer pays notional + their respective fee
+    // Makers pay limit notional + maker fee
     uint256 aliceNotional = (fillAmount * price0) / ONE;
     uint256 aliceFee = (aliceNotional * 100) / BPS; // 1% maker
     assertEq(aliceBefore - collateral.balanceOf(alice), aliceNotional + aliceFee, "alice pays notional + maker fee");
@@ -854,18 +866,20 @@ contract NegRiskAdapterTest is Test, ERC1155Holder {
     uint256 bobFee = (bobNotional * 100) / BPS; // 1% maker
     assertEq(bobBefore - collateral.balanceOf(bob), bobNotional + bobFee, "bob pays notional + maker fee");
 
-    uint256 charlieNotional = (fillAmount * price2) / ONE;
-    uint256 charlieFee = (charlieNotional * 200) / BPS; // 2% taker
-    assertEq(charlieBefore - collateral.balanceOf(charlie), charlieNotional + charlieFee, "charlie pays notional + taker fee");
+    // Taker pays the complement; the taker fee is based on the IMPROVED notional.
+    uint256 charlieNotional = fillAmount - aliceNotional - bobNotional;
+    uint256 charlieFee = (charlieNotional * 200) / BPS; // 2% taker on complement
+    assertEq(charlieBefore - collateral.balanceOf(charlie), charlieNotional + charlieFee, "charlie pays complement + taker fee");
 
-    // feeModule receives surplus + all fees
-    uint256 surplus = (aliceNotional + bobNotional + charlieNotional) - fillAmount;
+    // feeModule receives fees only — no surplus exists anymore
     uint256 totalFees = aliceFee + bobFee + charlieFee;
     assertEq(
       collateral.balanceOf(address(feeModule)) - feeModuleBefore,
-      surplus + totalFees,
-      "feeModule received surplus + fees"
+      totalFees,
+      "feeModule received fees only"
     );
+    assertEq(collateral.balanceOf(address(exchange)), 0, "exchange has no stuck underlying");
+    assertEq(wcol.balanceOf(address(exchange)), 0, "exchange has no stuck wcol");
   }
 
   function testCrossMarketNoSurplusWhenPriceSumExactlyOne() public {
