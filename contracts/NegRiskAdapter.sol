@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
 import "./AdminRegistry.sol";
 import "./PredictionMarketV3ManagerCLOB.sol";
+import "./IMyriadMarketManager.sol";
 import "./ConditionalTokens.sol";
 import "./WrappedCollateral.sol";
 import "./Outcomes.sol";
@@ -21,10 +22,18 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
   // ─── Types ───────────────────────────────────────────────────────────
 
+  /// @dev `winningIndex` is sentinel-encoded and -2 is OVERLOADED: it is the value
+  ///      both at creation (not yet finalized) AND after voidEvent (finalized).
+  ///      Disambiguate with `resolved` (and the EventVoided / EventResolved events),
+  ///      never `winningIndex` alone:
+  ///        resolved == false                      → open / not finalized (always -2)
+  ///        resolved == true  && winningIndex == -2 → voided  (see EventVoided)
+  ///        resolved == true  && winningIndex == -1 → "Other" wins, no named outcome
+  ///        resolved == true  && winningIndex 0..N-1 → that named outcome wins
   struct Event {
     uint256 outcomeCount;
     bool resolved;
-    int256 winningIndex;   // -1 = no winner ("Other"), 0..N-1 = specific outcome
+    int256 winningIndex;   // -2 unresolved OR voided, -1 "Other", 0..N-1 named winner (see @dev above)
     uint256[] marketIds;
     string question;       // parent event question (e.g. "Who will win the election?")
   }
@@ -55,6 +64,7 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
   event EventCreated(bytes32 indexed eventId, uint256 outcomeCount, uint256[] marketIds);
   event EventResolved(bytes32 indexed eventId, int256 winningIndex);
+  event EventMarketForcedNo(bytes32 indexed eventId, uint256 outcomeIndex, uint256 marketId);
   event EventVoided(bytes32 indexed eventId, uint256[] yesPayouts);
   event PositionsSplit(bytes32 indexed eventId, uint256 outcomeIndex, address indexed user, uint256 amount);
   event PositionsMerged(bytes32 indexed eventId, uint256 outcomeIndex, address indexed user, uint256 amount);
@@ -63,6 +73,8 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
   event NOPositionsRedeemed(bytes32 indexed eventId, uint256 wcolRecovered, uint256 wcolBurned, uint256 excessToTreasury);
   event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
   event ExchangeUpdated(address indexed oldExchange, address indexed newExchange);
+  event EventClosesAtUpdated(bytes32 indexed eventId, uint256 newClosesAt);
+  event EventOracleUpdated(bytes32 indexed eventId, address newOracle);
 
   // ─── Constructor ─────────────────────────────────────────────────────
 
@@ -108,6 +120,19 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     emit ExchangeUpdated(old, _exchange);
   }
 
+  // ─── Exchange wrap helper ────────────────────────────────────────────
+
+  /// @notice Wrap `amount` of underlying into wcol on behalf of the exchange.
+  ///         Exchange-only. The reverse uses WrappedCollateral.unwrap directly.
+  function wrapForExchange(uint256 amount) external nonReentrant {
+    require(msg.sender == exchange, "only exchange");
+    require(amount > 0, "amount 0");
+    underlying.safeTransferFrom(msg.sender, address(this), amount);
+    underlying.forceApprove(address(wcol), amount);
+    wcol.wrap(amount);
+    IERC20(address(wcol)).safeTransfer(msg.sender, amount);
+  }
+
   // ─── Event lifecycle ─────────────────────────────────────────────────
 
   /// @notice Create a neg risk event with all binary markets in one tx.
@@ -149,6 +174,59 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     }
 
     emit EventCreated(eventId, marketParams.length, evt.marketIds);
+  }
+
+  /// @notice Atomically rewrite `closesAt` for every still-unresolved constituent
+  ///         market of a neg-risk event, preserving the shared-close invariant
+  ///         that `createEvent` enforces. Per-leg `adminSetClosesAt` is gated to
+  ///         this path for neg-risk markets, so one leg cannot be rescheduled in
+  ///         isolation (which would break cross-market matching / convert / void).
+  function adminSetEventClosesAt(bytes32 eventId, uint256 newClosesAt) external nonReentrant {
+    require(registry.hasRole(registry.MARKET_ADMIN_ROLE(), msg.sender), "not market admin");
+    Event storage evt = _events[eventId];
+    require(evt.outcomeCount > 0, "event !exist");
+    require(!evt.resolved, "event resolved");
+
+    uint256 n = evt.outcomeCount;
+    for (uint256 i = 0; i < n; i++) {
+      uint256 marketId = evt.marketIds[i];
+      // A leg resolved on its own keeps its (now-moot) close time; adminSetClosesAt
+      // would revert on it. Only realign legs that can still trade/resolve.
+      if (manager.getMarketState(marketId) == IMyriadMarketManager.MarketState.resolved) continue;
+      manager.adminSetClosesAt(marketId, newClosesAt);
+    }
+
+    emit EventClosesAtUpdated(eventId, newClosesAt);
+  }
+
+  /// @notice Re-point the whole event's resolution oracle through the adapter,
+  ///         re-initializing every still-unresolved leg with its own payload.
+  ///         All legs share one oracle contract (per-leg `oracleData`), matching
+  ///         how `createEvent` wires them, so a leg's resolution source cannot be
+  ///         swapped independently of the event.
+  /// @param oracleData One initialization payload per outcome (length == outcomeCount).
+  function updateEventOracle(
+    bytes32 eventId,
+    address newOracle,
+    bytes[] calldata oracleData
+  ) external nonReentrant {
+    require(registry.hasRole(registry.MARKET_ADMIN_ROLE(), msg.sender), "not market admin");
+    Event storage evt = _events[eventId];
+    require(evt.outcomeCount > 0, "event !exist");
+    require(!evt.resolved, "event resolved");
+
+    uint256 n = evt.outcomeCount;
+    require(oracleData.length == n, "oracleData length");
+
+    for (uint256 i = 0; i < n; i++) {
+      uint256 marketId = evt.marketIds[i];
+      // A resolved leg's oracle is moot and updateMarketOracle would revert on it;
+      // only re-point legs that can still resolve. oracleData[i] maps to leg i.
+      if (manager.getMarketState(marketId) == IMyriadMarketManager.MarketState.resolved) continue;
+      manager.updateMarketOracle(marketId, newOracle, oracleData[i]);
+    }
+
+    emit EventOracleUpdated(eventId, newOracle);
   }
 
   // ─── Position operations ─────────────────────────────────────────────
@@ -213,8 +291,16 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     emit PositionsMerged(eventId, outcomeIndex, msg.sender, amount);
   }
 
-  /// @notice Convert NO tokens for one outcome into YES tokens for all other outcomes.
-  ///         The adapter mints wcol to facilitate splitting in the complementary markets.
+  /// @notice Convert `amount` of NO(noOutcomeIndex) into `amount` of YES on every
+  ///         other outcome. The adapter mints `(n-1) * amount` unbacked wcol to
+  ///         split the complementary markets and keeps the caller's supplied
+  ///         NO(noOutcomeIndex) as backing for that mint.
+  /// @dev One-way swap (no inverse). Versus just holding NO(noOutcomeIndex), it pays
+  ///      the same on every resolution except all-NO "Other" (winningIndex == -1):
+  ///      there the held NO would have won, but the converted YES bundle is worthless
+  ///      and the retained NO is swept to the treasury as `excess` in
+  ///      redeemNOPositions — the caller forfeits `amount`. Named-winner resolutions
+  ///      are break-even. Price this before converting.
   /// @param eventId The event identifier.
   /// @param noOutcomeIndex The outcome whose NO token the caller is giving up.
   /// @param amount Number of NO tokens to convert.
@@ -231,40 +317,56 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
     uint256 n = evt.outcomeCount;
     uint256 noMarketId = evt.marketIds[noOutcomeIndex];
+    require(
+      manager.getMarketState(noMarketId) != IMyriadMarketManager.MarketState.resolved,
+      "leg resolved"
+    );
     uint256 noTokenId = conditionalTokens.getTokenId(noMarketId, Outcomes.NO);
+
+    // Count splittable legs (i != noOutcomeIndex AND not resolved).
+    // Resolved legs are treated as if they never existed — their YES would be
+    // worth 0, so skipping them costs the user nothing.
+    uint256 k;
+    for (uint256 i = 0; i < n; i++) {
+      if (i == noOutcomeIndex) continue;
+      if (manager.getMarketState(evt.marketIds[i]) == IMyriadMarketManager.MarketState.resolved) continue;
+      k++;
+    }
+    require(k > 0, "no unresolved legs");
 
     // Take NO(noOutcomeIndex) from caller
     conditionalTokens.safeTransferFrom(msg.sender, address(this), noTokenId, amount, "");
 
-    // Mint wcol for splitting in the other (N-1) markets
-    uint256 wcolToMint = (n - 1) * amount;
+    // Mint wcol for splitting in the K unresolved complementary markets
+    uint256 wcolToMint = k * amount;
     wcol.adapterMint(address(this), wcolToMint);
     mintedWcolPerEvent[eventId] += wcolToMint;
 
-    // Split in each other market and send YES to caller, keep NO
+    // Split in each unresolved other market and send YES to caller, keep NO
     for (uint256 i = 0; i < n; i++) {
       if (i == noOutcomeIndex) continue;
-
       uint256 marketId = evt.marketIds[i];
+      if (manager.getMarketState(marketId) == IMyriadMarketManager.MarketState.resolved) continue;
+
       conditionalTokens.splitPosition(marketId, amount);
 
       // Send YES to caller
       uint256 yesTokenId = conditionalTokens.getTokenId(marketId, Outcomes.YES);
       conditionalTokens.safeTransferFrom(address(this), msg.sender, yesTokenId, amount, "");
 
-      // Adapter retains the NO token (backing for the minted wcol)
+      // Adapter retains the NO token (backing for the minted wcol). On an all-NO
+      // "Other" resolution this retained NO is swept to the treasury, not returned
+      // to the caller — see the @dev note on forfeiture above.
     }
 
     emit PositionsConverted(eventId, noOutcomeIndex, msg.sender, amount);
   }
 
   /// @notice Mint YES tokens for ALL outcomes in an event. Used by the exchange
-  ///         for cross-market matching. Takes wcol from caller, splits in the
-  ///         first market, then mints wcol and splits in remaining markets.
-  ///         All YES tokens go to `recipient`; adapter keeps all NO tokens.
-  /// @param eventId The event identifier.
-  /// @param amount Number of shares to create per outcome.
-  /// @param recipient Address to receive all YES tokens (typically the exchange).
+  ///         for cross-market matching. Takes underlying from caller, wraps
+  ///         to wcol internally, splits in the first market, then mints wcol
+  ///         and splits in the remaining markets. All YES tokens go to
+  ///         `recipient`; adapter keeps all NO tokens.
   function mintAllYesTokens(
     bytes32 eventId,
     uint256 amount,
@@ -279,25 +381,48 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
     uint256 n = evt.outcomeCount;
 
-    // Take `amount` wcol from caller for the first market's split
-    IERC20(address(wcol)).safeTransferFrom(msg.sender, address(this), amount);
+    // Locate the first unresolved leg — it consumes the freshly-wrapped wcol.
+    // Resolved legs are skipped: YES on a resolved-NO leg is worth 0, so
+    // the recipient losing that share has no economic effect.
+    uint256 firstUnresolved = type(uint256).max;
+    for (uint256 i = 0; i < n; i++) {
+      if (manager.getMarketState(evt.marketIds[i]) != IMyriadMarketManager.MarketState.resolved) {
+        firstUnresolved = i;
+        break;
+      }
+    }
+    require(firstUnresolved != type(uint256).max, "no unresolved legs");
 
-    // Split first market using the caller's wcol
+    // Pull underlying from the exchange and wrap for the first unresolved market's split.
+    underlying.safeTransferFrom(msg.sender, address(this), amount);
+    underlying.forceApprove(address(wcol), amount);
+    wcol.wrap(amount);
+
+    // Split first unresolved market using the freshly-wrapped wcol
     {
-      uint256 marketId = evt.marketIds[0];
+      uint256 marketId = evt.marketIds[firstUnresolved];
       conditionalTokens.splitPosition(marketId, amount);
       uint256 yesTokenId = conditionalTokens.getTokenId(marketId, Outcomes.YES);
       conditionalTokens.safeTransferFrom(address(this), recipient, yesTokenId, amount, "");
     }
 
-    // Mint wcol for the remaining (N-1) markets and split each
-    if (n > 1) {
-      uint256 wcolToMint = (n - 1) * amount;
+    // Count remaining unresolved legs after firstUnresolved
+    uint256 remaining;
+    for (uint256 i = firstUnresolved + 1; i < n; i++) {
+      if (manager.getMarketState(evt.marketIds[i]) != IMyriadMarketManager.MarketState.resolved) {
+        remaining++;
+      }
+    }
+
+    // Mint wcol for the remaining unresolved markets and split each
+    if (remaining > 0) {
+      uint256 wcolToMint = remaining * amount;
       wcol.adapterMint(address(this), wcolToMint);
       mintedWcolPerEvent[eventId] += wcolToMint;
 
-      for (uint256 i = 1; i < n; i++) {
+      for (uint256 i = firstUnresolved + 1; i < n; i++) {
         uint256 marketId = evt.marketIds[i];
+        if (manager.getMarketState(marketId) == IMyriadMarketManager.MarketState.resolved) continue;
         conditionalTokens.splitPosition(marketId, amount);
         uint256 yesTokenId = conditionalTokens.getTokenId(marketId, Outcomes.YES);
         conditionalTokens.safeTransferFrom(address(this), recipient, yesTokenId, amount, "");
@@ -309,9 +434,105 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
   // ─── Resolution ──────────────────────────────────────────────────────
 
-  /// @notice Resolve the event. winningIndex >= 0 means that outcome won (YES).
-  ///         winningIndex == -1 means "Other" won: all markets resolve NO.
-  function resolveEvent(bytes32 eventId, int256 winningIndex) external nonReentrant {
+  /// @notice Permissionless per-market resolution for a neg-risk event. Routes
+  ///         through `manager.resolveMarket`. When the resolved outcome is YES,
+  ///         atomically forces every other constituent market to NO and finalizes
+  ///         the event — encoding mutual exclusivity forward so a dual-YES race
+  ///         is structurally impossible.
+  function resolveEventMarket(bytes32 eventId, uint256 outcomeIndex) external nonReentrant returns (int256) {
+    Event storage evt = _events[eventId];
+    require(evt.outcomeCount > 0, "event !exist");
+    require(!evt.resolved, "already resolved");
+    require(outcomeIndex < evt.outcomeCount, "bad index");
+
+    uint256 marketId = evt.marketIds[outcomeIndex];
+    int256 outcome = manager.resolveMarket(marketId);
+    if (outcome == int256(Outcomes.YES)) {
+      _forceOthersNoAndFinalize(evt, eventId, outcomeIndex);
+    }
+    return outcome;
+  }
+
+  /// @notice Admin per-market override for a neg-risk event. Routes through
+  ///         `manager.adminResolveMarket`. When the supplied outcome is YES,
+  ///         atomically forces every other constituent market to NO and finalizes
+  ///         the event (same forward invariant as `resolveEventMarket`).
+  function adminResolveEventMarket(
+    bytes32 eventId,
+    uint256 outcomeIndex,
+    int256 outcome
+  ) external nonReentrant returns (int256) {
+    require(registry.hasRole(registry.RESOLUTION_ADMIN_ROLE(), msg.sender), "not resolution admin");
+
+    Event storage evt = _events[eventId];
+    require(evt.outcomeCount > 0, "event !exist");
+    require(!evt.resolved, "already resolved");
+    require(outcomeIndex < evt.outcomeCount, "bad index");
+
+    uint256 marketId = evt.marketIds[outcomeIndex];
+    int256 result = manager.adminResolveMarket(marketId, outcome);
+    if (outcome == int256(Outcomes.YES)) {
+      _forceOthersNoAndFinalize(evt, eventId, outcomeIndex);
+    }
+    return result;
+  }
+
+  /// @dev Force every constituent market other than `winnerIndex` to NO and
+  ///      finalize the event. Already-resolved markets are skipped (with a
+  ///      defense-in-depth check that they aren't YES — should be unreachable
+  ///      because the forward invariant prevents two YES from co-existing).
+  function _forceOthersNoAndFinalize(Event storage evt, bytes32 eventId, uint256 winnerIndex) internal {
+    uint256 n = evt.marketIds.length;
+    for (uint256 i = 0; i < n; i++) {
+      if (i == winnerIndex) continue;
+      uint256 mid = evt.marketIds[i];
+      if (manager.getMarketState(mid) == IMyriadMarketManager.MarketState.resolved) {
+        require(manager.getMarketResolvedOutcome(mid) != int256(Outcomes.YES), "event already has YES winner");
+        continue;
+      }
+      manager.adminResolveMarket(mid, int256(Outcomes.NO));
+      emit EventMarketForcedNo(eventId, i, mid);
+    }
+    evt.resolved = true;
+    evt.winningIndex = int256(winnerIndex);
+    emit EventResolved(eventId, int256(winnerIndex));
+  }
+
+  /// @notice Permissionless event resolution. Derives `winningIndex` by scanning
+  ///         the constituent markets — every market must already be resolved.
+  ///         A single YES across the constituents wins; all NO means "Other"
+  ///         (winningIndex = -1). Multiple YES is rejected.
+  function resolveEvent(bytes32 eventId) external nonReentrant {
+    Event storage evt = _events[eventId];
+    require(evt.outcomeCount > 0, "event !exist");
+    require(!evt.resolved, "already resolved");
+
+    uint256 n = evt.outcomeCount;
+    int256 winningIndex = -1;
+    uint256 yesCount = 0;
+
+    for (uint256 i = 0; i < n; i++) {
+      uint256 mid = evt.marketIds[i];
+      require(manager.getMarketState(mid) == IMyriadMarketManager.MarketState.resolved, "market !resolved");
+      int256 outcome = manager.getMarketResolvedOutcome(mid);
+      if (outcome == int256(Outcomes.YES)) {
+        require(yesCount == 0, "multiple YES");
+        winningIndex = int256(i);
+        yesCount++;
+      }
+    }
+
+    evt.resolved = true;
+    evt.winningIndex = winningIndex;
+
+    emit EventResolved(eventId, winningIndex);
+  }
+
+  /// @notice Admin override: caller supplies winningIndex. Resolves any unresolved
+  ///         constituent markets via `manager.adminResolveMarket`. For markets
+  ///         that are already resolved, asserts the existing outcome matches the
+  ///         supplied winningIndex (otherwise reverts).
+  function adminResolveEvent(bytes32 eventId, int256 winningIndex) external nonReentrant {
     require(registry.hasRole(registry.RESOLUTION_ADMIN_ROLE(), msg.sender), "not resolution admin");
 
     Event storage evt = _events[eventId];
@@ -324,25 +545,27 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     evt.resolved = true;
     evt.winningIndex = winningIndex;
 
-    if (winningIndex == -1) {
-      for (uint256 i = 0; i < n; i++) {
-        manager.adminResolveMarket(evt.marketIds[i], int256(Outcomes.NO));
+    for (uint256 i = 0; i < n; i++) {
+      uint256 mid = evt.marketIds[i];
+      int256 expected = (winningIndex >= 0 && int256(i) == winningIndex)
+        ? int256(Outcomes.YES)
+        : int256(Outcomes.NO);
+
+      if (manager.getMarketState(mid) == IMyriadMarketManager.MarketState.resolved) {
+        require(manager.getMarketResolvedOutcome(mid) == expected, "winningIndex conflicts with resolved market");
+        continue;
       }
-    } else {
-      for (uint256 i = 0; i < n; i++) {
-        if (int256(i) == winningIndex) {
-          manager.adminResolveMarket(evt.marketIds[i], int256(Outcomes.YES));
-        } else {
-          manager.adminResolveMarket(evt.marketIds[i], int256(Outcomes.NO));
-        }
-      }
+      manager.adminResolveMarket(mid, expected);
     }
 
     emit EventResolved(eventId, winningIndex);
   }
 
-  /// @notice Void the event with per-market YES payouts. Each market is voided
-  ///         via adminVoidMarket; NO payout is derived as 1e18 - yesPayout.
+  /// @notice Void the event with per-market YES payouts. Each unresolved market is
+  ///         voided via adminVoidMarket; NO payout is derived as 1e18 - yesPayout.
+  ///         Already-resolved legs (early NO via adminResolveEventMarket) are
+  ///         skipped and keep their existing resolution — their yesPayouts entry
+  ///         MUST be 0 to acknowledge the leg is not being voided.
   /// @param eventId The event identifier.
   /// @param yesPayouts Array of YES (outcome 0) payouts, one per market, in 1e18.
   function voidEvent(
@@ -358,19 +581,59 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     uint256 n = evt.outcomeCount;
     require(yesPayouts.length == n, "length mismatch");
 
+    uint256 totalYesPayout;
+    uint256 totalProduct;
+    for (uint256 i = 0; i < n; i++) {
+      require(yesPayouts[i] <= 1e18, "yes payout > 1e18");
+      if (manager.getMarketState(evt.marketIds[i]) == IMyriadMarketManager.MarketState.resolved) {
+        // Already-NO-resolved legs (YES-resolved would have finalized the event
+        // via _forceOthersNoAndFinalize, so we cannot be here) keep their NO
+        // outcome — caller must pass 0 to acknowledge they are not being voided.
+        require(yesPayouts[i] == 0, "resolved leg payout != 0");
+      }
+      totalYesPayout += yesPayouts[i];
+
+      // Project the exact (un-floored) post-void recovery against the adapter's
+      // current YES + NO inventory. Summing products before the single 1e18
+      // division eliminates the per-market floor that redeemVoided applies,
+      // so this rejects only genuine insolvency — never rounding dust.
+      uint256 mid = evt.marketIds[i];
+      uint256 noBal  = conditionalTokens.balanceOf(address(this), conditionalTokens.getTokenId(mid, Outcomes.NO));
+      uint256 yesBal = conditionalTokens.balanceOf(address(this), conditionalTokens.getTokenId(mid, Outcomes.YES));
+      totalProduct += noBal * (1e18 - yesPayouts[i]) + yesBal * yesPayouts[i];
+    }
+
+    // Event-level solvency invariant:
+    // a full YES basket across named outcomes can never redeem more than 1 unit.
+    require(totalYesPayout <= 1e18, "event payouts overallocated");
+    require(totalProduct >= mintedWcolPerEvent[eventId] * 1e18, "void leaves event insolvent");
+
     evt.resolved = true;
-    evt.winningIndex = -2;
+    // winningIndex retains its createEvent sentinel (-2); voided events are
+    // distinguished from unresolved ones by evt.resolved, not winningIndex.
 
     for (uint256 i = 0; i < n; i++) {
+      if (manager.getMarketState(evt.marketIds[i]) == IMyriadMarketManager.MarketState.resolved) continue;
       manager.adminVoidMarket(evt.marketIds[i], yesPayouts[i], 1e18 - yesPayouts[i]);
     }
 
     emit EventVoided(eventId, yesPayouts);
   }
 
-  /// @notice After resolution, redeem the adapter's held NO positions, burn
+  /// @notice After resolution, redeem the adapter's held outcome tokens, burn
   ///         the wcol that was minted during convert/mintAll operations, and
-  ///         send any excess to treasury.
+  ///         sweep any excess to treasury.
+  /// @dev    Admin-only (`DEFAULT_ADMIN_ROLE`). Single-shot — sets
+  ///         `noPositionsRedeemed[eventId]` permanently; there is no retry path.
+  ///         Requires the event resolved (or voided). For each constituent
+  ///         market the adapter redeems whatever outcome tokens it holds:
+  ///         NO tokens when outcome == NO, and BOTH YES and NO balances when
+  ///         outcome == VOIDED (per `ConditionalTokens.redeemVoided`). YES-won
+  ///         and "Other"-won markets contribute nothing. The function then
+  ///         burns exactly `mintedWcolPerEvent[eventId]` wcol and reverts with
+  ///         `"insolvent event payouts"` if the recovered wcol is below that
+  ///         amount — operators must resolve the underlying shortfall before
+  ///         retry is possible (which it is not, see single-shot above).
   function redeemNOPositions(bytes32 eventId) external nonReentrant {
     require(registry.hasRole(registry.DEFAULT_ADMIN_ROLE(), msg.sender), "not admin");
     Event storage evt = _events[eventId];
@@ -380,19 +643,23 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     uint256 n = evt.outcomeCount;
     uint256 wcolBefore = IERC20(address(wcol)).balanceOf(address(this));
 
-    // Redeem NO positions from all markets where NO won
     for (uint256 i = 0; i < n; i++) {
       uint256 marketId = evt.marketIds[i];
       int256 outcome = manager.getMarketResolvedOutcome(marketId);
 
-      uint256 noTokenId = conditionalTokens.getTokenId(marketId, Outcomes.NO);
-      uint256 balance = conditionalTokens.balanceOf(address(this), noTokenId);
-
-      if (balance == 0) continue;
+      uint256 noBal = conditionalTokens.balanceOf(address(this), conditionalTokens.getTokenId(marketId, Outcomes.NO));
 
       if (outcome == Outcomes.VOIDED) {
+        // Skip when both sides floor to zero. redeemVoided would revert with
+        // "zero payout" in that case, which (because this function is one-shot)
+        // would permanently brick the redemption.
+        uint256 yesBal = conditionalTokens.balanceOf(address(this), conditionalTokens.getTokenId(marketId, Outcomes.YES));
+        if (yesBal == 0 && noBal == 0) continue;
+        (uint256 yesPay, uint256 noPay) = manager.getVoidedPayouts(marketId);
+        if ((yesBal * yesPay) / 1e18 + (noBal * noPay) / 1e18 == 0) continue;
         conditionalTokens.redeemVoided(marketId);
       } else if (outcome == int256(Outcomes.NO)) {
+        if (noBal == 0) continue;
         conditionalTokens.redeemPosition(marketId);
       }
     }
@@ -400,16 +667,22 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
     uint256 wcolAfter = IERC20(address(wcol)).balanceOf(address(this));
     uint256 wcolRecovered = wcolAfter - wcolBefore;
 
-    // Burn the amount we minted during converts
     uint256 minted = mintedWcolPerEvent[eventId];
-    uint256 toBurn = minted < wcolRecovered ? minted : wcolRecovered;
+
+    // Guard wcol vault solvency: real insolvency is rejected at void time by
+    // the un-floored projection in voidEvent, so any shortfall that reaches
+    // this point should only be per-market floor dust from redeemVoided (at
+    // most 2 wei per market, 1 per side).
+    require(wcolRecovered + 2 * n >= minted, "insolvent beyond rounding");
+
+    uint256 toBurn = wcolRecovered < minted ? wcolRecovered : minted;
     if (toBurn > 0) {
       wcol.adapterBurn(address(this), toBurn);
     }
+
     mintedWcolPerEvent[eventId] = 0;
     noPositionsRedeemed[eventId] = true;
 
-    // Any excess is from users' original deposits — send to treasury
     uint256 excess = wcolRecovered > toBurn ? wcolRecovered - toBurn : 0;
     if (excess > 0) {
       wcol.unwrap(excess);
@@ -421,6 +694,10 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
   // ─── View functions ──────────────────────────────────────────────────
 
+  /// @notice Returns an event's resolution state.
+  /// @dev Branch on `resolved` first, not `winningIndex` alone: a voided event
+  ///      returns winningIndex == -2 (identical to an unresolved one) but with
+  ///      resolved == true. See the Event struct @dev for the full encoding.
   function getEvent(bytes32 eventId) external view returns (
     uint256 outcomeCount,
     bool resolved,
@@ -438,6 +715,21 @@ contract NegRiskAdapter is ReentrancyGuardTransient, ERC1155Holder {
 
   function getEventOutcomeCount(bytes32 eventId) external view returns (uint256) {
     return _events[eventId].outcomeCount;
+  }
+
+  /// @notice Number of constituent markets that are NOT yet resolved.
+  ///         Early-resolved legs are excluded — multi-leg paths treat them
+  ///         as if they never existed.
+  function getUnresolvedOutcomeCount(bytes32 eventId) external view returns (uint256) {
+    Event storage evt = _events[eventId];
+    uint256 n = evt.outcomeCount;
+    uint256 count;
+    for (uint256 i = 0; i < n; i++) {
+      if (manager.getMarketState(evt.marketIds[i]) != IMyriadMarketManager.MarketState.resolved) {
+        count++;
+      }
+    }
+    return count;
   }
 
   function isEventResolved(bytes32 eventId) external view returns (bool) {

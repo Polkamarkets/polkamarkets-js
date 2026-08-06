@@ -6,23 +6,25 @@ import {Script, console} from "forge-std/Script.sol";
 import {NegRiskAdapter} from "../contracts/NegRiskAdapter.sol";
 import {PredictionMarketV3ManagerCLOB} from "../contracts/PredictionMarketV3ManagerCLOB.sol";
 
-/// @notice Creates a neg risk event with all named outcomes via the NegRiskAdapter.
+/// @notice Creates a neg-risk event with all named outcomes via the NegRiskAdapter.
+///
+///         Signing: use an encrypted keystore account, never a plaintext key —
+///           cast wallet import <name> --interactive   # one-time
+///           forge script ... --account <name> --sender <addr>
+///         The signer must have MARKET_ADMIN_ROLE.
 ///
 ///         Env vars (required):
-///           PRIVATE_KEY          — signer (must have MARKET_ADMIN_ROLE)
 ///           NEG_RISK_ADAPTER     — NegRiskAdapter address
 ///           CLOB_FEE_MODULE      — FeeModule address (used per-market)
 ///           CLOSES_AT            — unix timestamp when all outcome markets close
 ///           OUTCOMES             — comma-separated outcome names (e.g. "Trump,Harris,Biden")
-///           QUESTION             — parent event question (e.g. "Who will win the election?")
+///           QUESTION             — parent event question
 ///
 ///         Env vars (optional):
 ///           IMAGE                — IPFS hash or URL (default: "")
 ///           ORACLE               — oracle contract address (default: address(0))
-///           ORACLE_DATA          — hex-encoded oracle data (default: empty)
 contract CreateNegRiskEvent is Script {
   function run() external {
-    uint256 privateKey = vm.envUint("PRIVATE_KEY");
     address adapterAddr = vm.envAddress("NEG_RISK_ADAPTER");
     address feeModule = vm.envAddress("CLOB_FEE_MODULE");
     uint256 closesAt = vm.envUint("CLOSES_AT");
@@ -31,13 +33,11 @@ contract CreateNegRiskEvent is Script {
     string memory image = vm.envOr("IMAGE", string(""));
     address oracle = vm.envOr("ORACLE", address(0));
 
-    // Parse comma-separated outcomes
     string[] memory outcomes = _split(outcomesRaw, ",");
     require(outcomes.length >= 2, "need >= 2 outcomes");
 
     PredictionMarketV3ManagerCLOB.CreateMarketParams[] memory params =
       new PredictionMarketV3ManagerCLOB.CreateMarketParams[](outcomes.length);
-
     for (uint256 i = 0; i < outcomes.length; i++) {
       params[i] = PredictionMarketV3ManagerCLOB.CreateMarketParams({
         closesAt: closesAt,
@@ -49,10 +49,9 @@ contract CreateNegRiskEvent is Script {
       });
     }
 
-    vm.startBroadcast(privateKey);
-
+    // Signer comes from the --account keystore; no private key in env.
+    vm.startBroadcast();
     bytes32 eventId = NegRiskAdapter(adapterAddr).createEvent(eventQuestion, params);
-
     vm.stopBroadcast();
 
     console.log("Event created:");
@@ -63,14 +62,13 @@ contract CreateNegRiskEvent is Script {
     }
   }
 
-  /// @dev Simple comma splitter. Allocates worst-case array and trims.
+  /// @dev Simple comma splitter. Allocates worst-case array and fills.
   function _split(string memory str, string memory delimiter) internal pure returns (string[] memory) {
     bytes memory strBytes = bytes(str);
     bytes memory delimBytes = bytes(delimiter);
     require(delimBytes.length == 1, "single-char delimiter only");
     bytes1 delim = delimBytes[0];
 
-    // Count delimiters
     uint256 count = 1;
     for (uint256 i = 0; i < strBytes.length; i++) {
       if (strBytes[i] == delim) count++;
