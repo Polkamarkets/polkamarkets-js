@@ -117,10 +117,11 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
     bytes32 indexed eventId,
     uint256 marketId,
     uint256 fillAmount,
-    uint256 totalFilled
+    uint256 totalFilled,
+    uint256 notional,
+    uint256 fee
   );
   event NegRiskAdapterUpdated(address indexed oldAdapter, address indexed newAdapter);
-  event SurplusCollected(bytes32 indexed eventId, uint256 amount);
 
   error ZeroManager();
   error ZeroCT();
@@ -368,6 +369,10 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
   ///         The NegRiskAdapter mints YES tokens via split + convert.
   ///         Same-trader orders across different outcomes are intentionally allowed,
   ///         as a trader may legitimately want YES exposure on multiple outcomes.
+  ///         Pricing: makers pay their limit price; the taker (last order) pays
+  ///         the complement (fillAmount − Σ maker notionals) and captures any
+  ///         price improvement. If the makers alone cover the fill, the match
+  ///         reverts ZeroNotional — completing a set can never be free.
   function matchCrossMarketOrders(
     Order[] calldata orders,
     bytes[] calldata signatures,
@@ -430,17 +435,24 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
     if (priceSum < ONE) revert PriceSumBelowOne();
 
     // Collect tradeToken from each buyer: notional + fee.
-    // Convention: last order = taker, all others = makers.
+    // Convention: last order = taker, all others = makers. Makers pay their
+    // limit price; the taker pays exactly what completes the set
+    // (fillAmount − Σ maker notionals), capturing any price improvement —
+    // same convention as _settleMintMatch. When the makers alone already
+    // cover the fill the taker would owe zero, which ZeroNotional rejects:
+    // such sets are unmatchable by design (no free tokens).
     (IERC20 collateral, , ) = _marketCollaterals(orders[0].marketId);
     uint256 totalFees;
     uint256 takerIdx = orders.length - 1;
 
+    uint256[] memory notionals = new uint256[](orders.length);
+    uint256[] memory fees = new uint256[](orders.length);
+
     uint256 totalNotional;
     for (uint256 i = 0; i < orders.length;) {
-      uint256 notional = (fillAmount * orders[i].price) / ONE;
-      if (i == takerIdx && totalNotional + notional < fillAmount) {
-        notional = fillAmount - totalNotional;
-      }
+      uint256 notional = i == takerIdx
+        ? (totalNotional >= fillAmount ? 0 : fillAmount - totalNotional)
+        : (fillAmount * orders[i].price) / ONE;
       if (notional == 0) revert ZeroNotional();
       totalNotional += notional;
 
@@ -453,6 +465,8 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
         fee = (notional * makerBps) / BPS;
       }
       totalFees += fee;
+      notionals[i] = notional;
+      fees[i] = fee;
 
       uint256 required = notional + fee;
       _checkCollateralBalance(orders[i].trader, collateral, required);
@@ -477,19 +491,15 @@ contract MyriadCTFExchange is Initializable, ReentrancyGuardTransientUpgradeable
         if (remaining != 0 && remaining < minOrderAmount) revert DustRemainder();
       }
 
-      emit CrossMarketOrderFilled(orderHashes[i], eventId, orders[i].marketId, fillAmount, newFill);
+      emit CrossMarketOrderFilled(orderHashes[i], eventId, orders[i].marketId, fillAmount, newFill, notionals[i], fees[i]);
       unchecked { ++i; }
     }
 
-    // Send surplus (priceSum > ONE overage) + fees to feeModule
-    uint256 surplus = totalNotional - fillAmount;
-    uint256 toFeeModule = totalFees + surplus;
-    if (toFeeModule > 0) {
-      collateral.safeTransfer(address(_feeModule), toFeeModule);
-      _feeModule.accrueFees(address(collateral), toFeeModule);
-    }
-    if (surplus > 0) {
-      emit SurplusCollected(eventId, surplus);
+    // Fees to FeeModule. Collected collateral equals fillAmount exactly (the
+    // taker pays the complement), so there is no surplus to sweep.
+    if (totalFees > 0) {
+      collateral.safeTransfer(address(_feeModule), totalFees);
+      _feeModule.accrueFees(address(collateral), totalFees);
     }
   }
 
