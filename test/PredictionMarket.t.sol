@@ -759,6 +759,112 @@ contract PredictionMarketTest is Test {
     assertEq(balanceAfterAction, 0);
   }
 
+  // A 2-outcome market seeded with a skewed initial distribution (45/55), then voided. The skew
+  // hands the market creator both a batch of outcome-0 shares and the whole liquidity position;
+  // when the market is voided, the voided-share price and the liquidity price each round up in
+  // their denominators, so the creator's two claims together exceed market.balance by rounding
+  // dust (~90k wei at ~1000 tokens of liquidity). Before the dust clamp, whichever of the two
+  // claims came second reverted with "b<v" and stranded the funds.
+  function _createSkewedVoidedMarket(uint256 liquidity) internal returns (uint256) {
+    tokenERC20.mint(user, liquidity); // ensure enough collateral at this scale
+
+    uint256[] memory distribution = new uint256[](2);
+    distribution[0] = 45000000;
+    distribution[1] = 55000000;
+
+    PredictionMarketV3_4.CreateMarketDescription memory desc = PredictionMarketV3_4.CreateMarketDescription({
+      value: liquidity,
+      closesAt: uint32(block.timestamp + 30 days),
+      outcomes: 2,
+      token: IERC20(address(tokenERC20)),
+      distribution: distribution,
+      question: string(abi.encodePacked("Voided Market ", predictionMarket.marketIndex())),
+      image: "test-image",
+      arbitrator: address(0x1),
+      buyFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+      sellFees: PredictionMarketV3_4.Fees({fee: 0, treasuryFee: 0, distributorFee: 0}),
+      treasury: treasury,
+      distributor: distributor,
+      realitioTimeout: 3600,
+      manager: IPredictionMarketV3Manager(address(manager))
+    });
+
+    uint256 marketId = predictionMarket.createMarket(desc);
+    // outcomeId == outcomeCount is out of range -> isMarketVoided() == true
+    predictionMarket.adminResolveMarketOutcome(marketId, 2);
+    assertTrue(predictionMarket.isMarketVoided(marketId));
+    return marketId;
+  }
+
+  // Regression: claim voided shares first, then liquidity. The second claim (liquidity) overshoots
+  // market.balance by rounding dust and reverted with "b<v" before the fix.
+  function testClaimVoidedSkewedMarketVoidedThenLiquidity() public {
+    uint256 marketId = _createSkewedVoidedMarket(1000 ether); // ~1000-token scale => ~90k wei overshoot
+
+    (,,, uint256 balanceBefore,,) = predictionMarket.getMarketData(marketId);
+    // single, fee-less market -> the contract's collateral equals market.balance exactly
+    assertEq(tokenERC20.balanceOf(address(predictionMarket)), balanceBefore);
+
+    predictionMarket.claimVoidedOutcomeShares(marketId, 0);
+    predictionMarket.claimLiquidity(marketId); // reverted here pre-fix
+
+    (,,, uint256 balanceAfter,,) = predictionMarket.getMarketData(marketId);
+    assertLt(balanceAfter, balanceBefore);
+    assertLe(balanceAfter, 1e6); // drained to at most rounding dust
+    assertEq(tokenERC20.balanceOf(address(predictionMarket)), balanceAfter);
+  }
+
+  // Regression: the reverse order — liquidity first, then voided shares. Now the second claim
+  // (voided shares) is the one that overshoots and reverted "b<v" before the fix.
+  function testClaimVoidedSkewedMarketLiquidityThenVoided() public {
+    uint256 marketId = _createSkewedVoidedMarket(1000 ether);
+
+    (,,, uint256 balanceBefore,,) = predictionMarket.getMarketData(marketId);
+    assertEq(tokenERC20.balanceOf(address(predictionMarket)), balanceBefore);
+
+    predictionMarket.claimLiquidity(marketId);
+    predictionMarket.claimVoidedOutcomeShares(marketId, 0); // reverted here pre-fix
+
+    (,,, uint256 balanceAfter,,) = predictionMarket.getMarketData(marketId);
+    assertLt(balanceAfter, balanceBefore);
+    assertLe(balanceAfter, 1e6);
+    assertEq(tokenERC20.balanceOf(address(predictionMarket)), balanceAfter);
+  }
+
+  // Baseline: a small 2-outcome voided market does not overshoot (claims undershoot, leaving dust)
+  // and must still drain cleanly with every holder able to claim.
+  function testClaimVoided2OutcomeMarketDrainsCleanly() public {
+    uint256 marketId = _createTestMarket();
+
+    address alice = makeAddr("voidAlice");
+    address bob = makeAddr("voidBob");
+    tokenERC20.transfer(alice, 1 ether);
+    tokenERC20.transfer(bob, 1 ether);
+
+    vm.startPrank(alice);
+    tokenERC20.approve(address(predictionMarket), 1 ether);
+    predictionMarket.buy(marketId, 0, 0, 0.02 ether);
+    vm.stopPrank();
+
+    vm.startPrank(bob);
+    tokenERC20.approve(address(predictionMarket), 1 ether);
+    predictionMarket.buy(marketId, 1, 0, 0.03 ether);
+    vm.stopPrank();
+
+    predictionMarket.adminResolveMarketOutcome(marketId, 2);
+    assertTrue(predictionMarket.isMarketVoided(marketId));
+
+    vm.prank(alice);
+    predictionMarket.claimVoidedOutcomeShares(marketId, 0);
+    vm.prank(bob);
+    predictionMarket.claimVoidedOutcomeShares(marketId, 1);
+    predictionMarket.claimLiquidity(marketId);
+
+    (,,, uint256 balanceAfter,,) = predictionMarket.getMarketData(marketId);
+    assertLe(balanceAfter, 1e6);
+    assertEq(tokenERC20.balanceOf(address(predictionMarket)), balanceAfter);
+  }
+
   function testWETHMarket() public {
     // creating weth land
     manager.createLand(IERC20(address(weth)), IERC20(address(managerTokenERC20)));

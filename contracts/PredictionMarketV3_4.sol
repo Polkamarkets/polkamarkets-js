@@ -948,8 +948,14 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     uint256 price = getMarketOutcomePrice(marketId, outcomeId);
     value = (price * outcome.shares.holders[msg.sender]) / ONE;
 
-    // assuring market has enough funds
-    require(market.balance >= value, "b<v");
+    // Voided-share pricing rounds up in its denominator, so the summed claims can exceed
+    // market.balance by a dust amount; without absorbing it the final claimer reverts on "b<v"
+    // and their funds are stranded. Only ever absorb rounding dust (at most 1e-6 of the pool);
+    // a larger shortfall signals a real accounting error and must still revert.
+    if (value > market.balance) {
+      require(value - market.balance <= market.balance / 1e6, "b<v");
+      value = market.balance;
+    }
 
     market.balance = market.balance - value;
     outcome.shares.voidedClaims[msg.sender] = true;
@@ -990,8 +996,14 @@ contract PredictionMarketV3_4 is Initializable, ReentrancyGuardUpgradeable, Owna
     uint256 liquidityPrice = getMarketLiquidityPrice(marketId);
     value = (liquidityPrice * market.liquidityShares[msg.sender]) / ONE;
 
-    // assuring market has enough funds
-    require(market.balance >= value, "b<v");
+    // On voided markets the liquidity price rounds up in its denominator, so the summed claims
+    // can exceed market.balance by a dust amount; without absorbing it the final claimer reverts
+    // on "b<v" and their funds are stranded. Only ever absorb rounding dust (at most 1e-6 of the
+    // pool); a larger shortfall signals a real accounting error and must still revert.
+    if (value > market.balance) {
+      require(value - market.balance <= market.balance / 1e6, "b<v");
+      value = market.balance;
+    }
 
     market.balance = market.balance - value;
     market.liquidityClaims[msg.sender] = true;
