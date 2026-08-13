@@ -36,6 +36,9 @@ contract CryptoCREOracleTest is Test {
   bytes32 internal BTC_FEED = keccak256("BTCUSDT");
   bytes32 internal ETH_FEED = keccak256("ETHUSDT");
 
+  // mirror of CryptoCREOracle.PriceReportDropped for expectEmit
+  event PriceReportDropped(bytes32 indexed feedId, uint256 indexed timestamp, int256 storedClosePrice, int256 droppedClosePrice);
+
   function setUp() public {
     admin = address(this);
     registry = new AdminRegistry(admin);
@@ -119,6 +122,28 @@ contract CryptoCREOracleTest is Test {
   ) internal {
     mockManager.setClosesAt(marketId, closesAt);
     bytes memory data = abi.encode(feedId, feedIdB, rule, yesAbove, param, openTimestamp, paramB, interval, uint8(0), uint8(0));
+    vm.prank(address(mockManager));
+    oracle.initialize(marketId, data);
+  }
+
+  /// @dev Init a standard-rule market with explicit dataSource / binanceInterval (for slot-guard tests).
+  function _initCfg(
+    uint256 marketId,
+    bytes32 feedId,
+    bytes32 feedIdB,
+    uint8 rule,
+    int256 param,
+    uint256 openTimestamp,
+    uint256 closesAt,
+    int256 paramB,
+    uint256 interval,
+    uint8 dataSource,
+    uint8 binanceInterval
+  ) internal {
+    mockManager.setClosesAt(marketId, closesAt);
+    bytes memory data = abi.encode(
+      feedId, feedIdB, rule, true, param, openTimestamp, paramB, interval, dataSource, binanceInterval
+    );
     vm.prank(address(mockManager));
     oracle.initialize(marketId, data);
   }
@@ -236,6 +261,84 @@ contract CryptoCREOracleTest is Test {
 
     (int256 close,,,) = oracle.getVerifiedPrice(BTC_FEED, ts);
     assertEq(close, 100000e8, "write-once: original price preserved");
+  }
+
+  // =========================================================================
+  // Slot-collision guard (M-02)
+  // =========================================================================
+
+  // DataSource: AUTO=0, CHAINLINK_FEEDS=1, CHAINLINK_STREAMS=2, BINANCE=3
+  // BinanceInterval: ONE_HOUR=5, FOUR_HOUR=7
+  // RuleType: THRESHOLD=0, HIT=4, FIRST_TO_HIT=6
+
+  /// @dev Two high/low-reading markets on the same (feed, close) with different candle widths
+  ///      would settle off the wrong candle — the second init must revert.
+  function testInitRevertsOnConflictingCandleWidth() public {
+    uint256 closesAt = 1714608000;
+    _initCfg(1, BTC_FEED, bytes32(0), 4, 100000e8, 0, closesAt, 0, 0, 3, 5); // HIT, Binance 1h
+    // market 2: same feed+close, Binance 4h → same slot, different width
+    mockManager.setClosesAt(2, closesAt);
+    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(4), true, int256(100000e8), uint256(0), int256(0), uint256(0), uint8(3), uint8(7));
+    vm.prank(address(mockManager));
+    vm.expectRevert("slot width conflict");
+    oracle.initialize(2, data);
+  }
+
+  /// @dev Two markets reading the same (feed, close) close price but from different explicit data
+  ///      sources would read one wrong price — the second init must revert.
+  function testInitRevertsOnConflictingDataSource() public {
+    uint256 closesAt = 1714608000;
+    _initCfg(1, BTC_FEED, bytes32(0), 0, 100000e8, 0, closesAt, 0, 0, 1, 0); // THRESHOLD, Chainlink Feeds
+    // market 2: same feed+close, explicit Binance → source conflict
+    mockManager.setClosesAt(2, closesAt);
+    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(0), true, int256(100000e8), uint256(0), int256(0), uint256(0), uint8(3), uint8(0));
+    vm.prank(address(mockManager));
+    vm.expectRevert("slot source conflict");
+    oracle.initialize(2, data);
+  }
+
+  /// @dev Same feed+close+width+source → the markets legitimately share the slot; no conflict.
+  function testInitAllowsIdenticalSlotConfig() public {
+    uint256 closesAt = 1714608000;
+    _initCfg(1, BTC_FEED, bytes32(0), 4, 100000e8, 0, closesAt, 0, 0, 3, 5);
+    _initCfg(2, BTC_FEED, bytes32(0), 4, 110000e8, 0, closesAt, 0, 0, 3, 5); // different param, same slot meaning
+  }
+
+  /// @dev Close-only rules are width-independent, so two of them may differ in candle width on the
+  ///      same slot without conflicting (guards against over-restriction).
+  function testInitAllowsDifferentWidthForCloseOnlyRules() public {
+    uint256 closesAt = 1714608000;
+    _initCfg(1, BTC_FEED, bytes32(0), 0, 100000e8, 0, closesAt, 0, 0, 3, 5); // THRESHOLD, 1h
+    _initCfg(2, BTC_FEED, bytes32(0), 0, 110000e8, 0, closesAt, 0, 0, 3, 7); // THRESHOLD, 4h — OK
+  }
+
+  /// @dev AUTO defers routing to the workflow, so it never reserves/conflicts a source.
+  function testInitAutoSourceNeverConflicts() public {
+    uint256 closesAt = 1714608000;
+    _initCfg(1, BTC_FEED, bytes32(0), 0, 100000e8, 0, closesAt, 0, 0, 0, 0); // AUTO
+    _initCfg(2, BTC_FEED, bytes32(0), 0, 110000e8, 0, closesAt, 0, 0, 3, 0); // BINANCE — OK
+  }
+
+  /// @dev Documents the intentional guard gap: FIRST_TO_HIT reads high/low at intermediate
+  ///      timestamps (not the closesAt anchor), so it is not width-reserved at init and relies on
+  ///      the PriceReportDropped event as the backstop. Two differing-width FIRST_TO_HIT markets
+  ///      init without reverting.
+  function testInitDoesNotHardGuardFirstToHitWidth() public {
+    _initCfg(1, BTC_FEED, bytes32(0), 6, 105000e8, 100, 500, 90000e8, 100, 3, 5);
+    _initCfg(2, BTC_FEED, bytes32(0), 6, 105000e8, 100, 500, 90000e8, 100, 3, 7); // no revert (event-backstopped)
+  }
+
+  /// @dev A dropped duplicate report now emits PriceReportDropped instead of being silent.
+  function testOnReportEmitsDroppedDuplicate() public {
+    uint256 ts = 1714608000;
+    _deliverPrice(BTC_FEED, ts, 100000e8, 101000e8, 99000e8);
+
+    vm.expectEmit(true, true, false, true);
+    emit PriceReportDropped(BTC_FEED, ts, 100000e8, 200000e8);
+    _deliverPrice(BTC_FEED, ts, 200000e8, 200000e8, 200000e8);
+
+    (int256 close,,,) = oracle.getVerifiedPrice(BTC_FEED, ts);
+    assertEq(close, 100000e8, "original price preserved");
   }
 
   function testOnReportNotForwarderReverts() public {

@@ -113,10 +113,22 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
   ///      so it can compare its own % change against theirs.
   mapping(uint256 => bytes32[]) internal marketPeerFeedIds;
 
+  /// @dev Slot-meaning reservations that guard against price-key collisions. A single verified
+  ///      price is stored per (feedId, timestamp), so two markets reading the same slot but
+  ///      expecting a different data source or candle width would settle one of them off the
+  ///      wrong price. At market-init each market reserves the "meaning" of the slots it reads;
+  ///      a later market with a conflicting meaning reverts. Stored offset by +1 (0 == unset).
+  mapping(bytes32 => uint8) internal slotSource; // 0 unset, else uint8(DataSource) + 1
+  mapping(bytes32 => uint8) internal slotWidth;  // 0 unset, else uint8(BinanceInterval) + 1
+
   // ─── Events ──────────────────────────────────────────────────────────
 
   event PriceVerified(bytes32 indexed feedId, uint256 indexed timestamp, int256 closePrice, int256 highPrice, int256 lowPrice);
   event MarketConfigured(uint256 indexed marketId, bytes32 feedId, RuleType rule, bool yesAbove, int256 param);
+  /// @dev Emitted when a report tries to write a (feedId, timestamp) slot that is already set.
+  ///      Surfaces the write-once drop that would otherwise be silent, so any residual slot
+  ///      collision (e.g. FIRST_TO_HIT / CANDLE intermediate timestamps) is observable off-chain.
+  event PriceReportDropped(bytes32 indexed feedId, uint256 indexed timestamp, int256 storedClosePrice, int256 droppedClosePrice);
 
   // ─── Constructor ─────────────────────────────────────────────────────
 
@@ -228,6 +240,22 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
       binanceInterval: BinanceInterval(binanceIntervalRaw)
     });
 
+    // Reserve the price slots this market reads so a later market can't claim the same
+    // (feedId, timestamp) with a conflicting data source or candle width. Width is enforced only
+    // for the rules that read the slot's high/low at closesAt (HIT, RANGE_BUCKET_HIGH); openTs and
+    // feedB reads are close prices (width-independent). FIRST_TO_HIT / CANDLE read intermediate
+    // timestamps not reserved here — they are covered by the PriceReportDropped event.
+    BinanceInterval binanceInterval = BinanceInterval(binanceIntervalRaw);
+    bool widthAtClose = (rule == RuleType.HIT || rule == RuleType.RANGE_BUCKET_HIGH);
+    _reserveSlot(feedId, closesAt, dataSource, binanceInterval, widthAtClose);
+    if (openTimestamp > 0) {
+      _reserveSlot(feedId, openTimestamp, dataSource, binanceInterval, false);
+    }
+    if (rule == RuleType.RELATIVE) {
+      _reserveSlot(feedIdB, closesAt, dataSource, binanceInterval, false);
+      if (openTimestamp > 0) _reserveSlot(feedIdB, openTimestamp, dataSource, binanceInterval, false);
+    }
+
     emit MarketConfigured(marketId, feedId, rule, yesAbove, param);
   }
 
@@ -273,6 +301,18 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
       peers.push(peerFeedIds[i]);
     }
 
+    // Reserve the open/close close-price slots for this feed and every peer. BEST_PERFORMER reads
+    // only close prices (width-independent), so guard the data source only. Constituents of the
+    // same neg-risk event share slots + source and reserve idempotently.
+    DataSource bpSource = DataSource(dataSourceRaw);
+    BinanceInterval bpWidth = BinanceInterval(binanceIntervalRaw);
+    _reserveSlot(myFeedId, closesAt, bpSource, bpWidth, false);
+    _reserveSlot(myFeedId, openTimestamp, bpSource, bpWidth, false);
+    for (uint256 i = 0; i < peerFeedIds.length; i++) {
+      _reserveSlot(peerFeedIds[i], closesAt, bpSource, bpWidth, false);
+      _reserveSlot(peerFeedIds[i], openTimestamp, bpSource, bpWidth, false);
+    }
+
     emit MarketConfigured(marketId, myFeedId, RuleType(ruleRaw), true, 0);
   }
 
@@ -312,6 +352,10 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
         priceExists[priceKey] = true;
 
         emit PriceVerified(feedIds[i], timestamps[i], closePrices[i], highPrices[i], lowPrices[i]);
+      } else {
+        // Slot already claimed by an earlier report: keep the first value (write-once) but make
+        // the dropped duplicate visible instead of silently discarding it.
+        emit PriceReportDropped(feedIds[i], timestamps[i], verifiedPrices[priceKey].closePrice, closePrices[i]);
       }
     }
   }
@@ -548,6 +592,35 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────
+
+  /// @dev Reserves the "meaning" of the price slot a market reads, reverting if a
+  ///      previously-initialized market already claimed the same (feedId, timestamp) with a
+  ///      different meaning. Source is compared only between explicit sources — AUTO defers to the
+  ///      workflow and never conflicts. Candle width is compared only when `widthMatters`, i.e.
+  ///      when the reading rule uses the slot's high/low (close prices are width-independent).
+  function _reserveSlot(
+    bytes32 feedId,
+    uint256 timestamp,
+    DataSource source,
+    BinanceInterval width,
+    bool widthMatters
+  ) internal {
+    bytes32 slot = keccak256(abi.encode(feedId, timestamp));
+
+    if (source != DataSource.AUTO) {
+      uint8 s = uint8(source) + 1;
+      uint8 existingSource = slotSource[slot];
+      if (existingSource == 0) slotSource[slot] = s;
+      else require(existingSource == s, "slot source conflict");
+    }
+
+    if (widthMatters) {
+      uint8 w = uint8(width) + 1;
+      uint8 existingWidth = slotWidth[slot];
+      if (existingWidth == 0) slotWidth[slot] = w;
+      else require(existingWidth == w, "slot width conflict");
+    }
+  }
 
   function _getClosePrice(bytes32 feedId, uint256 timestamp) internal view returns (int256, bool) {
     bytes32 priceKey = keccak256(abi.encode(feedId, timestamp));
