@@ -102,7 +102,11 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
 
   address public immutable manager;
 
-  /// @dev Verified prices keyed by keccak256(abi.encode(feedId, timestamp)).
+  /// @dev Verified prices keyed by keccak256(abi.encode(feedId, timestamp, dataSource, binanceInterval)).
+  ///      The candle width and data source are part of the key so two markets on the same feed and
+  ///      timestamp but different width/source get distinct slots and never collide. The key always
+  ///      uses the market's DECLARED config enum values (AUTO stays AUTO) — the read side only ever
+  ///      has the declared values, so the workflow must stamp declared values on delivery.
   mapping(bytes32 => PriceData) public verifiedPrices;
   mapping(bytes32 => bool) public priceExists;
 
@@ -117,6 +121,11 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
 
   event PriceVerified(bytes32 indexed feedId, uint256 indexed timestamp, int256 closePrice, int256 highPrice, int256 lowPrice);
   event MarketConfigured(uint256 indexed marketId, bytes32 feedId, RuleType rule, bool yesAbove, int256 param);
+  /// @dev Emitted when a report tries to write a price slot that is already set. With the
+  ///      width/source-qualified key a genuine collision shouldn't happen, so this surfaces an
+  ///      unexpected duplicate delivery (same feed/timestamp/source/width) instead of dropping it
+  ///      silently.
+  event PriceReportDropped(bytes32 indexed feedId, uint256 indexed timestamp, int256 storedClosePrice, int256 droppedClosePrice);
 
   // ─── Constructor ─────────────────────────────────────────────────────
 
@@ -280,7 +289,10 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
 
   /// @notice Receives verified price data from the Chainlink CRE workflow.
   /// @param metadata Workflow metadata (contains workflow ID, name, owner).
-  /// @param report ABI-encoded (bytes32[] feedIds, uint256[] timestamps, int256[] closePrices, int256[] highPrices, int256[] lowPrices).
+  /// @param report ABI-encoded (bytes32[] feedIds, uint256[] timestamps, int256[] closePrices,
+  ///        int256[] highPrices, int256[] lowPrices, uint8[] dataSources, uint8[] binanceIntervals).
+  ///        `dataSources`/`binanceIntervals` are the market's DECLARED config enum values and must
+  ///        match what the read side keys by (see `_priceKey`). Kept index-aligned by the workflow.
   function onReport(bytes calldata metadata, bytes calldata report) external override {
     _validate(metadata);
 
@@ -290,17 +302,23 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
       uint256[] memory timestamps,
       int256[] memory closePrices,
       int256[] memory highPrices,
-      int256[] memory lowPrices
-    ) = abi.decode(report, (bytes32[], uint256[], int256[], int256[], int256[]));
+      int256[] memory lowPrices,
+      uint8[] memory dataSources,
+      uint8[] memory binanceIntervals
+    ) = abi.decode(report, (bytes32[], uint256[], int256[], int256[], int256[], uint8[], uint8[]));
 
     uint256 len = feedIds.length;
     require(
-      timestamps.length == len && closePrices.length == len && highPrices.length == len && lowPrices.length == len,
+      timestamps.length == len && closePrices.length == len && highPrices.length == len
+        && lowPrices.length == len && dataSources.length == len && binanceIntervals.length == len,
       "length mismatch"
     );
 
     for (uint256 i = 0; i < len; i++) {
-      bytes32 priceKey = keccak256(abi.encode(feedIds[i], timestamps[i]));
+      // Out-of-range enum values revert on cast (Solidity >=0.8), rejecting a malformed report row.
+      bytes32 priceKey = _priceKey(
+        feedIds[i], timestamps[i], DataSource(dataSources[i]), BinanceInterval(binanceIntervals[i])
+      );
 
       // Write-once: skip if already stored
       if (!priceExists[priceKey]) {
@@ -312,6 +330,10 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
         priceExists[priceKey] = true;
 
         emit PriceVerified(feedIds[i], timestamps[i], closePrices[i], highPrices[i], lowPrices[i]);
+      } else {
+        // Slot already claimed by an earlier report: keep the first value (write-once) but make
+        // the dropped duplicate visible instead of silently discarding it.
+        emit PriceReportDropped(feedIds[i], timestamps[i], verifiedPrices[priceKey].closePrice, closePrices[i]);
       }
     }
   }
@@ -353,7 +375,7 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
   // ─── Internal resolution logic ───────────────────────────────────────
 
   function _resolveThreshold(MarketConfig storage config) internal view returns (int256, bool) {
-    (int256 closePrice, bool ok) = _getClosePrice(config.feedId, config.closesAt);
+    (int256 closePrice, bool ok) = _getClosePrice(config.feedId, config.closesAt, config.dataSource, config.binanceInterval);
     if (!ok) return (-2, false);
 
     bool condition = closePrice >= config.param;
@@ -361,10 +383,10 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
   }
 
   function _resolveDirection(MarketConfig storage config) internal view returns (int256, bool) {
-    (int256 openPrice, bool okOpen) = _getClosePrice(config.feedId, config.openTimestamp);
+    (int256 openPrice, bool okOpen) = _getClosePrice(config.feedId, config.openTimestamp, config.dataSource, config.binanceInterval);
     if (!okOpen) return (-2, false);
 
-    (int256 closePrice, bool okClose) = _getClosePrice(config.feedId, config.closesAt);
+    (int256 closePrice, bool okClose) = _getClosePrice(config.feedId, config.closesAt, config.dataSource, config.binanceInterval);
     if (!okClose) return (-2, false);
 
     // Tie → NO regardless of yesAbove
@@ -375,10 +397,10 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
   }
 
   function _resolveChangePct(MarketConfig storage config) internal view returns (int256, bool) {
-    (int256 openPrice, bool okOpen) = _getClosePrice(config.feedId, config.openTimestamp);
+    (int256 openPrice, bool okOpen) = _getClosePrice(config.feedId, config.openTimestamp, config.dataSource, config.binanceInterval);
     if (!okOpen) return (-2, false);
 
-    (int256 closePrice, bool okClose) = _getClosePrice(config.feedId, config.closesAt);
+    (int256 closePrice, bool okClose) = _getClosePrice(config.feedId, config.closesAt, config.dataSource, config.binanceInterval);
     if (!okClose) return (-2, false);
 
     // Avoid division by zero
@@ -396,15 +418,15 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
 
   function _resolveRelative(MarketConfig storage config) internal view returns (int256, bool) {
     // Feed A: primary
-    (int256 openA, bool okOpenA) = _getClosePrice(config.feedId, config.openTimestamp);
+    (int256 openA, bool okOpenA) = _getClosePrice(config.feedId, config.openTimestamp, config.dataSource, config.binanceInterval);
     if (!okOpenA) return (-2, false);
-    (int256 closeA, bool okCloseA) = _getClosePrice(config.feedId, config.closesAt);
+    (int256 closeA, bool okCloseA) = _getClosePrice(config.feedId, config.closesAt, config.dataSource, config.binanceInterval);
     if (!okCloseA) return (-2, false);
 
     // Feed B: secondary
-    (int256 openB, bool okOpenB) = _getClosePrice(config.feedIdB, config.openTimestamp);
+    (int256 openB, bool okOpenB) = _getClosePrice(config.feedIdB, config.openTimestamp, config.dataSource, config.binanceInterval);
     if (!okOpenB) return (-2, false);
-    (int256 closeB, bool okCloseB) = _getClosePrice(config.feedIdB, config.closesAt);
+    (int256 closeB, bool okCloseB) = _getClosePrice(config.feedIdB, config.closesAt, config.dataSource, config.binanceInterval);
     if (!okCloseB) return (-2, false);
 
     if (openA == 0 || openB == 0) return (Outcomes.VOIDED, true);
@@ -424,7 +446,7 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
   }
 
   function _resolveHit(MarketConfig storage config) internal view returns (int256, bool) {
-    bytes32 priceKey = keccak256(abi.encode(config.feedId, config.closesAt));
+    bytes32 priceKey = _priceKey(config.feedId, config.closesAt, config.dataSource, config.binanceInterval);
     if (!priceExists[priceKey]) return (-2, false);
 
     PriceData storage pd = verifiedPrices[priceKey];
@@ -450,9 +472,9 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
     uint256 redCount = 0;
 
     for (uint256 t = start; t + interval <= end; t += interval) {
-      (int256 candleOpen, bool okOpen) = _getClosePrice(config.feedId, t);
+      (int256 candleOpen, bool okOpen) = _getClosePrice(config.feedId, t, config.dataSource, config.binanceInterval);
       if (!okOpen) return (-2, false);
-      (int256 candleClose, bool okClose) = _getClosePrice(config.feedId, t + interval);
+      (int256 candleClose, bool okClose) = _getClosePrice(config.feedId, t + interval, config.dataSource, config.binanceInterval);
       if (!okClose) return (-2, false);
 
       if (candleClose > candleOpen) {
@@ -471,7 +493,7 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
   }
 
   function _resolveRangeBucket(MarketConfig storage config, bool useHigh) internal view returns (int256, bool) {
-    bytes32 priceKey = keccak256(abi.encode(config.feedId, config.closesAt));
+    bytes32 priceKey = _priceKey(config.feedId, config.closesAt, config.dataSource, config.binanceInterval);
     if (!priceExists[priceKey]) return (-2, false);
 
     PriceData storage pd = verifiedPrices[priceKey];
@@ -486,9 +508,9 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
     view
     returns (int256, bool)
   {
-    (int256 myOpen, bool okMyOpen) = _getClosePrice(config.feedId, config.openTimestamp);
+    (int256 myOpen, bool okMyOpen) = _getClosePrice(config.feedId, config.openTimestamp, config.dataSource, config.binanceInterval);
     if (!okMyOpen) return (-2, false);
-    (int256 myClose, bool okMyClose) = _getClosePrice(config.feedId, config.closesAt);
+    (int256 myClose, bool okMyClose) = _getClosePrice(config.feedId, config.closesAt, config.dataSource, config.binanceInterval);
     if (!okMyClose) return (-2, false);
 
     // If my open is 0 we can't compute a meaningful % change → can't win.
@@ -500,9 +522,9 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
     bytes32[] storage peers = marketPeerFeedIds[marketId];
     uint256 n = peers.length;
     for (uint256 i = 0; i < n; i++) {
-      (int256 peerOpen, bool okPeerOpen) = _getClosePrice(peers[i], config.openTimestamp);
+      (int256 peerOpen, bool okPeerOpen) = _getClosePrice(peers[i], config.openTimestamp, config.dataSource, config.binanceInterval);
       if (!okPeerOpen) return (-2, false);
-      (int256 peerClose, bool okPeerClose) = _getClosePrice(peers[i], config.closesAt);
+      (int256 peerClose, bool okPeerClose) = _getClosePrice(peers[i], config.closesAt, config.dataSource, config.binanceInterval);
       if (!okPeerClose) return (-2, false);
 
       // Skip peers with a zero open price — they have no comparable %change.
@@ -524,7 +546,7 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
     uint256 step = config.interval;
 
     for (uint256 t = start; t + step <= end; t += step) {
-      bytes32 priceKey = keccak256(abi.encode(config.feedId, t + step));
+      bytes32 priceKey = _priceKey(config.feedId, t + step, config.dataSource, config.binanceInterval);
       if (!priceExists[priceKey]) return (-2, false);
 
       PriceData storage pd = verifiedPrices[priceKey];
@@ -549,8 +571,24 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
 
   // ─── Helpers ─────────────────────────────────────────────────────────
 
-  function _getClosePrice(bytes32 feedId, uint256 timestamp) internal view returns (int256, bool) {
-    bytes32 priceKey = keccak256(abi.encode(feedId, timestamp));
+  /// @dev The storage key for a verified price. Candle width and data source are part of the key
+  ///      so markets on the same feed+timestamp but different width/source get distinct slots.
+  ///      Always uses the market's DECLARED config enum values (the read side only has those, and
+  ///      the workflow stamps declared values on delivery so write and read keys match).
+  function _priceKey(bytes32 feedId, uint256 timestamp, DataSource ds, BinanceInterval bi)
+    internal
+    pure
+    returns (bytes32)
+  {
+    return keccak256(abi.encode(feedId, timestamp, uint8(ds), uint8(bi)));
+  }
+
+  function _getClosePrice(bytes32 feedId, uint256 timestamp, DataSource ds, BinanceInterval bi)
+    internal
+    view
+    returns (int256, bool)
+  {
+    bytes32 priceKey = _priceKey(feedId, timestamp, ds, bi);
     if (!priceExists[priceKey]) return (0, false);
     return (verifiedPrices[priceKey].closePrice, true);
   }
@@ -571,13 +609,13 @@ contract CryptoCREOracle is IMarketOracle, CREReceiverBase {
     return marketPeerFeedIds[marketId];
   }
 
-  /// @notice Returns verified price data for a (feedId, timestamp) pair.
-  function getVerifiedPrice(bytes32 feedId, uint256 timestamp)
+  /// @notice Returns verified price data for a (feedId, timestamp, dataSource, binanceInterval) key.
+  function getVerifiedPrice(bytes32 feedId, uint256 timestamp, DataSource dataSource, BinanceInterval binanceInterval)
     external
     view
     returns (int256 closePrice, int256 highPrice, int256 lowPrice, bool exists)
   {
-    bytes32 priceKey = keccak256(abi.encode(feedId, timestamp));
+    bytes32 priceKey = _priceKey(feedId, timestamp, dataSource, binanceInterval);
     if (!priceExists[priceKey]) return (0, 0, 0, false);
     PriceData storage pd = verifiedPrices[priceKey];
     return (pd.closePrice, pd.highPrice, pd.lowPrice, true);
