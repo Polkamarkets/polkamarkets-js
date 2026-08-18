@@ -75,21 +75,39 @@ contract CryptoCREOracleTest is Test {
     return abi.encodePacked(wfId, bytes10(wfName), wfOwner, bytes2(0x0001));
   }
 
-  /// @dev Delivers a single price via onReport.
+  /// @dev Delivers a single price via onReport, stamped with the default (AUTO, 1m) key so it
+  ///      matches markets initialized with default dataSource/binanceInterval.
   function _deliverPrice(bytes32 feedId, uint256 timestamp, int256 close, int256 high, int256 low) internal {
+    _deliverPriceCfg(feedId, timestamp, close, high, low, 0, 0);
+  }
+
+  /// @dev Delivers a single price stamped with an explicit dataSource/binanceInterval enum index.
+  function _deliverPriceCfg(
+    bytes32 feedId,
+    uint256 timestamp,
+    int256 close,
+    int256 high,
+    int256 low,
+    uint8 dataSource,
+    uint8 binanceInterval
+  ) internal {
     bytes32[] memory feedIds = new bytes32[](1);
     uint256[] memory timestamps = new uint256[](1);
     int256[] memory closes = new int256[](1);
     int256[] memory highs = new int256[](1);
     int256[] memory lows = new int256[](1);
+    uint8[] memory dataSources = new uint8[](1);
+    uint8[] memory binanceIntervals = new uint8[](1);
 
     feedIds[0] = feedId;
     timestamps[0] = timestamp;
     closes[0] = close;
     highs[0] = high;
     lows[0] = low;
+    dataSources[0] = dataSource;
+    binanceIntervals[0] = binanceInterval;
 
-    bytes memory report = abi.encode(feedIds, timestamps, closes, highs, lows);
+    bytes memory report = abi.encode(feedIds, timestamps, closes, highs, lows, dataSources, binanceIntervals);
     vm.prank(forwarder);
     oracle.onReport(_buildMetadata(), report);
   }
@@ -246,7 +264,7 @@ contract CryptoCREOracleTest is Test {
     uint256 ts = 1714608000;
     _deliverPrice(BTC_FEED, ts, 100000e8, 101000e8, 99000e8);
 
-    (int256 close, int256 high, int256 low, bool exists) = oracle.getVerifiedPrice(BTC_FEED, ts);
+    (int256 close, int256 high, int256 low, bool exists) = oracle.getVerifiedPrice(BTC_FEED, ts, CryptoCREOracle.DataSource.AUTO, CryptoCREOracle.BinanceInterval.ONE_MIN);
     assertTrue(exists);
     assertEq(close, 100000e8);
     assertEq(high, 101000e8);
@@ -259,76 +277,70 @@ contract CryptoCREOracleTest is Test {
     // Deliver again with different values — should be ignored
     _deliverPrice(BTC_FEED, ts, 200000e8, 200000e8, 200000e8);
 
-    (int256 close,,,) = oracle.getVerifiedPrice(BTC_FEED, ts);
+    (int256 close,,,) = oracle.getVerifiedPrice(BTC_FEED, ts, CryptoCREOracle.DataSource.AUTO, CryptoCREOracle.BinanceInterval.ONE_MIN);
     assertEq(close, 100000e8, "write-once: original price preserved");
   }
 
   // =========================================================================
-  // Slot-collision guard (M-02)
+  // Detailed price key — width/source coexistence (M-02)
   // =========================================================================
 
   // DataSource: AUTO=0, CHAINLINK_FEEDS=1, CHAINLINK_STREAMS=2, BINANCE=3
-  // BinanceInterval: ONE_HOUR=5, FOUR_HOUR=7
-  // RuleType: THRESHOLD=0, HIT=4, FIRST_TO_HIT=6
+  // BinanceInterval: ONE_MIN=0, ONE_HOUR=5, FOUR_HOUR=7
+  // RuleType: THRESHOLD=0, HIT=4
 
-  /// @dev Two high/low-reading markets on the same (feed, close) with different candle widths
-  ///      would settle off the wrong candle — the second init must revert.
-  function testInitRevertsOnConflictingCandleWidth() public {
+  /// @dev Two HIT markets on the same feed+close but different candle width coexist and each
+  ///      resolves off ITS OWN candle's high — proving the width is part of the price key.
+  function testCoexistDifferentCandleWidthResolveOwnCandle() public {
     uint256 closesAt = 1714608000;
-    _initCfg(1, BTC_FEED, bytes32(0), 4, 100000e8, 0, closesAt, 0, 0, 3, 5); // HIT, Binance 1h
-    // market 2: same feed+close, Binance 4h → same slot, different width
-    mockManager.setClosesAt(2, closesAt);
-    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(4), true, int256(100000e8), uint256(0), int256(0), uint256(0), uint8(3), uint8(7));
-    vm.prank(address(mockManager));
-    vm.expectRevert("slot width conflict");
-    oracle.initialize(2, data);
+    // Both: HIT, "did the high reach 100000?", Binance. Market 1 = 1h candle, Market 2 = 4h candle.
+    _initCfg(1, BTC_FEED, bytes32(0), 4, 100000e8, 0, closesAt, 0, 0, 3, 5); // 1h
+    _initCfg(2, BTC_FEED, bytes32(0), 4, 100000e8, 0, closesAt, 0, 0, 3, 7); // 4h
+
+    // Distinct candles land on distinct slots: the 1h high clears the strike, the 4h high does not.
+    _deliverPriceCfg(BTC_FEED, closesAt, 100500e8, 101000e8, 99000e8, 3, 5); // 1h: high 101000 >= 100000
+    _deliverPriceCfg(BTC_FEED, closesAt, 99500e8, 99000e8, 98000e8, 3, 7);   // 4h: high  99000 <  100000
+
+    (int256 o1, bool r1) = oracle.getResult(1);
+    (int256 o2, bool r2) = oracle.getResult(2);
+    assertTrue(r1 && r2, "both resolved");
+    assertEq(o1, int256(Outcomes.YES), "1h market: high hit -> YES");
+    assertEq(o2, int256(Outcomes.NO), "4h market: high missed -> NO");
   }
 
-  /// @dev Two markets reading the same (feed, close) close price but from different explicit data
-  ///      sources would read one wrong price — the second init must revert.
-  function testInitRevertsOnConflictingDataSource() public {
+  /// @dev Two THRESHOLD markets on the same feed+close but different data source coexist and each
+  ///      resolves off its own source's close.
+  function testCoexistDifferentDataSourceResolveOwnClose() public {
     uint256 closesAt = 1714608000;
     _initCfg(1, BTC_FEED, bytes32(0), 0, 100000e8, 0, closesAt, 0, 0, 1, 0); // THRESHOLD, Chainlink Feeds
-    // market 2: same feed+close, explicit Binance → source conflict
-    mockManager.setClosesAt(2, closesAt);
-    bytes memory data = abi.encode(BTC_FEED, bytes32(0), uint8(0), true, int256(100000e8), uint256(0), int256(0), uint256(0), uint8(3), uint8(0));
-    vm.prank(address(mockManager));
-    vm.expectRevert("slot source conflict");
-    oracle.initialize(2, data);
+    _initCfg(2, BTC_FEED, bytes32(0), 0, 100000e8, 0, closesAt, 0, 0, 3, 0); // THRESHOLD, Binance
+
+    _deliverPriceCfg(BTC_FEED, closesAt, 101000e8, 101000e8, 101000e8, 1, 0); // feeds close 101000 >= 100000
+    _deliverPriceCfg(BTC_FEED, closesAt, 99000e8, 99000e8, 99000e8, 3, 0);    // binance close 99000 < 100000
+
+    (int256 o1, bool r1) = oracle.getResult(1);
+    (int256 o2, bool r2) = oracle.getResult(2);
+    assertTrue(r1 && r2, "both resolved");
+    assertEq(o1, int256(Outcomes.YES), "feeds market -> YES");
+    assertEq(o2, int256(Outcomes.NO), "binance market -> NO");
   }
 
-  /// @dev Same feed+close+width+source → the markets legitimately share the slot; no conflict.
-  function testInitAllowsIdenticalSlotConfig() public {
+  /// @dev Same feed+close+width+source legitimately share one slot: a single delivery resolves
+  ///      both markets identically.
+  function testCoexistIdenticalKeyShareSlot() public {
     uint256 closesAt = 1714608000;
     _initCfg(1, BTC_FEED, bytes32(0), 4, 100000e8, 0, closesAt, 0, 0, 3, 5);
-    _initCfg(2, BTC_FEED, bytes32(0), 4, 110000e8, 0, closesAt, 0, 0, 3, 5); // different param, same slot meaning
+    _initCfg(2, BTC_FEED, bytes32(0), 4, 100000e8, 0, closesAt, 0, 0, 3, 5);
+
+    _deliverPriceCfg(BTC_FEED, closesAt, 100500e8, 101000e8, 99000e8, 3, 5); // one shared slot
+
+    (int256 o1,) = oracle.getResult(1);
+    (int256 o2,) = oracle.getResult(2);
+    assertEq(o1, int256(Outcomes.YES));
+    assertEq(o2, int256(Outcomes.YES));
   }
 
-  /// @dev Close-only rules are width-independent, so two of them may differ in candle width on the
-  ///      same slot without conflicting (guards against over-restriction).
-  function testInitAllowsDifferentWidthForCloseOnlyRules() public {
-    uint256 closesAt = 1714608000;
-    _initCfg(1, BTC_FEED, bytes32(0), 0, 100000e8, 0, closesAt, 0, 0, 3, 5); // THRESHOLD, 1h
-    _initCfg(2, BTC_FEED, bytes32(0), 0, 110000e8, 0, closesAt, 0, 0, 3, 7); // THRESHOLD, 4h — OK
-  }
-
-  /// @dev AUTO defers routing to the workflow, so it never reserves/conflicts a source.
-  function testInitAutoSourceNeverConflicts() public {
-    uint256 closesAt = 1714608000;
-    _initCfg(1, BTC_FEED, bytes32(0), 0, 100000e8, 0, closesAt, 0, 0, 0, 0); // AUTO
-    _initCfg(2, BTC_FEED, bytes32(0), 0, 110000e8, 0, closesAt, 0, 0, 3, 0); // BINANCE — OK
-  }
-
-  /// @dev Documents the intentional guard gap: FIRST_TO_HIT reads high/low at intermediate
-  ///      timestamps (not the closesAt anchor), so it is not width-reserved at init and relies on
-  ///      the PriceReportDropped event as the backstop. Two differing-width FIRST_TO_HIT markets
-  ///      init without reverting.
-  function testInitDoesNotHardGuardFirstToHitWidth() public {
-    _initCfg(1, BTC_FEED, bytes32(0), 6, 105000e8, 100, 500, 90000e8, 100, 3, 5);
-    _initCfg(2, BTC_FEED, bytes32(0), 6, 105000e8, 100, 500, 90000e8, 100, 3, 7); // no revert (event-backstopped)
-  }
-
-  /// @dev A dropped duplicate report now emits PriceReportDropped instead of being silent.
+  /// @dev A duplicate delivery for the same key still write-once-drops and emits PriceReportDropped.
   function testOnReportEmitsDroppedDuplicate() public {
     uint256 ts = 1714608000;
     _deliverPrice(BTC_FEED, ts, 100000e8, 101000e8, 99000e8);
@@ -337,7 +349,7 @@ contract CryptoCREOracleTest is Test {
     emit PriceReportDropped(BTC_FEED, ts, 100000e8, 200000e8);
     _deliverPrice(BTC_FEED, ts, 200000e8, 200000e8, 200000e8);
 
-    (int256 close,,,) = oracle.getVerifiedPrice(BTC_FEED, ts);
+    (int256 close,,,) = oracle.getVerifiedPrice(BTC_FEED, ts, CryptoCREOracle.DataSource.AUTO, CryptoCREOracle.BinanceInterval.ONE_MIN);
     assertEq(close, 100000e8, "original price preserved");
   }
 
@@ -409,15 +421,16 @@ contract CryptoCREOracleTest is Test {
     bytes32[] memory feedIds = new bytes32[](1);
     uint256[] memory timestamps = new uint256[](1);
     int256[] memory prices = new int256[](1);
+    uint8[] memory zeros = new uint8[](1);
     feedIds[0] = BTC_FEED;
     timestamps[0] = 100;
     prices[0] = 100000e8;
 
-    bytes memory report = abi.encode(feedIds, timestamps, prices, prices, prices);
+    bytes memory report = abi.encode(feedIds, timestamps, prices, prices, prices, zeros, zeros);
     bytes memory metadata = _buildMetadata(keccak256("WRONG-WF-ID"), workflowName, workflowOwner);
     vm.prank(forwarder);
     oracle.onReport(metadata, report); // should succeed
-    assertTrue(oracle.priceExists(keccak256(abi.encode(BTC_FEED, uint256(100)))));
+    assertTrue(oracle.priceExists(keccak256(abi.encode(BTC_FEED, uint256(100), uint8(0), uint8(0)))));
   }
 
   function testOnReportBatchMultiplePrices() public {
@@ -432,13 +445,15 @@ contract CryptoCREOracleTest is Test {
     closes[0] = 100000e8; closes[1] = 3500e8;
     highs[0] = 101000e8; highs[1] = 3600e8;
     lows[0] = 99000e8; lows[1] = 3400e8;
+    uint8[] memory dataSources = new uint8[](2);
+    uint8[] memory binanceIntervals = new uint8[](2);
 
-    bytes memory report = abi.encode(feedIds, timestamps, closes, highs, lows);
+    bytes memory report = abi.encode(feedIds, timestamps, closes, highs, lows, dataSources, binanceIntervals);
     vm.prank(forwarder);
     oracle.onReport(_buildMetadata(), report);
 
-    (int256 btcClose,,,) = oracle.getVerifiedPrice(BTC_FEED, 100);
-    (int256 ethClose,,,) = oracle.getVerifiedPrice(ETH_FEED, 100);
+    (int256 btcClose,,,) = oracle.getVerifiedPrice(BTC_FEED, 100, CryptoCREOracle.DataSource.AUTO, CryptoCREOracle.BinanceInterval.ONE_MIN);
+    (int256 ethClose,,,) = oracle.getVerifiedPrice(ETH_FEED, 100, CryptoCREOracle.DataSource.AUTO, CryptoCREOracle.BinanceInterval.ONE_MIN);
     assertEq(btcClose, 100000e8);
     assertEq(ethClose, 3500e8);
   }
