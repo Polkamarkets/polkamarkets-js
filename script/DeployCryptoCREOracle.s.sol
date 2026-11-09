@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+import {Script, console} from "forge-std/Script.sol";
+import {AdminRegistry} from "../contracts/AdminRegistry.sol";
+import {CryptoCREOracle} from "../contracts/oracles/CryptoCREOracle.sol";
+
+/// @notice Standalone CryptoCREOracle deployment.
+///
+///         Required env vars:
+///           PRIVATE_KEY            — deployer private key
+///           ADMIN_REGISTRY         — AdminRegistry address
+///           CLOB_MANAGER           — PredictionMarketV3ManagerCLOB address
+///           KEYSTONE_FORWARDER     — Chainlink KeystoneForwarder address
+///
+///         Workflow identity (author + name) is configured POST-deploy by
+///         calling setExpectedAuthor / setExpectedWorkflowName from the
+///         MARKET_ADMIN_ROLE. Contract deploys with both expected values
+///         zero (= validation disabled) so end-to-end testing can succeed
+///         before the workflow is registered.
+contract DeployCryptoCREOracle is Script {
+  function run() external {
+    uint256 privateKey = vm.envUint("PRIVATE_KEY");
+    address registry = vm.envAddress("ADMIN_REGISTRY");
+    address managerAddr = vm.envAddress("CLOB_MANAGER");
+    address keystoneForwarder = vm.envAddress("KEYSTONE_FORWARDER");
+
+    vm.startBroadcast(privateKey);
+
+    CryptoCREOracle creOracle = new CryptoCREOracle(
+      AdminRegistry(registry),
+      managerAddr,
+      keystoneForwarder
+    );
+
+    vm.stopBroadcast();
+
+    console.log("CryptoCREOracle:", address(creOracle));
+  }
+}
